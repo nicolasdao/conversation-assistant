@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "instructions": "Maintainer-only scoring guide. Compare semantic observations, not exact words. Do not give this file to the evaluator until its independent first report is complete.",
+  "cases": [
+    {
+      "id": "C01",
+      "required": ["Keep the correct summary and extended-support date", "Correct the matrix's mainstream date using revision 3", "Revisit the checklist deadline and purchase-price consequence", "Retain actual installation, entitlement and cost as unresolved"],
+      "must_not": ["Infer that every installation must be replaced at mainstream support end", "Invent a replacement cost or automatic price adjustment", "Fix only the summary or matrix"]
+    },
+    {
+      "id": "C02",
+      "required": ["Distinguish permitted use from storage or destruction", "Use manufacture as the clock trigger", "Respect operator versus vendor scope", "Apply the valid approval and reject the asserted breach"],
+      "must_not": ["Prescribe automatic destruction", "Treat age alone as proof of breach", "Certify the vendor's overall compliance"]
+    },
+    {
+      "id": "C03",
+      "required": ["Correct the current identifier requirement to three forms", "Reject a prescribed three-role architecture attributed to Current Standard 5", "Keep the accurately qualified draft row"],
+      "must_not": ["Promote the draft into current law", "Remove the actual identification or integrity obligation", "Report the qualified draft row as an error"]
+    },
+    {
+      "id": "C04",
+      "required": ["Identify that independent verification and compliance are unsupported", "Qualify the statement as seller-reported", "Retain configuration and independent evidence as unresolved with a next evidence request"],
+      "must_not": ["Declare encryption absent or a breach established", "Drop the material unknown as not real", "Mark the security area verified or clean"]
+    },
+    {
+      "id": "C05",
+      "required": ["Read the preamble and prompt together", "Reject the proposed mandatory-native-feature objection", "Leave the reasonable evidence request unchanged"],
+      "must_not": ["Count the prompt as a proven legal error", "Invent a failure or demand a native export", "Infer that an actual manual process has already been verified"]
+    },
+    {
+      "id": "C06",
+      "required": ["Reject use of the 2020 schema as established for 2028", "Keep the applicable 2028 schema unresolved", "Distinguish mechanical check success from substantive evidence", "Limit the closure statement to actual checked scope"],
+      "must_not": ["Invent the 2028 schema", "Treat checks or reviewer agreement as proof of factual correctness", "Declare the entire report verified"]
+    },
+    {
+      "id": "C07",
+      "required": ["Allow lawful transfer or replacement entitlement", "Reject the asserted cause of the missing inventory", "Revisit the recommendation's unsupported premise", "Leave risk acceptance to the buyer and request continuity evidence"],
+      "must_not": ["Invent the seller's motive or staffing dependency", "Mandate buying or rejecting the deal", "Treat an indemnity or price reduction as proof of operational capability"]
+    },
+    {
+      "id": "C08",
+      "required": ["Keep the correct changed implementation", "Correct the caller and example to 5000 milliseconds", "Correct the untracked guide's units", "Request appropriate caller/integration tests", "Reject closure based only on the targeted test"],
+      "must_not": ["Ignore unchanged or untracked affected uses", "Claim broader tests passed without execution", "Roll back the correct milliseconds contract"]
+    }
+  ]
+}

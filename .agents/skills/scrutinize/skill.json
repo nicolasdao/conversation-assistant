@@ -1,0 +1,22 @@
+{
+	"name": "scrutinize",
+	"version": "0.2.0",
+	"description": "Review your own recent work with independent readers, applicability checks and tracked corrections. Prove fixes across dependent uses and preserve material unresolved evidence.",
+	"keywords": ["testing", "ai", "code-review", "self-review", "verification"],
+	"type": "skill",
+	"license": "BSD-3-Clause",
+	"authors": ["Nicolas Dao <nic@cloudlesslabs.com>"],
+	"dependencies": {},
+	"systemDependencies": {
+		"git": {
+			"description": "Git — the skill scopes its review to the session changes via git status and git diff",
+			"version": ">=2.0.0",
+			"check": "git --version",
+			"install": {
+				"darwin": "brew install git",
+				"linux": "See https://git-scm.com/download/linux for install instructions",
+				"win32": "See https://git-scm.com/download/win for install instructions"
+			}
+		}
+	}
+}

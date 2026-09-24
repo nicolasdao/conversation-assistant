@@ -1,0 +1,30 @@
+{
+	"name": "go-with-recommendations",
+	"version": "0.1.0",
+	"description": "Executes the agent's own recommendations in dependency order, deriving them from the mission, docs and source when none are explicit, and stopping only at irreversible or outward-facing actions.",
+	"type": "skill",
+	"authors": [
+		"Nicolas Dao <nic@cloudlesslabs.com>"
+	],
+	"license": "BSD-3-Clause",
+	"keywords": [
+		"autonomy",
+		"recommendations",
+		"execution",
+		"prioritization",
+		"session",
+		"workflow"
+	],
+	"dependencies": {},
+	"systemDependencies": {
+		"git": {
+			"description": "Git; used to inspect repo state when deriving recommendations from project evidence",
+			"check": "git --version",
+			"install": {
+				"darwin": "brew install git",
+				"linux": "See https://git-scm.com/download/linux for your distro",
+				"win32": "winget install Git.Git"
+			}
+		}
+	}
+}

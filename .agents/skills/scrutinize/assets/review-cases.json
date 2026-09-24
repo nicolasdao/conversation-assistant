@@ -1,0 +1,108 @@
+{
+  "format_version": 1,
+  "synthetic": true,
+  "instructions": "The source statements are authoritative fixture evidence. Review the lead's just-edited artifacts. Cite source IDs and affected location IDs. Do not look up real products or laws or assume facts outside the fixture.",
+  "cases": [
+    {
+      "id": "C01",
+      "request": "Verify the report's support dates and upgrade recommendation.",
+      "sources": [
+        {"id": "S1", "text": "Vendor lifecycle policy revision 3: Product Cedar 4 mainstream support ends 15 January 2032; extended support ends 15 January 2037. This replaces revision 2's mainstream date of 2031."},
+        {"id": "S2", "text": "Installed product version, support entitlement and upgrade cost have not been obtained from the seller."}
+      ],
+      "artifact": [
+        {"id": "summary", "text": "Cedar 4 mainstream support ends 15 January 2032."},
+        {"id": "matrix", "text": "Cedar 4: mainstream ends 15 January 2031; extended support ends 15 January 2037."},
+        {"id": "checklist", "text": "Budget mandatory replacement by January 2031 because mainstream support ends then."},
+        {"id": "decision", "text": "Deduct the unquoted replacement cost from the purchase price now."}
+      ]
+    },
+    {
+      "id": "C02",
+      "request": "Check this compliance assessment and its expiry logic.",
+      "sources": [
+        {"id": "S1", "text": "Operative Rule 8 applies to operators using regulated reusable components. Use beyond 12 years from manufacture requires regulator approval. It imposes no storage expiry and does not apply directly to software vendors."},
+        {"id": "S2", "text": "The fictional target is a software vendor. Its customer's component was manufactured 13 years ago and has a valid approval for continued use."}
+      ],
+      "artifact": [
+        {"id": "rule", "text": "Every component must be destroyed 12 years after entering storage under Rule 8."},
+        {"id": "finding", "text": "The software vendor violates Rule 8 because a customer uses a 13-year-old component."}
+      ]
+    },
+    {
+      "id": "C03",
+      "request": "Verify that current requirements and proposed changes are correctly distinguished.",
+      "sources": [
+        {"id": "S1", "text": "Current Standard 5 requires three forms of identification and controls protecting record integrity. It does not prescribe human-readable labels or a fixed number of permission roles."},
+        {"id": "S2", "text": "Draft Standard 6 proposes three human-readable identifiers. It is not yet operative."}
+      ],
+      "artifact": [
+        {"id": "current-row", "text": "Current Standard 5 mandates three human-readable identifiers and separate clinical, technical and financial permission roles."},
+        {"id": "future-row", "text": "Draft Standard 6 proposes three human-readable identifiers; timing and final content remain unconfirmed."}
+      ]
+    },
+    {
+      "id": "C04",
+      "request": "Check whether the evidence supports the security conclusion.",
+      "sources": [
+        {"id": "S1", "text": "Seller questionnaire: the seller says the service encrypts stored records."},
+        {"id": "S2", "text": "The reviewer could not access the configuration, keys, independent audit or deployment inventory. No evidence establishes plaintext storage or a breach."}
+      ],
+      "artifact": [
+        {"id": "security", "text": "Encryption at rest is independently verified and this area is compliant."}
+      ]
+    },
+    {
+      "id": "C05",
+      "request": "Review this checklist for claims that wrongly require native software features.",
+      "sources": [
+        {"id": "S1", "text": "Rule 4 requires an accurate return within ten days. A documented manual submission is permitted."}
+      ],
+      "artifact": [
+        {"id": "preamble", "text": "These are evidence requests, not compliance findings. Evaluate native, integrated and documented manual controls. Lack of an export alone is not a breach."},
+        {"id": "prompt", "text": "Evidence warranting further review: no native export. Ask for the actual submission process and reconciliation evidence."}
+      ]
+    },
+    {
+      "id": "C06",
+      "request": "Assess whether the review can be closed based on its passing checks.",
+      "sources": [
+        {"id": "S1", "text": "Schema revision 2 covers treatment year 2020. The current task concerns 2028. The applicable 2028 schema has not been obtained."},
+        {"id": "S2", "text": "The checker confirms matching file hashes, valid links and the phrase 'current schema'. It does not test schema applicability."}
+      ],
+      "artifact": [
+        {"id": "claim", "text": "Revision 2 is the current schema for the 2028 return."},
+        {"id": "closure", "text": "All checks pass, so the schema and the entire report are factually verified."}
+      ]
+    },
+    {
+      "id": "C07",
+      "request": "Review the acquisition recommendation against the evidence and permitted licence arrangements.",
+      "sources": [
+        {"id": "S1", "text": "Component licence terms permit either transfer with approval or acquisition of a replacement entitlement."},
+        {"id": "S2", "text": "The seller has offered a supervised build but has not supplied an account inventory. The reason is unknown. The buyer's risk appetite and replacement cost are not recorded."}
+      ],
+      "artifact": [
+        {"id": "condition", "text": "Every existing component licence must be assigned to the buyer; replacement entitlements cannot satisfy continuity."},
+        {"id": "inference", "text": "The missing account inventory proves that the seller cannot control the engineers."},
+        {"id": "recommendation", "text": "Therefore reject the acquisition unless a discount and indemnity are offered."}
+      ]
+    },
+    {
+      "id": "C08",
+      "request": "Review the changed timeout behavior and all affected uses before declaring the task complete.",
+      "sources": [
+        {"id": "S1", "text": "Current contract: submit(timeout_ms) accepts positive milliseconds and converts to seconds internally. The previous seconds-based contract no longer applies."},
+        {"id": "S2", "text": "The changed implementation and targeted test correctly convert 5000 milliseconds to a five-second wait. No broader tests have been run."},
+        {"id": "S3", "text": "The caller, example and new untracked guide each intend a five-second wait."}
+      ],
+      "artifact": [
+        {"id": "changed-code", "text": "submit divides timeout_ms by 1000 before calling the seconds-based wait routine."},
+        {"id": "unchanged-caller", "text": "submit(timeout_ms=5)"},
+        {"id": "example", "text": "For a five-second wait call submit(timeout_ms=5)."},
+        {"id": "untracked-guide", "text": "The timeout argument is measured in seconds."},
+        {"id": "test-report", "text": "The changed unit test passes, therefore all callers and documentation are correct."}
+      ]
+    }
+  ]
+}
