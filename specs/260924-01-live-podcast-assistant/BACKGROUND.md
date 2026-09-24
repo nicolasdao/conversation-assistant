@@ -63,3 +63,18 @@ Each research verdict also grades the flag that triggered it. That grade is the 
 - OpenAI's diarization model runs only on uploaded files.
 
 Sources: see SPEC.md §10.
+
+## Capture and front-end decision (24 September 2026)
+
+The user rejected browser capture as not robust: the engine would depend on a Chrome tab that has to be re-picked every session and can be closed or throttled. They asked for an engine that owns capture and intelligence, and a front end that is only an interface.
+
+| Question | Decision | Reasoning from the discussion |
+| --- | --- | --- |
+| Who captures audio | A native Swift helper started by the Node server | AudioTee covers system audio only; one helper for both streams gives one clock. Node has no dependency-free mic module. |
+| What "system audio" means | Everything the Mac plays, on any output device | The user wanted it general, not tied to the earbuds or to Riverside's process. A global tap captures the mix before it reaches a device, so it survives switching between speakers, wired earbuds, and AirPods. |
+| Speakers and echo | Out of scope: the host wears earbuds | With speakers, the mic would re-capture the call. There is no feedback loop, because nothing is played back, but every remote sentence would be duplicated on `host`. The fixes discussed were Apple's voice processing (unverified for audio from other apps), SpeexDSP or WebRTC echo cancellation using the tap as the reference, and an engine-side `echo` drop rule. The user chose to assume earbuds instead: this is a demo. |
+| Which mic | Built-in, forced by the helper | When an app opens the AirPods mic, macOS switches the AirPods to the call profile, which degrades both transcription and voiceprints. |
+| Speaker identification | Unchanged: local WeSpeaker embeddings | OpenAI's diarization labels are scoped to one request and cannot track a voice across per-utterance requests. Hosted alternatives have the same session-scope problem, or need a GPU or a paid plan. |
+| Front end | A local web page, TypeScript compiled with `tsc` | Nothing to install for open-source users; shareable as a window in Riverside; no bundler dependency. A SwiftUI client stays possible because the API is the boundary. |
+| Storage | Plain files per session | Already in the spec; a database only helps cross-session queries, and Node 24's built-in `node:sqlite` would cover that later without a dependency. |
+| License | MIT | The project will be open-sourced as a demo. |

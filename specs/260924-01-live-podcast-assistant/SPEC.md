@@ -1,10 +1,10 @@
 # SPEC — Podcast Assistant v1: live transcript, Jev timeline, and fact-checker
 
-Created 24 September 2026 from a design session held in the private jev-xp research repository. Stack: TypeScript on Node 24, macOS 26.2 on Apple Silicon. Status: Tier 1 is ready to implement. Tier 2 opens with a decision the user has deliberately left open (§4.13).
+Created 24 September 2026 from a design session held in the private jev-xp research repository. Stack: TypeScript on Node 24, macOS 26.2 on Apple Silicon. Status: Tier 1 is ready to implement. The Tier 2 capture and front-end decision was made with the user on 24 September 2026 (§4.13).
 
 ## §0 How to use this spec (read first)
 
-**What this is.** Everything needed to build Podcast Assistant v1 in this repository. It is a local app that listens to a remote podcast recording (the host's microphone plus the Riverside call audio) and transcribes it live. It labels the conversation on a timeline with Jev and fact-checks claims with a System 1 / System 2 loop. The host will demonstrate it live, on air, during the hosts' AI podcast.
+**What this is.** Everything needed to build Podcast Assistant v1 in this repository. It is a local app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio, which carries the Riverside call) and transcribes it live. It labels the conversation on a timeline with Jev and fact-checks claims with a System 1 / System 2 loop. The host will demonstrate it live, on air, during the hosts' AI podcast.
 
 **Who you are.** A fresh session with no memory of the design discussion. Every decision is recorded here. `BACKGROUND.md` explains why; you do not need it to build.
 
@@ -12,7 +12,7 @@ Created 24 September 2026 from a design session held in the private jev-xp resea
 - Read this file end to end before writing code.
 - Implement Tier 1 (§4.1–§4.12) in order, and verify each task's **Done when** before starting the next.
 - In your first 30 minutes, ask the user once whether you may make one local conventional commit per task (`feat(audio): …`, `test(factcheck): …`) on branch `master`. Without that yes, do not commit. When committing, stage only the paths the task touched (`git add <paths>`), never `git add -A`.
-- Stop at §4.13 and hold the decision conversation with the user before writing any capture or UI code.
+- At §4.13, read the recorded decision and follow it. Do not reopen it.
 - Ask the user for `OPENROUTER_API_KEY` and `OPENAI_API_KEY` when `.env` lacks them.
 - Keep development spend under **$3**, the sum of logged `cost_usd`. Stop and report when you reach it.
 
@@ -40,9 +40,10 @@ No project spec-rules file is configured. Terms are defined in §9.
 Build a local pipeline and API that works with any capture method. For a live or replayed podcast session, it:
 1. Takes two audio streams:
    - `host`: the host's microphone.
-   - `remote`: the Riverside call, meaning co-hosts and guests.
+   - `remote`: the Mac's system audio, meaning everything the Mac plays, whatever the output device. During the show that is the Riverside call: co-hosts and guests.
 
    It cuts each stream into utterances with local voice activity detection (VAD). It labels each utterance's speaker with local voice embeddings: an unrecognised voice becomes "Speaker N", which the host can rename or merge live.
+   The host wears earbuds during the show, so the microphone never picks up the call audio (§2.1, §5).
 2. Transcribes each utterance with OpenAI `gpt-transcribe`.
 3. Groups utterances into segments using a Jev boundary question plus code rules.
 4. Labels each closed segment with a predefined, host-editable set of Jev questions (the timeline).
@@ -53,7 +54,7 @@ Build a local pipeline and API that works with any capture method. For a live or
    - System 2 reprograms System 1 through memory questions and criteria rewrites. A rewrite takes effect only after it passes a replay gate.
 6. Records every session so it can be replayed through the same pipeline for tests, calibration, and an on-air fallback. It streams all results to any front end over HTTP and Server-Sent Events (SSE).
 
-Tier 1 delivers items 1–6 headless, driven by WAV files. Tier 2 adds live capture and the front end once the user chooses them. Tier 3 prepares the live show.
+Tier 1 delivers items 1–6 headless, driven by WAV files. Tier 2 adds live capture (a native Swift helper) and a local web front end. Tier 3 prepares the live show.
 
 ## §2 Context
 
@@ -78,7 +79,13 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
 | Speakers | Local embeddings (`sherpa-onnx-node`, WeSpeaker ResNet34-LM). An unknown voice becomes "Speaker N". Rename and merge live. No pre-registration. | User decision |
 | Transcription | Per-utterance file transcription with OpenAI `gpt-transcribe`, English, keyword hints | Works with any capture method, testable with files |
 | Jev access | OpenRouter Decisions API over raw HTTP, pinned to `typesafe/jev-1.13` | 0 failures in 10,120 calls from this Mac |
-| Capture method and front end | **Open.** Decided with the user at §4.13 | User decision |
+| Architecture | A headless engine (the Node server plus a native capture helper) owns all capture and intelligence. The front end is a thin client of the HTTP and SSE API. | User decision: capture must not depend on a browser tab |
+| Capture method | A native Swift command-line helper captures both streams: the built-in microphone (`host`) and a global Core Audio tap of all system output (`remote`). It pipes framed PCM to the Node server over stdout (§4.14). | User decision, 24 September 2026 |
+| System audio scope | Everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), not one app's output | User decision |
+| Echo | The host wears earbuds, so the mic never hears the call. No echo cancellation (§5). | User decision: a demo, not a production system |
+| Front end | A local web page served by the engine, in plain TypeScript compiled with `tsc` to browser ES modules. No bundler, no UI framework. | User decision; no new dependencies |
+| Storage | Plain files: one folder per session with WAVs, `session.json`, and append-only JSONL (§4.10). Live state in memory. No database. | Crash-safe, readable, dependency-free, and replay is built on it |
+| License | MIT; the project will be open-sourced as a demo | User decision |
 | Repository | This repository, separate from jev-xp: TypeScript on Node 24, vitest, zod, `tsx --env-file` | User decision |
 
 ### §2.2 Jev essentials you must respect
@@ -271,7 +278,7 @@ const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
 **sherpa-onnx helpers to reuse** (from the official examples):
 - `sherpa.readWave(path)` returns `{ samples: Float32Array, sampleRate }`.
 - `sherpa.writeWave(path, { samples, sampleRate })`.
-- `new sherpa.LinearResampler(fromRate, toRate).resample(samples)`, for 48 kHz capture in Tier 2.
+- `new sherpa.LinearResampler(fromRate, toRate).resample(samples)`, for WAV files that are not 16 kHz. Live capture arrives already at 16 kHz from the Swift helper (§4.14a).
 - `new sherpa.CircularBuffer(capacity)`, with `push`, `get(start, n)`, `pop(n)`, `size()`, and `head()`, to feed VAD windows.
 
 **Fallback, only with the user's approval: TypeSafe's direct API.**
@@ -327,10 +334,12 @@ const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
 - A rename request (§8) emits `speaker.updated`, and later events use the new name.
 - `npm run calibrate:boundary -- <labelled.jsonl>` prints precision, recall, and F1 for thresholds 0.3–0.9.
 
-**Tier 2** (details decided at §4.13). A live session on the user's real setup must show, at minimum:
-- level meters for both streams;
-- transcripts within 3 s (p90) of each utterance ending;
-- every UI element in §4.15.
+**Tier 2** (decided at §4.13):
+- `npm run build:capture` builds the Swift helper, and `npm run capture:test` passes (§4.14a).
+- A live session on the user's real setup (earbuds, Riverside in Chrome) shows, at minimum:
+  - level meters for both streams;
+  - transcripts within 3 s (p90) of each utterance ending;
+  - every UI element in §4.15.
 
 **Tier 3.** `npm run preflight` passes, and a rehearsal session with the planted claims (§4.16) is recorded and replays.
 
@@ -348,9 +357,9 @@ The order is fixed, and Tier 1 tasks each end with tests. The files named in §4
 - `vitest.config.ts`: tests in `tests/**/*.test.ts`, 120 s timeout, `setupFiles: ["tests/setup.ts"]`.
 - `tests/setup.ts`: replaces `globalThis.fetch` with a function that throws "network disabled in tests". Tests pass fakes to the clients through their constructors. This is how "tests never call the network" (§7) is enforced.
 - `.gitignore` already exists (added 24 September 2026). Do not recreate or trim it. It ignores secrets, `node_modules/`, build output, `models/`, `fixtures/`, `sessions/`, `data/`, every audio, video, and `*.jsonl` file anywhere, and macOS and editor clutter. To commit a deliberate test asset, add a `!path` exception and tell the user.
-- `.env.example`, a short `README.md` (setup and scripts), and `config/app.json` (§4.2).
+- `.env.example`, a short `README.md` (setup and scripts), `LICENSE` (MIT, "Copyright (c) 2026 Nicolas Dao"), and `config/app.json` (§4.2).
 
-**npm scripts:** `test`, `typecheck`, `models` (`sh scripts/download-models.sh`), `fixtures`, `smoke`, `replay`, `serve`, `preflight`, `calibrate:boundary`, `calibrate:speakers`.
+**npm scripts:** `test`, `typecheck`, `models` (`sh scripts/download-models.sh`), `fixtures`, `smoke`, `replay`, `serve`, `preflight`, `calibrate:boundary`, `calibrate:speakers`. Tier 2 adds `build:capture`, `capture:test`, and `build:web` (§4.14, §4.15).
 
 Scripts that load `sherpa-onnx-node` (including `test`) need its native library to load:
 1. After `npm install`, run `node -e "require('sherpa-onnx-node')"`. If it loads, no special environment is needed. Run TypeScript scripts as `node --env-file=.env --import tsx <file>`, and tests as `vitest run`.
@@ -487,6 +496,10 @@ The lines, in this order:
 **Editing:**
 - `rename(id, displayName)`.
 - `merge(fromId, intoId)` moves the embeddings, records `mergedInto`, and resolves every later lookup of `fromId` to `intoId`.
+
+**Scope notes:**
+- Because the host wears earbuds, the `host` stream is expected to hold only the host's voice. The registry is still shared by both streams and makes no such assumption; the real work is telling co-hosts and guests apart on `remote`.
+- OpenAI's speaker labels are not used (§5). They are scoped to one request, and this pipeline sends one request per utterance, so they could not track a voice across the session.
 
 **`src/cli/calibrateSpeakers.ts`** prints, for thresholds 0.35–0.75 in steps of 0.05, how many speakers each threshold creates on the given WAVs.
 
@@ -901,7 +914,8 @@ Files are append-only and flushed on every write.
 | --- | --- | --- |
 | GET | `/api/events` | SSE; replays the session's events so far on connect |
 | GET | `/api/state` | Full current state |
-| POST | `/api/session/start` | `{ mode: "replay", dir, speed }`; Tier 2 adds live modes |
+| POST | `/api/session/start` | `{ mode: "replay", dir, speed }`; Tier 2 adds `{ mode: "live", mic? }` (§4.14b) |
+| GET | `/api/devices` | Tier 2: input devices from the capture helper (§4.14b) |
 | POST | `/api/session/stop` | |
 | POST | `/api/speakers/:id/rename` | `{ displayName }` |
 | POST | `/api/speakers/merge` | `{ fromId, intoId }` |
@@ -957,56 +971,129 @@ Checks 2, 3, 5, and 6 use the background settings (§2.5).
 
 **Done when:** the stats tests pass on a synthetic session, and the calibrate CLI runs on a labelled sample of 20 rows.
 
-### Tier 2: live capture and front end (starts with a decision)
+### Tier 2: live capture and front end
 
-#### §4.13 Decision gate: stop and decide with the user
+#### §4.13 Decision record (decided 24 September 2026; do not reopen)
 
-Before writing any capture or UI code, present this summary and ask the user to choose.
+The user and a design session chose the following. Copy this record (date, choice, reasons) into `README.md` under "Design decisions", then proceed.
 
-Known facts about this Mac:
-- macOS 26.2, with Chrome 153 and Edge installed.
-- No Riverside Mac app is installed.
-- Xcode and Swift 6.3 are installed.
-- No virtual audio drivers are installed.
+**Architecture.** The engine owns everything smart: capture, VAD, speakers, transcription, System 1 and System 2, storage, and the HTTP and SSE API. It is the Node server from Tier 1 plus a native capture helper that the server starts as a child process. The front end is a thin client: it only reads `GET /api/state` and `GET /api/events` and posts the commands in §4.10. It could be replaced later, for example by a SwiftUI app, without touching the engine.
 
-Riverside officially supports Chrome and Edge, and it also offers a Mac app.
+**Capture: a native Swift helper, `podcast-capture` (§4.14).**
+- `host`: the MacBook's built-in microphone, chosen explicitly whatever the system default input is.
+- `remote`: a global Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session.
+- It works whether Riverside runs in Chrome or as the Mac app.
 
-| Capture option | Host mic | Remote (Riverside) | Needs | Main risk |
-| --- | --- | --- | --- | --- |
-| A. Local web page in Chrome, with Riverside in a Chrome tab | `getUserMedia` | `getDisplayMedia` → pick the Riverside tab → "Also share tab audio" | Nothing to install | The tab must be re-picked each session. Unverified: whether the tab's audio excludes the host's own voice. |
-| B. Riverside Mac app | Browser `getUserMedia` or a Node mic module | AudioTee (Core Audio process tap, macOS 14.2+) filtered to Riverside's process, PCM on stdout | Build AudioTee with Xcode; grant the "System Audio Recording" permission | An extra native tool |
-| C. Chrome system audio (Chrome 141+, sharing a window or screen) | `getUserMedia` | All system audio | Nothing | Notification sounds and other apps leak in |
-| D. BlackHole virtual device | Any | A routed output device | Driver install and a multi-output device | Fiddly routing, and normal volume control is lost |
+**Front end: a local web page served by the engine (§4.15)**, in plain TypeScript compiled with `tsc` to browser ES modules. No bundler, no UI framework, no new dependencies.
 
-Front-end options:
-- A local web page served by this server, in vanilla TypeScript bundled with esbuild or Vite.
-- A native SwiftUI app.
-- Electron.
+**Show setup assumption.** The host wears earbuds, so the microphone never hears the call. Echo cancellation is out of scope (§5). Riverside's own microphone is also set to the MacBook's built-in mic (§4.16).
 
-The design session recommended A with a local web page, B as the fallback, and a native app only if Riverside must run as the Mac app. The user explicitly left the choice open.
+**Why:**
+- Browser capture (the former option A) tied the engine to a Chrome tab that had to be re-picked every session and could be closed or throttled.
+- AudioTee (the former option B) captures system audio only, not the microphone. One helper that captures both streams gives them a single clock.
+- A global tap, rather than one app's output, is independent of the output device and of which Riverside client is used. Notification sounds are handled by the show checklist (Focus mode).
+- Chrome's system audio (option C) and BlackHole (option D) had the risks listed in `BACKGROUND.md`.
+- A local web page needs nothing installed, runs in any browser, and can be shared as a window in Riverside.
 
-Record the decision (date, choice, reason) in `README.md`, then proceed.
+**Done when:** the record is in `README.md`.
 
-**Done when:** the user has chosen a capture method and a front end, and the choice is recorded.
+#### §4.14 Live capture: the Swift helper and its Node adapter
 
-#### §4.14 Live capture adapter (per the decision)
+##### §4.14a `native/capture/`: the `podcast-capture` helper
 
-- Implement the chosen adapter behind `AudioSource` (§4.3). It delivers 16 kHz mono Float32 frames, with `sessionMs` taken from a single session clock.
-- Browser capture sends PCM16 chunks of about 250 ms to `POST /api/audio/:stream`, with `x-seq` and `x-session-ms` headers. Use a WebSocket instead only if the user approves adding `ws`.
-- A native tool pipes PCM into the server instead.
-- The server records the raw streams to `host.wav` and `remote.wav` as received.
-- Add `{ mode: "live" }` to `POST /api/session/start`.
+**Package.** A Swift package (Swift 6, `platforms: [.macOS(.v14)]`) with one executable target, `podcast-capture`. It uses Apple frameworks only (CoreAudio, AudioToolbox, AVFoundation) and no package dependencies. Files:
+- `native/capture/Package.swift`
+- `native/capture/Info.plist`: `CFBundleIdentifier` `com.cloudlesslabs.podcast-capture`, `NSMicrophoneUsageDescription`, and `NSAudioCaptureUsageDescription`. Embed it in the binary with `linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Info.plist"])]`, as AudioTee does. Without it, macOS refuses the capture permissions.
+- `native/capture/Sources/podcast-capture/`: `main.swift` (arguments, stdout writer, stderr status), `Mic.swift`, `SystemTap.swift`, `Devices.swift`, and `ClockLock.swift`.
 
-**Done when:** a 2-minute live test with a co-host on Riverside:
-- produces utterances on both streams;
-- shows transcripts within 3 s (p90) of each utterance ending;
-- leaves a session folder that replays.
+`npm run build:capture` runs `swift build -c release --package-path native/capture`. The binary is `native/capture/.build/release/podcast-capture`.
 
-**Stop and ask if:** the remote stream contains the host's own voice.
+**Command line.**
 
-#### §4.15 Front end (per the decision)
+| Invocation | Does |
+| --- | --- |
+| `podcast-capture --list-devices` | Prints input devices as JSON lines `{ uid, name, transport, isDefault }` and exits. |
+| `podcast-capture [--mic builtin\|<uid>] [--no-mic] [--no-system]` | Captures until stdin closes or SIGTERM. Default `--mic builtin`. |
+| `podcast-capture --probe <seconds>` | Captures without writing frames, then prints one JSON line `{ host: { peakDbfs, rmsDbfs }, remote: { peakDbfs, rmsDbfs } }` and exits. Used by `capture:test` and preflight. |
 
-These requirements hold whatever the technology. Everything comes from `GET /api/state` plus `GET /api/events`.
+**Microphone (`Mic.swift`).**
+- Resolve the device: `builtin` is the input device whose `kAudioDevicePropertyTransportType` is `kAudioDeviceTransportTypeBuiltIn`; otherwise match by UID. If it is missing, exit with code 2 and a status line.
+- Capture with `AVAudioEngine`: set the device on `inputNode.audioUnit` through `kAudioOutputUnitProperty_CurrentDevice` before starting, and install a tap on the input node.
+- Voice processing stays off: no echo cancellation, AGC, or ducking.
+- Downmix to mono (channel 0 if the device is multichannel).
+
+**System audio (`SystemTap.swift`).**
+- `CATapDescription(monoGlobalTapButExcludeProcesses: [])`, with `isPrivate = true` and `muteBehavior = .unmuted`. Create it with `AudioHardwareCreateProcessTap`.
+- Wrap it in a private aggregate device (`AudioHardwareCreateAggregateDevice`) whose tap list holds the tap and whose main sub-device is the current default output device. This follows Apple's "Capturing system audio with Core Audio taps" sample and AudioCap. Read buffers with an IOProc.
+- Listen for `kAudioHardwarePropertyDefaultOutputDevice` changes, for example when AirPods connect. On a change, destroy and rebuild the aggregate device and emit a status line; ClockLock fills the gap.
+- On exit (normal, SIGTERM, or SIGINT), destroy the aggregate device and the tap.
+
+**Conversion.** Convert each stream with `AVAudioConverter` to 16 kHz mono, then to PCM16 little-endian.
+
+**ClockLock (`ClockLock.swift`).**
+- The session clock starts at zero when capture starts, measured with `mach_absolute_time`.
+- Each buffer's first sample is timestamped from its `AudioTimeStamp.mHostTime`, converted to session milliseconds.
+- For each stream, keep the number of samples emitted within 20 ms of elapsed host-clock time: insert silence when the stream falls behind (dropped buffers, a device rebuild) and drop samples when it runs ahead.
+- As a result, sample index / 16 = session milliseconds on both streams. This is what §4.3's `startMs = streamStartMs + seg.start / 16` relies on, and it keeps both streams aligned over an hour despite separate hardware clocks.
+
+**Stdout protocol.** Binary frames only, little-endian, no text:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | magic `PCAP` (ASCII) |
+| 4 | 1 | stream: `0` = host, `1` = remote |
+| 5 | 3 | reserved, zero |
+| 8 | 8 | `sessionMs` of the first sample (float64) |
+| 16 | 4 | sample count `n` (uint32) |
+| 20 | 2n | PCM16 mono samples at 16 kHz |
+
+Emit a frame about every 100 ms per stream (1,600 samples).
+
+**Stderr protocol.** One JSON object per line: `{ "type": "started", "epochMs", "host": { device }, "remote": { outputDevice } }`, `{ "type": "device_changed", ... }`, `{ "type": "warning" | "error", "message" }`. `epochMs` is the wall-clock time of session clock zero.
+
+**Permissions.** macOS asks once for Microphone and once for System Audio Recording. When the helper is started from a terminal (directly or through Node), the permission is attributed to that terminal app. A denied permission delivers silence rather than an error, so `capture:test` and preflight detect it by level (below).
+
+**`npm run capture:test`** (`scripts/capture-test.sh`) checks the helper on this Mac, printing PASS or FAIL for each:
+1. `--list-devices` lists a built-in input device.
+2. System audio: run `--probe 3` while `afplay /System/Library/Sounds/Ping.aiff` plays twice. `remote.peakDbfs > -40`. A FAIL says: "grant System Audio Recording to your terminal in System Settings → Privacy & Security".
+3. Microphone: `--probe 3` while the host says a sentence. `host.peakDbfs > -40`. On FAIL, the Microphone permission hint.
+4. Isolation, with earbuds in: `--probe 5` while a video plays and the host stays silent. `host.rmsDbfs < -55`. This confirms that the mic does not hear the system audio.
+
+**Done when:** `npm run build:capture && npm run capture:test` passes on the user's Mac.
+
+**Stop and ask if:** the tap delivers silence after the permission is granted, or the helper cannot select the built-in mic.
+
+##### §4.14b `src/audio/nativeSource.ts`: the Node adapter
+
+- `startNativeCapture({ mic, host, remote })` spawns the helper with `child_process.spawn`, parses stdout frames (buffering partial reads), and returns two `AudioSource`s (§4.3) that re-chunk into 512-sample Float32 frames. Each frame's `sessionMs` is the helper's `sessionMs` plus the sample offset / 16, plus `offsetMs`.
+- `offsetMs` is `started.epochMs − session start epochMs`, so helper time maps onto the session clock. It is recomputed after a restart.
+- A malformed frame (bad magic, impossible count) kills the helper and is handled as a crash.
+- Stderr status lines become `health` details and, for `warning` and `error`, `error` events with `component: "capture"`.
+- If the helper exits unexpectedly, restart it up to 3 times per session, 1 s apart, and emit an `error` event each time. The gap stays in the recording as silence. After the third failure, end the live source cleanly: flush the VADs as at end of stream, and keep the session running for what is already in flight.
+- On session stop, close the helper's stdin, send SIGTERM after 2 s, and SIGKILL after 5 s.
+- The session store records each stream to `host.wav` and `remote.wav` as received (§4.10), so a live session replays exactly.
+- `POST /api/session/start` gains `{ mode: "live", mic?: "builtin" | "<uid>" }`, and `GET /api/devices` returns the helper's `--list-devices` output. There is no browser audio upload route.
+
+**Done when:**
+- A unit test feeds recorded stdout bytes (split at awkward boundaries) through the parser and checks the frames, `sessionMs`, and malformed-frame handling. A fake child process covers the restart rule. No test spawns the real helper.
+- A 2-minute live test with a co-host on Riverside:
+  - produces utterances on both streams;
+  - shows transcripts within 3 s (p90) of each utterance ending;
+  - leaves a session folder that replays.
+
+**Stop and ask if:** the remote stream contains the host's own voice (Riverside playing it back, §6 row 2).
+
+#### §4.15 Front end: a local web page
+
+**Build and serving.**
+- Files: `web/index.html`, `web/styles.css`, `web/tsconfig.json`, and `web/src/*.ts`.
+- `web/tsconfig.json`: `target` and `module` `ES2022`, `lib` `["ES2022", "DOM"]`, `outDir` `web/dist`. Imports use relative `.js` specifiers so browsers load the output as-is.
+- `npm run build:web` runs `tsc -p web/tsconfig.json`. `npm run serve` builds first.
+- `src/server/main.ts` serves `web/index.html` at `/` and `web/styles.css` and `web/dist/**` as static files, with correct content types, confined to `web/` (no path traversal).
+- No bundler, no framework, and no chart library: the timeline is inline SVG.
+- Session controls: start live (with a mic picker from `GET /api/devices`), start replay, and stop.
+
+**Requirements.** Everything comes from `GET /api/state` plus `GET /api/events`.
 
 - **Stream health:** a level meter and "last frame" age for `host` and `remote`. Show red when a stream is silent for more than 10 s during a session.
 - **Live transcript:** speaker display names, and click a name to rename it. A speaker panel renames and merges speakers; a merge asks for confirmation.
@@ -1040,6 +1127,7 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 
 **`npm run preflight`** checks, printing PASS or FAIL for each:
 - the models are present;
+- the capture helper is built, and `podcast-capture --probe 3` during an `afplay` ping shows system audio and a non-silent mic (the permissions are granted);
 - the keys are set;
 - the config is valid;
 - the OpenRouter key's limit and remaining credit (`GET https://openrouter.ai/api/v1/key`);
@@ -1048,7 +1136,9 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 
 **`docs/rehearsal.md`** contains:
 - The pre-show checklist:
-  - everyone wears headphones;
+  - everyone wears headphones, and the host wears earbuds (the spec assumes it: no echo handling);
+  - Riverside's microphone is set to the MacBook's built-in mic, like the helper's. If any app opens the AirPods mic, macOS switches the AirPods to the low-quality call profile;
+  - a Focus mode is on and other apps are quiet, because the tap captures every sound the Mac plays;
   - the spend cap is set;
   - tonight's stories are typed in;
   - speakers are renamed as they first speak;
@@ -1075,9 +1165,12 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 - No LLM that writes or changes timeline labels, and no live System 2 on the timeline.
 - No fixed-interval chunking.
 - No Jev for anything code does exactly: company mentions, counting, time, speaker identity.
-- No OpenAI diarization model. No OpenAI realtime transcription in v1; reconsider realtime only if the user wants live word-by-word text.
+- No OpenAI diarization model: its speaker labels hold only within one request, and the pipeline sends one request per utterance. No OpenAI realtime transcription in v1; reconsider realtime only if the user wants live word-by-word text.
 - No multi-language support, video, clip export, social posting, cloud deployment, or authentication (the server binds to 127.0.0.1).
 - No integration with Riverside beyond reading exported tracks for calibration.
+- No echo cancellation or speaker-output setup. The host wears earbuds (§2.1). With speakers, the mic would also pick up the call and duplicate it on the `host` stream.
+- No browser-based capture, and no per-app audio filtering: the tap captures all system output.
+- No database. Storage is session folders of plain files (§4.10).
 - No fine-tuning or model training beyond speaker enrolment.
 - No changes to the private jev-xp research repository.
 
@@ -1085,8 +1178,8 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 
 | # | Uncertainty | Safe behavior |
 | --- | --- | --- |
-| 1 | Capture method and front end are undecided. | Hold the §4.13 gate; never choose for the user. |
-| 2 | Unknown whether Riverside's tab audio contains only the remote participants. | Test in §4.14 before relying on it; stop if the host's voice is in it. |
+| 1 | Resolved on 24 September 2026: the Swift capture helper and a local web page (§4.13). | Follow the record; do not reopen it. |
+| 2 | Unknown whether Riverside plays the host's own voice back, which would put it in the system audio. | Check in the §4.14 live test; stop if the host's voice is in `remote`. |
 | 3 | Per-utterance Jev latency with 5–48 questions is unmeasured. Small requests measured p95 838 ms. | Follow smoke check 4 and its stop rule (§4.11). |
 | 4 | OpenRouter's Decisions endpoint is alpha. A third party reported about 15% of calls hanging; this Mac saw 0 failures in 10,120 calls. | Short timeouts, one retry, the boundary fallback. Stop per §4.11 if timeouts exceed the limit. |
 | 5 | Unconfirmed whether the web plugin works together with strict `json_schema` and reasoning on GPT-6 Luna, and which engine is better. | Smoke check 5. If strict output fails with the plugin, retry with `response_format: { type: "json_object" }` and a zod parse. If that also fails, stop and ask. |
@@ -1098,11 +1191,13 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 | 11 | Native web search price through OpenRouter is passed through and not listed. | Log `usage.cost`; cap research by count. |
 | 12 | Unknown whether `gpt-transcribe` returns usage. | Estimate cost from audio seconds and mark it `estimated`. |
 | 13 | The user has not chosen a privacy setting for podcast content sent to OpenRouter, TypeSafe, and OpenAI (§2.5). | Use account defaults for development with fixtures. Ask the user before the first session with real voices whether to add `provider: { data_collection: "deny" }` to OpenRouter calls. |
+| 14 | Core Audio tap details on macOS 26: the aggregate-device rebuild when the output device changes, and whether a denied permission always yields silence. | Follow Apple's tap sample and AudioCap; `capture:test` and preflight check by level. Stop per §4.14a. |
+| 15 | Whether a command-line helper with an embedded Info.plist gets the System Audio Recording prompt when started through Node from a terminal. AudioTee reports that it does. | `capture:test` step 2; stop and ask if no prompt appears and the tap stays silent. |
 
 ## §7 Anti-hallucination guardrails
 
-1. **Dependencies.** Runtime: `sherpa-onnx-node` (^1.13.8) and `zod` (^4). Dev: `typescript`, `tsx`, `vitest`, `@types/node`. Anything else, such as `ws`, a bundler, or UI libraries, needs the user's approval at §4.13. No OpenAI or OpenRouter SDKs; use `fetch`.
-2. **Files.** Only the files named in §4 and §A, plus tests under `tests/`. Tier 2 files follow the §4.13 decision.
+1. **Dependencies.** Runtime: `sherpa-onnx-node` (^1.13.8) and `zod` (^4). Dev: `typescript`, `tsx`, `vitest`, `@types/node`. Anything else, such as `ws`, a bundler, or UI libraries, needs the user's approval; §4.13 approved none. No OpenAI or OpenRouter SDKs; use `fetch`. The Swift helper uses Apple frameworks only, with no Swift package dependencies. The front end is compiled by the `typescript` dev dependency.
+2. **Files.** Only the files named in §4 and §A, plus tests under `tests/`.
 3. **Call paths.** Jev only through `src/jev/client.ts`, never through chat completions. System 2 only through `src/factcheck/s2.ts`.
 4. **Jev state.** Speaker display names, text, and tags only. No timestamps, ids, costs, or scores.
 5. **System 2's reach.** It may change only the fact-check System 1 set, only through the §4.8 ops. Never `boundary`, never timeline labels, never thresholds outside their ranges, never budgets.
@@ -1142,6 +1237,11 @@ curl -X POST localhost:4317/api/speakers/spk_1/rename -H 'content-type: applicat
 curl -X POST localhost:4317/api/speakers/merge -H 'content-type: application/json' -d '{"fromId":"spk_3","intoId":"spk_2"}'
 curl localhost:4317/api/stats
 
+# Live capture (Tier 2; earbuds in)
+npm run build:capture && npm run capture:test
+native/capture/.build/release/podcast-capture --list-devices
+npm run serve   # then open http://127.0.0.1:4317 and start a live session
+
 # Calibration
 npm run calibrate:speakers -- --host <host.wav> --remote <remote.wav>
 npm run replay -- --host <host.wav> --remote <remote.wav> --speed max --export boundary.jsonl
@@ -1154,7 +1254,11 @@ npm run calibrate:boundary -- boundary.jsonl
 | --- | --- |
 | Jev | TypeSafe AI's decision model. It answers typed questions (`noul`, `choice`, `score`) about a state, with probabilities. It cannot generate text or invent options. |
 | System 1 / System 2 | Fast, cheap, always-on judgment (Jev plus its question set and thresholds) / slow, deliberate research and rewriting (GPT-6 Luna). |
-| `host` / `remote` stream | The host's microphone / the Riverside call audio (co-hosts and guests). |
+| `host` / `remote` stream | The host's microphone (the MacBook's built-in mic) / the Mac's system audio, all output on any device, which carries the Riverside call (co-hosts and guests). |
+| Capture helper | `podcast-capture`, the native Swift tool that captures both streams and pipes framed PCM to the engine (§4.14a). |
+| Core Audio tap | A macOS 14.2+ API that captures audio that processes play, before it reaches an output device, without a driver. |
+| ClockLock | The helper's rule that keeps each stream's sample count aligned with the host clock (§4.14a). |
+| Engine | The Node server plus the capture helper: everything except the front end. |
 | Utterance | A stretch of speech between pauses, cut by VAD, with one speaker and one transcript. |
 | Filler | A short utterance such as "yeah" that skips the per-utterance Jev request. |
 | Segment | Consecutive utterances making one point, closed by the boundary rule. The unit the timeline labels. |
@@ -1183,7 +1287,8 @@ npm run calibrate:boundary -- boundary.jsonl
 - OpenRouter: [web search](https://openrouter.ai/docs/guides/features/plugins/web-search), [structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
 - OpenAI: [speech to text](https://developers.openai.com/api/docs/guides/speech-to-text), [gpt-transcribe](https://developers.openai.com/api/docs/models/gpt-transcribe), [realtime transcription](https://developers.openai.com/api/docs/guides/realtime-transcription) (a non-goal).
 - sherpa-onnx: [Node examples](https://github.com/k2-fsa/sherpa-onnx/tree/master/nodejs-addon-examples) (`test_speaker_identification.js`, `test_vad_microphone.js`); npm `sherpa-onnx-node` 1.13.8, with a darwin-arm64 build.
-- Capture options for §4.13: [AudioTee](https://github.com/makeusabrew/audiotee), [AudioCap (Core Audio taps)](https://github.com/insidegui/AudioCap), [Chrome system audio on macOS](https://blog.addpipe.com/getdisplaymedia-allows-capturing-the-screen-with-system-sounds-on-chrome-on-macos/), [Riverside supported browsers](https://support.riverside.com/hc/en-us/articles/5252134218013-System-requirements-and-supported-browsers), [browser VAD alternative](https://docs.vad.ricky0123.com/user-guide/browser/).
+- Core Audio taps: [Apple, Capturing system audio with Core Audio taps](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps), [`CATapDescription`](https://developer.apple.com/documentation/coreaudio/catapdescription).
+- Capture options considered for §4.13: [AudioTee](https://github.com/makeusabrew/audiotee), [AudioCap (Core Audio taps)](https://github.com/insidegui/AudioCap), [Chrome system audio on macOS](https://blog.addpipe.com/getdisplaymedia-allows-capturing-the-screen-with-system-sounds-on-chrome-on-macos/), [Riverside supported browsers](https://support.riverside.com/hc/en-us/articles/5252134218013-System-requirements-and-supported-browsers), [browser VAD alternative](https://docs.vad.ricky0123.com/user-guide/browser/).
 
 ### §A Anchors (the Tier 1 file set)
 
@@ -1206,5 +1311,21 @@ src/server/main.ts                               HTTP + SSE (§4.10)
 src/cli/{replay,smoke,preflight,calibrateBoundary,calibrateSpeakers}.ts
 src/types/sherpa-onnx-node.d.ts                  only if typings are missing (§4.1)
 scripts/{download-models.sh,make-fixtures.ts}
-docs/rehearsal.md                                Tier 3 (§4.16)
+LICENSE                                          MIT (§4.1)
+```
+
+Tier 2 adds:
+
+```
+native/capture/Package.swift, Info.plist         capture helper (§4.14a)
+native/capture/Sources/podcast-capture/{main,Mic,SystemTap,Devices,ClockLock}.swift
+scripts/capture-test.sh                          capture checks (§4.14a)
+src/audio/nativeSource.ts                        helper adapter (§4.14b)
+web/{index.html,styles.css,tsconfig.json}, web/src/*.ts   front end (§4.15)
+```
+
+Tier 3 adds:
+
+```
+docs/rehearsal.md                                (§4.16)
 ```
