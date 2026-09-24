@@ -10,7 +10,7 @@ describe("config", () => {
     expect(cfg.app.server.port).toBe(4317);
     expect(Object.keys(cfg.labels.questions)).toContain("subject");
     expect(cfg.s1.id).toBe("s1@1");
-    expect(cfg.s1.thresholds.worthMin).toBe(2);
+    expect(cfg.s1.thresholds.worthMin).toBe(1.5);
   });
 
   test("rejects minSegmentMs > maxSegmentMs", () => {

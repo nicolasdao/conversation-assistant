@@ -33,5 +33,5 @@
                    "Central to the speaker's argument", "Surprising or high-stakes if wrong"]
     }
   },
-  "thresholds": { "claimThreshold": 0.7, "worthMin": 2, "attentionThreshold": 0.7 }
+  "thresholds": { "claimThreshold": 0.7, "worthMin": 1.5, "attentionThreshold": 0.7 }
 }

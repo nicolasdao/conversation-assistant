@@ -25,6 +25,11 @@ export interface S1Version extends S1Set {
 
 export const S1_BASE_IDS = ["claim", "claim_type", "hedged", "worth"] as const;
 
+export const KNOWN_CRITERIA = {
+  true: "new_utterance states the same factual claim again, in the same or different words.",
+  false: "new_utterance makes a different claim, or only reacts to, questions, or disputes the claim.",
+};
+
 /** The questions a System 1 version asks (memory questions excluded). */
 export function versionQuestions(v: S1Set): QuestionSet {
   return { ...v.questions } as QuestionSet;
@@ -292,9 +297,12 @@ export class FactChecker implements FactcheckHook {
   questions(): { questions: QuestionSet; version: string } {
     const questions: QuestionSet = versionQuestions(this.activeVersion);
     for (const m of this.memory) {
+      // The "Judge only new_utterance." opener and the criteria lift a verbatim repeat from ~0.55 to ~0.86 and
+      // push a reply that only reacts to the claim from ~0.5 to ~0.05 (measured on the fixture, 24 September 2026).
       questions[`known_${m.claimId}`] = {
         type: "noul",
-        instructions: `new_utterance restates or relies on this already-checked claim: "${m.text}"`,
+        instructions: `Judge only new_utterance. It restates or relies on this already-checked claim: "${m.text}"`,
+        criteria: KNOWN_CRITERIA,
       };
     }
     return { questions, version: this.activeVersion.id };

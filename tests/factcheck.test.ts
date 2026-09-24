@@ -83,8 +83,8 @@ describe("System 1: flag rule, priority, memory", () => {
     expect(flagDecision(ans(FLAG), v, 0.6).flag).toBe(true);
     expect(flagDecision(ans({ ...FLAG, claim: 0.69 }), v, 0.6).flag).toBe(false);
     expect(flagDecision(ans({ ...FLAG, type: "none" }), v, 0.6).flag).toBe(false);
-    expect(flagDecision(ans({ ...FLAG, worth: 1.99 }), v, 0.6).flag).toBe(false);
-    expect(flagDecision(ans({ ...FLAG, worth: 2 }), v, 0.6).flag).toBe(true);
+    expect(flagDecision(ans({ ...FLAG, worth: 1.49 }), v, 0.6).flag).toBe(false);
+    expect(flagDecision(ans({ ...FLAG, worth: 1.5 }), v, 0.6).flag).toBe(true);
   });
 
   test("priority adds hedging and attention", () => {
@@ -120,7 +120,14 @@ describe("System 1: flag rule, priority, memory", () => {
     h.say("claim three", ans(FLAG));
     const q = h.fc.questions();
     expect(Object.keys(q.questions)).toEqual(["claim", "claim_type", "hedged", "worth", "known_c_2", "known_c_3"]);
-    expect((q.questions.known_c_3 as any).instructions).toBe('new_utterance restates or relies on this already-checked claim: "claim three"');
+    expect(q.questions.known_c_3).toEqual({
+      type: "noul",
+      instructions: 'Judge only new_utterance. It restates or relies on this already-checked claim: "claim three"',
+      criteria: {
+        true: "new_utterance states the same factual claim again, in the same or different words.",
+        false: "new_utterance makes a different claim, or only reacts to, questions, or disputes the claim.",
+      },
+    });
     expect(h.of("s1.memory").map((e) => e.data.action)).toEqual(["add", "add", "add", "evict"]);
     expect(q.version).toBe("s1@1");
   });
