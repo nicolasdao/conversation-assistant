@@ -24,12 +24,17 @@ Use a dedicated OpenRouter key for this project with a credit limit (for example
 | `npm run fixtures` | Builds `fixtures/conversation/{host,remote}.wav` and `script.json` with macOS `say` |
 | `npm run smoke` | Live checks of every external service (about $0.30) |
 | `npm run replay -- --host <wav> --remote <wav> --speed max\|1 [--export <file>]` | Runs WAV files through the pipeline into `sessions/<id>/` |
-| `npm run serve [-- --replay <dir> --speed 1\|max]` | HTTP + SSE API on `127.0.0.1:4317` |
-| `npm run preflight` | Pre-show checks |
+| `npm run serve [-- --replay <dir> --speed 1\|max]` | The web page and HTTP + SSE API on http://127.0.0.1:4317 |
+| `npm run build:capture` | Builds the `podcast-capture` Swift helper (microphone + system audio) |
+| `npm run capture:test` | Checks the helper and the macOS permissions on this Mac (interactive) |
+| `npm run build:web` | Compiles the web page (`npm run serve` does it first) |
+| `npm run preflight` | Pre-show checks (see `docs/rehearsal.md`) |
 | `npm run calibrate:boundary -- <labelled.jsonl>` | Precision / recall / F1 of the boundary threshold (offline) |
 | `npm run calibrate:speakers -- --host <wav> --remote <wav>` | Speaker count per similarity threshold |
 
 Development runs stop at a $3 total spend (summed from `sessions/**/*.jsonl`); `--allow-over-dev-cap` lifts that cap.
+
+macOS asks once for **Microphone** and once for **System Audio Recording**; both are granted to the terminal app that starts the server (System Settings → Privacy & Security). A denied permission delivers silence, which `capture:test` and `preflight` detect.
 
 ## Design decisions
 
