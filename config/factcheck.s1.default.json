@@ -1,0 +1,37 @@
+{
+  "id": "s1@1",
+  "questions": {
+    "claim": {
+      "type": "noul",
+      "instructions": "Judge only new_utterance. It states a specific factual claim that could be checked against public sources, such as a number, price, date, ranking, quote, attribution, release, or product capability.",
+      "criteria": {
+        "true": "At least one concrete, checkable statement of fact.",
+        "false": "An opinion, joke, question, feeling, exaggeration, vague statement, or no factual content."
+      }
+    },
+    "claim_type": {
+      "type": "choice",
+      "instructions": "Judge only new_utterance. What kind of factual claim does it make?",
+      "criteria": {
+        "number_or_price": "A figure, price, multiple, or percentage.",
+        "date_or_release": "When something happened or was released.",
+        "quote_or_attribution": "Who said, did, or owns something.",
+        "capability_or_benchmark": "What a product or model can do, or how it scored.",
+        "event": "Something that happened.",
+        "prediction": "What will happen in the future.",
+        "none": "No checkable factual claim."
+      }
+    },
+    "hedged": {
+      "type": "noul",
+      "instructions": "Judge only new_utterance. The speaker signals uncertainty about a fact, such as 'I think', 'if I remember correctly', 'something like', or 'don't quote me'."
+    },
+    "worth": {
+      "type": "score",
+      "instructions": "Judge only new_utterance. How much would listeners care whether its factual claim is accurate?",
+      "criteria": ["No factual claim, or trivial", "A minor detail", "Relevant to the discussion",
+                   "Central to the speaker's argument", "Surprising or high-stakes if wrong"]
+    }
+  },
+  "thresholds": { "claimThreshold": 0.7, "worthMin": 2, "attentionThreshold": 0.7 }
+}

@@ -1,0 +1,29 @@
+{
+  "server": { "port": 4317 },
+  "budget": { "sessionCapUsd": 5, "devCapUsd": 3 },
+  "vad": { "threshold": 0.5, "minSpeechDuration": 0.4, "minSilenceDuration": 0.5, "maxSpeechDuration": 20 },
+  "speakers": { "threshold": 0.55, "minEmbedSeconds": 1.5, "maxEmbeddingsPerSpeaker": 20 },
+  "transcription": {
+    "model": "gpt-transcribe", "languages": ["en"], "concurrency": 4, "timeoutMs": 20000,
+    "prompt": "Three friends co-host an English-language podcast about AI news, tech and marketing.",
+    "keywords": ["Jev", "TypeSafe", "OpenRouter", "Riverside", "GPT-6 Luna", "GPT-6 Sol", "OpenAI", "Anthropic",
+                 "Claude", "DeepSeek", "Gemini", "Hugging Face", "Nvidia", "System 1", "System 2", "Kahneman"],
+    "fixes": []
+  },
+  "jev": { "model": "typesafe/jev-1.13", "utteranceTimeoutMs": 3000, "segmentTimeoutMs": 5000, "maxAttempts": 2,
+           "backgroundTimeoutMs": 30000, "backgroundMaxAttempts": 5, "concurrency": 8, "segmentConcurrency": 4 },
+  "segmentation": { "boundaryThreshold": 0.6, "speakerChangeGapMs": 1500, "speakerChangeBonus": 0.1,
+                    "minSegmentMs": 12000, "maxSegmentMs": 75000, "reorderTimeoutMs": 8000 },
+  "timeline": { "noulMarkerThreshold": 0.7, "clipWorthyMin": 3, "fadedBelowConfidence": 0.5,
+                "companies": ["OpenAI", "Anthropic", "Google", "Meta", "Nvidia", "TypeSafe", "OpenRouter", "DeepSeek", "Hugging Face"],
+                "stories": [] },
+  "s2": { "model": "openai/gpt-6-luna",
+          "provider": { "order": ["openai"], "allow_fallbacks": false, "require_parameters": true },
+          "web": { "engine": "exa", "max_results": 5 },
+          "effort": { "research": "medium", "audit": "low", "rewrite": "medium" },
+          "timeoutMs": 90000, "maxAttempts": 2, "researchConcurrency": 2, "maxResearchPerHour": 30, "maxResearchPerSession": 40,
+          "staleAfterMs": 600000 },
+  "factcheck": { "hedgedThreshold": 0.6, "knownMatchThreshold": 0.8, "maxKnownQuestions": 40,
+                 "auditIntervalMs": 300000, "auditMinUtterances": 10, "auditSample": 10,
+                 "rewriteOnFalseAlarms": 3, "rewriteOnMisses": 2, "rewriteCooldownMs": 180000, "replayMaxItems": 300 }
+}
