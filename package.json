@@ -18,7 +18,9 @@
     "serve": "node --env-file=.env --import tsx src/server/main.ts",
     "preflight": "node --env-file=.env --import tsx src/cli/preflight.ts",
     "calibrate:boundary": "node --import tsx src/cli/calibrateBoundary.ts",
-    "calibrate:speakers": "node --env-file=.env --import tsx src/cli/calibrateSpeakers.ts"
+    "calibrate:speakers": "node --env-file=.env --import tsx src/cli/calibrateSpeakers.ts",
+    "build:capture": "swift build -c release --package-path native/capture",
+    "capture:test": "sh scripts/capture-test.sh"
   },
   "dependencies": {
     "sherpa-onnx-node": "^1.13.8",

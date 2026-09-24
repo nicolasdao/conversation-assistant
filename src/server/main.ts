@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
 import { Session, type SessionOptions } from "../pipeline/session.ts";
+import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
 
@@ -51,13 +52,15 @@ export interface LiveCapture {
   stop(): Promise<void>;
 }
 
+export type CaptureStatusHandler = (type: "error" | "health", data: Record<string, unknown>) => void;
+
 export interface EngineOptions {
   config?: Config;
   sessionsDir?: string;
   allowOverDevCap?: boolean;
   session?: Partial<SessionOptions>;
   /** Tier 2: starts the native capture helper. */
-  live?: (mic: string | undefined, emit: Session["emit"] | null) => Promise<LiveCapture>;
+  live?: (mic: string | undefined, onStatus: CaptureStatusHandler) => Promise<LiveCapture>;
   devices?: () => Promise<unknown[]>;
 }
 
@@ -66,6 +69,7 @@ export class Engine implements EngineApi {
   readonly bus = new EventBus({ redact: processSecrets(), onInvalid: (t, m) => console.error(`event ${t} failed validation: ${m}`) });
   private session: Session | null = null;
   private capture: LiveCapture | null = null;
+  private captureDetail: Record<string, unknown> | null = null;
   private readonly config: Config;
 
   constructor(private readonly opts: EngineOptions = {}) {
@@ -96,7 +100,11 @@ export class Engine implements EngineApi {
       mode = "replay";
     } else if (req?.mode === "live") {
       if (!this.opts.live) throw new ApiError(501, "live capture is not available");
-      this.capture = await this.opts.live(req.mic, (t, d) => this.session?.emit(t, d));
+      this.captureDetail = null;
+      this.capture = await this.opts.live(req.mic, (type, data) => {
+        if (type === "error") this.session?.emit("error", data);
+        else this.captureDetail = (data.capture as Record<string, unknown>) ?? data;
+      });
       sources = this.capture.sources;
       mode = "live";
     } else {
@@ -105,7 +113,7 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, ...this.opts.session,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, ...this.opts.session,
     });
     const s = this.session;
     s.run().catch((e) => console.error("session failed:", e));
@@ -283,7 +291,11 @@ async function main() {
     },
   });
   const config = loadConfig();
-  const engine = new Engine({ config, allowOverDevCap: values["allow-over-dev-cap"] });
+  const engine = new Engine({
+    config, allowOverDevCap: values["allow-over-dev-cap"],
+    live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
+    devices: () => listDevices(),
+  });
   const port = Number(values.port ?? config.app.server.port);
   const server = createApiServer(engine);
   server.listen(port, "127.0.0.1", () => console.log(`Podcast Assistant on http://127.0.0.1:${port}`));

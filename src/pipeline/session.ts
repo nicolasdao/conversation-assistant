@@ -40,8 +40,9 @@ export interface SessionOptions {
   keys?: { openrouter?: string; openai?: string };
   embedder?: Embedder;
   exportBoundary?: string;
-  /** Called when a source ends unexpectedly early (live capture gave up). */
   statsIntervalMs?: number;
+  /** Extra detail for health events, such as the capture helper's device names. */
+  healthDetail?: () => Record<string, unknown> | null;
 }
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
@@ -274,6 +275,7 @@ export class Session {
       this.emit("health", {
         stream, rmsDbfs: Number.isFinite(db) ? Math.round(db * 10) / 10 : -120,
         msSinceLastFrame: h.lastFrameAt ? now - h.lastFrameAt : -1, utterancesLastMinute: h.utteranceTimes.length,
+        ...(this.opts.healthDetail?.() ? { detail: this.opts.healthDetail() } : {}),
       });
     }
   }

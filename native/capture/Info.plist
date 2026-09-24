@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.cloudlesslabs.podcast-capture</string>
+    <key>CFBundleName</key>
+    <string>podcast-capture</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Podcast Assistant transcribes the host's microphone during a recording.</string>
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Podcast Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.</string>
+</dict>
+</plist>
