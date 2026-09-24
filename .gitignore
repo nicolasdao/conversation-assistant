@@ -1,0 +1,109 @@
+# ------------------------------------------------------------
+# Secrets: API keys live in .env (see specs/.../SPEC.md §2.4)
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# ------------------------------------------------------------
+# Podcast data: private recordings, transcripts, voice data
+# Keep these out of git even when they sit outside the folders
+# below. To commit a deliberate test asset, add a `!path` rule.
+# ------------------------------------------------------------
+sessions/
+fixtures/
+data/
+models/
+*.onnx
+*.jsonl
+*.wav
+*.aif
+*.aiff
+*.caf
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.webm
+*.pcm
+*.raw
+*.mp4
+*.mov
+*.mkv
+
+# ------------------------------------------------------------
+# Node.js and TypeScript
+# ------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+*.tsbuildinfo
+dist/
+build/
+out/
+.vite/
+dist-electron/
+coverage/
+
+# ------------------------------------------------------------
+# Native tools (a possible Swift capture helper, Tier 2)
+# ------------------------------------------------------------
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# ------------------------------------------------------------
+# Logs, caches, temporary files
+# ------------------------------------------------------------
+logs/
+*.log
+.cache/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# ------------------------------------------------------------
+# Editors and local AI-assistant settings
+# ------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+.history/
+*.swp
+*.swo
+*~
+.claude/settings.local.json
+
+# ------------------------------------------------------------
+# macOS
+# ------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+.apdisk
+Network Trash Folder
+Temporary Items
