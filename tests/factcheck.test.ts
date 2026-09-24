@@ -140,7 +140,7 @@ describe("System 1: flag rule, priority, memory", () => {
     h.say("as I said, 445 times cheaper", ans({ ...FLAG, known_c_1: 0.9 }));
     expect(h.of("claim.duplicate")[0].data).toMatchObject({ claimId: "c_1" });
     await h.fc.drain();
-    h.say("Jev is 445 times cheaper than GPT", ans({ ...FLAG, known_c_1: 0.85 }));
+    h.say("Jev is 445 times cheaper than GPT", ans({ ...FLAG, known_c_1: 0.6 }));
     const rep = h.of("claim.repeat")[0].data;
     expect(rep.claimId).toBe("c_1");
     expect(rep.verdict.verdict).toBe("supported");
@@ -149,7 +149,7 @@ describe("System 1: flag rule, priority, memory", () => {
     // the verdict's restated claim replaces the quoted text
     expect((h.fc.questions().questions.known_c_1 as any).instructions).toContain("Jev costs 1/445 of GPT.");
     // a match below knownMatchThreshold flags normally
-    h.say("another claim", ans({ ...FLAG, known_c_1: 0.79 }));
+    h.say("another claim", ans({ ...FLAG, known_c_1: 0.59 }));
     expect(h.of("claim.flagged").length).toBe(2);
   });
 });
@@ -216,6 +216,18 @@ describe("System 2: queue, research, grading", () => {
     expect(v.correction.split(" ").length).toBe(25);
     expect(v.verdict).toBe("contradicted");
     expect(v.downgraded).toBe(false);
+  });
+
+  test("inline markdown citations are stripped from text and titles", () => {
+    const v = finalizeVerdict({
+      ...VERDICT(),
+      correction: "445x is a vendor figure ([tomshardware.com](https://t.com/a)); tests found 40–49x ([a.com](https://a.com), [b.com](https://b.com)).",
+      restated_claim: "Jev is [445 times](https://x.com) cheaper.",
+      sources: [{ url: "https://www.ayautomate.com/blog", title: "[ayautomate.com](https://www.ayautomate.com/blog)" }, { url: "https://dev.to/x", title: "https://dev.to/x" }],
+    }, []);
+    expect(v.correction).toBe("445x is a vendor figure; tests found 40–49x.");
+    expect(v.restated_claim).toBe("Jev is 445 times cheaper.");
+    expect(v.sources.map((s) => s.title)).toEqual(["ayautomate.com", "dev.to"]);
   });
 
   test("a sourced verdict without sources is downgraded to unverifiable", () => {

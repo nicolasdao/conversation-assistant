@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Podcast Assistant</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%234f86f7'/></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span id="conn" class="conn" title="Event stream connection"></span>Podcast Assistant</div>
+    <div id="session-status"></div>
+    <div class="controls">
+      <select id="mic" aria-label="Microphone"><option value="builtin">Built-in microphone</option></select>
+      <button id="start-live" class="primary">Start live</button>
+      <span class="sep"></span>
+      <input id="replay-dir" value="fixtures/conversation" aria-label="Replay folder" size="18">
+      <select id="replay-speed" aria-label="Replay speed"><option value="1">1×</option><option value="max">max</option></select>
+      <button id="start-replay">Replay</button>
+      <button id="stop" class="danger" disabled>Stop</button>
+    </div>
+  </header>
+  <section class="statusbar">
+    <div id="health" class="health"></div>
+    <div id="cost" class="cost"></div>
+  </section>
+  <section class="timeline-wrap">
+    <svg id="timeline" role="img" aria-label="Timeline of the conversation"></svg>
+  </section>
+  <main class="columns">
+    <section class="col col-transcript">
+      <div id="filters" class="filters"></div>
+      <div id="transcript" class="transcript"></div>
+    </section>
+    <section class="col col-claims">
+      <h2>Fact-checks <span id="claims-count" class="count"></span></h2>
+      <div id="claims" class="claims"></div>
+    </section>
+    <section class="col col-panel">
+      <nav class="tabs">
+        <button data-tab="tab-s1" class="on">System 1</button>
+        <button data-tab="tab-speakers">Speakers</button>
+        <button data-tab="tab-labels">Labels</button>
+        <button data-tab="tab-stats">Stats</button>
+        <button data-tab="tab-log">Log</button>
+      </nav>
+      <div id="tab-s1" class="tab"><div id="s1"></div></div>
+      <div id="tab-speakers" class="tab" hidden><div id="speakers"></div></div>
+      <div id="tab-labels" class="tab" hidden><div id="labels"></div></div>
+      <div id="tab-stats" class="tab" hidden><div id="stats"></div></div>
+      <div id="tab-log" class="tab" hidden><div id="errors"></div></div>
+    </section>
+  </main>
+  <div id="toasts" class="toasts"></div>
+  <script type="module" src="/dist/main.js"></script>
+</body>
+</html>

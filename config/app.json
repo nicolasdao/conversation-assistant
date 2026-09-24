@@ -23,7 +23,7 @@
           "effort": { "research": "medium", "audit": "low", "rewrite": "medium" },
           "timeoutMs": 90000, "maxAttempts": 2, "researchConcurrency": 2, "maxResearchPerHour": 30, "maxResearchPerSession": 40,
           "staleAfterMs": 600000 },
-  "factcheck": { "hedgedThreshold": 0.6, "knownMatchThreshold": 0.8, "maxKnownQuestions": 40,
+  "factcheck": { "hedgedThreshold": 0.6, "knownMatchThreshold": 0.6, "maxKnownQuestions": 40,
                  "auditIntervalMs": 300000, "auditMinUtterances": 10, "auditSample": 10,
                  "rewriteOnFalseAlarms": 3, "rewriteOnMisses": 2, "rewriteCooldownMs": 180000, "replayMaxItems": 300 }
 }

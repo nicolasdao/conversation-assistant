@@ -154,6 +154,26 @@ export function truncateWords(s: string, n: number): string {
   return words.length <= n ? s.trim() : words.slice(0, n).join(" ");
 }
 
+/** Removes inline markdown citations the web plugin adds: "([site](url))" goes, "[text](url)" becomes "text". */
+export function stripCitations(s: string): string {
+  return s
+    .replace(/\s*\(\s*\[[^\]]*\]\([^)]*\)(?:\s*[,;]\s*\[[^\]]*\]\([^)]*\))*\s*\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
+    .trim();
+}
+
+function cleanTitle(title: string, url: string): string {
+  const t = stripCitations(title || "").trim();
+  if (t && !/^https?:\/\//.test(t)) return t;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 /** Enforces limits in code, merges citations (deduplicated by URL) before the 3-source limit, and downgrades sourceless verdicts. */
 export function finalizeVerdict(raw: RawVerdict, annotations: unknown): Verdict {
   const seen = new Set<string>();
@@ -161,12 +181,12 @@ export function finalizeVerdict(raw: RawVerdict, annotations: unknown): Verdict 
   for (const s of [...raw.sources, ...citationsOf(annotations)]) {
     if (!s.url || seen.has(s.url)) continue;
     seen.add(s.url);
-    sources.push({ url: s.url, title: s.title || s.url });
+    sources.push({ url: s.url, title: cleanTitle(s.title, s.url) });
   }
   const v: Verdict = {
     ...raw,
-    restated_claim: raw.restated_claim.slice(0, 200),
-    correction: truncateWords(raw.correction, 25),
+    restated_claim: stripCitations(raw.restated_claim).slice(0, 200),
+    correction: truncateWords(stripCitations(raw.correction), 25),
     sources: sources.slice(0, 3),
     downgraded: false,
   };

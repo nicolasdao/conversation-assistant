@@ -10,17 +10,18 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json --noEmit",
     "models": "sh scripts/download-models.sh",
     "fixtures": "node --import tsx scripts/make-fixtures.ts",
     "smoke": "node --env-file=.env --import tsx src/cli/smoke.ts",
     "replay": "node --env-file=.env --import tsx src/cli/replay.ts",
-    "serve": "node --env-file=.env --import tsx src/server/main.ts",
+    "serve": "npm run build:web && node --env-file=.env --import tsx src/server/main.ts",
     "preflight": "node --env-file=.env --import tsx src/cli/preflight.ts",
     "calibrate:boundary": "node --import tsx src/cli/calibrateBoundary.ts",
     "calibrate:speakers": "node --env-file=.env --import tsx src/cli/calibrateSpeakers.ts",
     "build:capture": "swift build -c release --package-path native/capture",
-    "capture:test": "sh scripts/capture-test.sh"
+    "capture:test": "sh scripts/capture-test.sh",
+    "build:web": "tsc -p web/tsconfig.json"
   },
   "dependencies": {
     "sherpa-onnx-node": "^1.13.8",
