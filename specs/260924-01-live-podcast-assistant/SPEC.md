@@ -11,7 +11,7 @@ Created 24 September 2026 from a design session held in the private jev-xp resea
 **DO**
 - Read this file end to end before writing code.
 - Implement Tier 1 (§4.1–§4.12) in order, and verify each task's **Done when** before starting the next.
-- In your first 30 minutes, ask the user once whether you may make one local conventional commit per task (`feat(audio): …`, `test(factcheck): …`) on branch `main`. Without that yes, do not commit.
+- In your first 30 minutes, ask the user once whether you may make one local conventional commit per task (`feat(audio): …`, `test(factcheck): …`) on branch `master`. Without that yes, do not commit. When committing, stage only the paths the task touched (`git add <paths>`), never `git add -A`.
 - Stop at §4.13 and hold the decision conversation with the user before writing any capture or UI code.
 - Ask the user for `OPENROUTER_API_KEY` and `OPENAI_API_KEY` when `.env` lacks them.
 - Keep development spend under **$3**, the sum of logged `cost_usd`. Stop and report when you reach it.
@@ -30,7 +30,7 @@ Created 24 September 2026 from a design session held in the private jev-xp resea
 **First 30 minutes.**
 1. Read §1–§3.
 2. Run the §8 environment check.
-3. Run `git status`. The folder may not be a git repository yet; if so, ask the user before running `git init -b main`, and ask about commits at the same time.
+3. Run `git status`. The repository already exists on `master`, with remote `origin` (`github.com/nicolasdao/podcast-ai-assistant`), and `.gitignore` is committed. Leave any uncommitted edits under `specs/` alone: they are the user's. Ask about commits (see DO).
 4. Start §4.1.
 
 No project spec-rules file is configured. Terms are defined in §9.
@@ -130,7 +130,7 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
 
 **OpenAI `gpt-transcribe`.**
 - `POST https://api.openai.com/v1/audio/transcriptions`, multipart, with parameters `prompt`, `keywords`, and `languages`.
-- The response is `{ text, languages }`, with no usage field.
+- The documented response is `{ text, languages }`. No usage field is documented (§6 row 12).
 - $0.0045 per audio minute.
 
 **sherpa-onnx-node 1.13.8** has a darwin-arm64 build. Its README asks for `DYLD_LIBRARY_PATH=node_modules/sherpa-onnx-darwin-arm64` on macOS.
@@ -143,6 +143,174 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
 - Suggest to the user a dedicated OpenRouter key for this project with a $10 credit limit.
 - Keys never appear in logs, session files, or events.
 
+### §2.5 How to call each service (use these recipes; do not reinvent them)
+
+**OpenRouter in brief.** OpenRouter is an API gateway.
+- One key (`OPENROUTER_API_KEY`, created by the user at openrouter.ai with a credit limit on the key) reaches many models through an OpenAI-compatible chat endpoint (`https://openrouter.ai/api/v1/chat/completions`). Jev has its own alpha endpoint beside it (`https://openrouter.ai/api/alpha/decisions`).
+- Authenticate with `Authorization: Bearer <key>`. The optional header `X-OpenRouter-Title: Podcast Assistant` labels calls in the OpenRouter dashboard.
+- Every response reports its price in USD in `usage.cost`.
+- `GET https://openrouter.ai/api/v1/key` returns the key's `limit`, `limit_remaining`, and usage.
+- Per-model rate limits exist but are unpublished. From this Mac, 10,120 Jev calls at concurrency 8 needed one retry and none failed.
+
+**Jev call** (Node 24 `fetch`):
+
+```ts
+const res = await fetch("https://openrouter.ai/api/alpha/decisions", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json",
+             "X-OpenRouter-Title": "Podcast Assistant" },
+  body: JSON.stringify({ model: "typesafe/jev-1.13", state, questions }),
+  signal: AbortSignal.timeout(timeoutMs),
+});
+const text = await res.text();                 // read once: error bodies are not always JSON
+const ra = res.headers.get("retry-after");     // seconds, or an HTTP date
+const retryAfterMs = ra === null ? null
+  : Number.isFinite(Number(ra)) ? Number(ra) * 1000
+  : Math.max(0, Date.parse(ra) - Date.now()) || null;
+if (!res.ok) throw new HttpError(res.status, text, retryAfterMs);
+const start = text.indexOf("{");               // the body may start with keep-alive whitespace
+if (start < 0) throw new HttpError(res.status, text, retryAfterMs);  // a 2xx without JSON: treated as an error body without a code
+const body = JSON.parse(text.slice(start));
+if (body.error) throw new HttpError(res.status, text, retryAfterMs);  // an upstream error delivered with HTTP 200
+if (typeof body.usage?.cost !== "number") throw new HttpError(-1, text, null);  // rejected, not retried
+```
+
+A real response, with the legend text abridged. Raw HTTP uses snake_case; OpenRouter's SDK would convert it to camelCase.
+
+```json
+{ "answers": {
+    "is_bug":  { "type": "noul", "noul": 0.96 },
+    "team":    { "type": "choice", "choice": "payments", "confidence": 0.75,
+                 "probabilities": { "account": 0, "frontend": 0.16, "payments": 0.84 } },
+    "urgency": { "type": "score", "score": 1.99, "confidence": 0.99,
+                 "legend": { "0": "Can wait", "1": "This week", "2": "Blocking revenue" },
+                 "probabilities": { "0": 0, "1": 0.01, "2": 0.99 } } },
+  "id": "gen-dec-1789738314-X5e5eKGQdvR9rblyX250", "model": "typesafe/jev-1.13-20260917",
+  "provider": "TypeSafe", "usage": { "cost": 0.000019992, "input_tokens": 476, "output_tokens": 70 } }
+```
+
+**Retry and backoff for every OpenRouter call.** This is jev-xp's proven logic (`classifyError`, `embeddedErrorCode`, `backoffMs`).
+- **Retry:**
+  - no HTTP status (a network error or timeout);
+  - 429;
+  - any 5xx, including 524 (edge timeout) and 529 (provider overloaded);
+  - a 402 whose `error.metadata.limit_source` is `openrouter_in_flight_budget`;
+  - an HTTP 2xx whose body is an error object. Classify it by the `error.code` inside the body with these same rules, and retry when the body has no code.
+- **Fail without retrying:**
+  - 400;
+  - 401, a bad key: stop and tell the user;
+  - 403 and 404;
+  - 413, payload too large: too many questions;
+  - status −1, a response without `usage.cost`;
+  - any other 402, meaning credits or the key limit are exhausted: emit `budget.exhausted`.
+- **Wait** `retryAfterMs ?? min(30_000, 1_000 × 2^attempt)` plus 0–500 ms of jitter. The pause is shared across concurrent callers.
+- **Live purposes** (`utterance`, `segment`) make at most `jev.maxAttempts` (2) attempts with their short timeouts. The second attempt happens only after a no-status failure, a 5xx, or a 2xx error body that the rules above would retry, and only immediately; a live call never waits out a backoff. A 429 or the transient 402 goes straight to the caller's fallback, and it sets the shared pause that background calls respect.
+- **Background purposes** (`relabel`, `gate`, `preflight`) use `jev.backgroundMaxAttempts` and `jev.backgroundTimeoutMs`, with the backoff above.
+- **Smoke checks** use the settings each check states in §4.11.
+
+**Question authoring rules** (the rulebook from TypeSafe and OpenRouter):
+- Use the fewest questions that capture every judgment, with one narrow judgment per question.
+- `choice`: a description for every option, plus a `none` or `other` option.
+- `noul`: concrete `criteria.true` and `criteria.false` descriptions when the boundary is fuzzy.
+- `score`: 2–6 concrete levels recommended, lowest first. TypeSafe accepts 2–10 and rejects fewer than two.
+- snake_case ids.
+- Never ask for free text, counting, or arithmetic.
+
+System 2's rewrites must pass the same checks (§4.8c).
+
+**GPT-6 Luna call:**
+
+```json
+POST https://openrouter.ai/api/v1/chat/completions
+{ "model": "openai/gpt-6-luna",
+  "messages": [ { "role": "system", "content": "…" }, { "role": "user", "content": "…" } ],
+  "reasoning": { "effort": "medium" },
+  "provider": { "order": ["openai"], "allow_fallbacks": false, "require_parameters": true },
+  "plugins": [ { "id": "web", "engine": "exa", "max_results": 5 } ],
+  "response_format": { "type": "json_schema", "json_schema": { "name": "verdict", "strict": true, "schema": { } } } }
+```
+
+Read from the response:
+- `choices[0].message.content`: a JSON string. Parse it, then validate it with zod.
+- `choices[0].message.annotations[]`: entries `{ type: "url_citation", url_citation: { url, title, content, start_index, end_index } }`.
+- Top-level `model` and `provider`.
+- `usage`: `prompt_tokens`, `completion_tokens`, `completion_tokens_details.reasoning_tokens`, `prompt_tokens_details.cached_tokens`, and `cost`.
+
+Rules for GPT-6 Luna calls:
+- Omit `plugins` in audit and rewrite calls.
+- Send no `temperature` or `top_p`; they are unsupported.
+- Use no function calling. These models accept tools only with reasoning `none`.
+- The knowledge cutoff is 18 May 2026, so anything later must come from web results.
+- Keep each system prompt byte-identical across calls, so cached input is billed at $0.01 instead of $0.10 per million tokens.
+- `usage.cost` is always present. The old `usage: { include: true }` flag is deprecated.
+- Error bodies add `error.metadata.error_type`: `rate_limit_exceeded`, `provider_overloaded`, `provider_unavailable`, `context_length_exceeded`, `timeout`, or `payment_required`. Classify errors with the retry rules above.
+- Every System 2 call (research, audit, rewrite) uses `s2.timeoutMs` and at most `s2.maxAttempts` (2) attempts, with the backoff above.
+
+**OpenAI transcription call:**
+
+```ts
+const form = new FormData();
+form.append("file", new Blob([wavBytes], { type: "audio/wav" }), "utterance.wav");
+form.append("model", "gpt-transcribe");
+form.append("prompt", cfg.transcription.prompt);
+for (const k of cfg.transcription.keywords) form.append("keywords[]", k);
+for (const l of cfg.transcription.languages) form.append("languages[]", l);
+const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, // no Content-Type: fetch sets the multipart boundary
+  body: form,
+  signal: AbortSignal.timeout(cfg.transcription.timeoutMs),
+});
+// 200 → { text, languages }; error → { error: { message, type, param, code } }
+```
+
+- Files may be up to 25 MB, in mp3, mp4, mpeg, mpga, m4a, wav, or webm.
+- The default Tier 1 limit for `gpt-transcribe` is 500 requests per minute; the pipeline sends about 15.
+- The OpenAI account needs billing enabled.
+
+**sherpa-onnx helpers to reuse** (from the official examples):
+- `sherpa.readWave(path)` returns `{ samples: Float32Array, sampleRate }`.
+- `sherpa.writeWave(path, { samples, sampleRate })`.
+- `new sherpa.LinearResampler(fromRate, toRate).resample(samples)`, for 48 kHz capture in Tier 2.
+- `new sherpa.CircularBuffer(capacity)`, with `push`, `get(start, n)`, `pop(n)`, `size()`, and `head()`, to feed VAD windows.
+
+**Fallback, only with the user's approval: TypeSafe's direct API.**
+- `POST https://api.typesafe.ai/v1/systemone` with a TypeSafe key, the same `{ state, questions }` body, and `model: "jev-1.13.0"`.
+- 64,000 tokens per request, of which state plus the longest question may use 32,000. 1,200 requests per minute per model.
+- Responses lack OpenRouter's `id`, `provider`, and `usage.cost`, so estimate cost from tokens at $0.042 per million.
+- The documented client is TypeSafe's JS SDK (`@typesafe-ai/sdk`, `TypeSafeClient`).
+
+**Privacy.** Podcast audio goes to OpenAI, and transcripts go to OpenRouter, TypeSafe, and OpenAI (through GPT-6 Luna).
+- OpenRouter stores prompts only if the account has opted into logging.
+- Per request, `provider: { data_collection: "deny" }` restricts routing to providers that do not collect data.
+- `provider: { zdr: true }` restricts routing to zero-data-retention endpoints. It is not confirmed that Jev's TypeSafe endpoint is on that list.
+- The user has not chosen a setting (§6).
+
+**Long-form references, if anything above is unclear.** These are read-only, in the private jev-xp research repository.
+- `specs/260922-01-xp/openrouter-integration.md`:
+
+  | Section | Topic |
+  | --- | --- |
+  | §1 | Two endpoints, one key |
+  | §3 | Authentication and headers |
+  | §4.1–§4.2 | Decisions request and response |
+  | §4.3–§4.4 | SDK alternatives |
+  | §4.5 | Model pinning |
+  | §4.6 | Errors, retries, and concurrency |
+  | §4.7 | Packing several records into one request (not used here) |
+  | §4.8 | Authoring rules |
+  | §5.0 | GPT-6 Luna facts |
+  | §5.3 | Request fields |
+  | §5.6 | Errors, limits, and credits |
+  | §6 | Ledger fields |
+  | §7 | Data policy |
+
+- `specs/260922-01-xp/models-research.md`, sections "Jev: availability, economics, and correct use" and "23 September operational recheck": rate limits, context, state format, batching, billing overhead, latency, endpoints, and SDK retry defaults.
+- `specs/260922-01-xp/jev-as-primitive.md`: §2 (the hallucination claim, confidence, calibration), §5 (request shape for loops and streams), §8 (run-to-run stability).
+- Working code:
+  - `src/policy/jevClient.ts`: a complete Jev client on the OpenRouter SDK.
+  - `src/s2/researcher.ts`: `sdkS2Transport` (line 52) makes GPT-6 Luna calls with provider pinning. It reads `provider` from the raw body because the SDK drops that field.
+
 ## §3 Acceptance criteria
 
 **Tier 1 (headless):**
@@ -153,7 +321,7 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
   - `speakers.json` holds exactly 3 speakers, one per fixture voice.
   - `segments.jsonl` holds ≥ 2 closed segments, none longer than `maxSegmentMs`.
   - `claims.jsonl` flags the "445 times cheaper" utterance and the "never hallucinate" utterance.
-  - Each researched claim has a schema-valid verdict with ≥ 1 source, or the verdict `unverifiable`.
+  - Each researched claim has a schema-valid verdict with ≥ 1 source, or the verdict `unverifiable` or `not_a_claim`.
   - The repeated "445 times cheaper" line produces a `claim.repeat` or `claim.duplicate` event linked to the first claim, with no second research call.
 - With `npm run serve -- --replay fixtures/conversation --speed 1` running, `curl -N localhost:4317/api/events` shows `utterance`, `segment.closed`, `segment.labels`, `claim.flagged`, and `claim.verdict` events.
 - A rename request (§8) emits `speaker.updated`, and later events use the new name.
@@ -177,11 +345,20 @@ The order is fixed, and Tier 1 tasks each end with tests. The files named in §4
 **Files:**
 - `package.json`: `"type": "module"`, `engines.node >= 24`.
 - `tsconfig.json`: copy the compiler options of the jev-xp repository's `tsconfig.json`, and include `src`, `tests`, and `scripts`.
-- `vitest.config.ts`: tests in `tests/**/*.test.ts`, 120 s timeout.
+- `vitest.config.ts`: tests in `tests/**/*.test.ts`, 120 s timeout, `setupFiles: ["tests/setup.ts"]`.
+- `tests/setup.ts`: replaces `globalThis.fetch` with a function that throws "network disabled in tests". Tests pass fakes to the clients through their constructors. This is how "tests never call the network" (§7) is enforced.
 - `.gitignore` already exists (added 24 September 2026). Do not recreate or trim it. It ignores secrets, `node_modules/`, build output, `models/`, `fixtures/`, `sessions/`, `data/`, every audio, video, and `*.jsonl` file anywhere, and macOS and editor clutter. To commit a deliberate test asset, add a `!path` exception and tell the user.
 - `.env.example`, a short `README.md` (setup and scripts), and `config/app.json` (§4.2).
 
-**npm scripts:** `test`, `typecheck`, `models` (`sh scripts/download-models.sh`), `fixtures`, `smoke`, `replay`, `serve`, `preflight`, `calibrate:boundary`, `calibrate:speakers`. Every script that loads `sherpa-onnx-node`, including `test`, is prefixed with `DYLD_LIBRARY_PATH=node_modules/sherpa-onnx-darwin-arm64`.
+**npm scripts:** `test`, `typecheck`, `models` (`sh scripts/download-models.sh`), `fixtures`, `smoke`, `replay`, `serve`, `preflight`, `calibrate:boundary`, `calibrate:speakers`.
+
+Scripts that load `sherpa-onnx-node` (including `test`) need its native library to load:
+1. After `npm install`, run `node -e "require('sherpa-onnx-node')"`. If it loads, no special environment is needed. Run TypeScript scripts as `node --env-file=.env --import tsx <file>`, and tests as `vitest run`.
+2. If it fails, set `DYLD_LIBRARY_PATH=node_modules/sherpa-onnx-darwin-arm64`, and put it directly in front of `node`. For example:
+   - `DYLD_LIBRARY_PATH=node_modules/sherpa-onnx-darwin-arm64 node --env-file=.env --import tsx src/cli/replay.ts`
+   - `DYLD_LIBRARY_PATH=node_modules/sherpa-onnx-darwin-arm64 node node_modules/vitest/vitest.mjs run`
+
+   macOS strips `DYLD_*` variables when a program starts through a `/usr/bin/env` shebang, which is how the `tsx` and `vitest` commands start. Setting the variable in front of `tsx` or `vitest` therefore does not reach the addon.
 
 **`scripts/download-models.sh`** downloads into `models/`, skipping files that already exist:
 - `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx`
@@ -191,7 +368,7 @@ Tests that need `models/` or `fixtures/` fail with the message "run npm run mode
 
 **Done when:** `npm install && npm run models && npm run typecheck && npm test` succeeds with one placeholder test, and a script importing `sherpa-onnx-node` runs.
 
-**Stop and ask if:** `sherpa-onnx-node` fails to load even with `DYLD_LIBRARY_PATH` set.
+**Stop and ask if:** `sherpa-onnx-node` still fails to load with `DYLD_LIBRARY_PATH` set directly in front of `node`.
 
 #### §4.2 Config
 
@@ -210,7 +387,8 @@ Tests that need `models/` or `fixtures/` fail with the message "run npm run mode
                  "Claude", "DeepSeek", "Gemini", "Hugging Face", "Nvidia", "System 1", "System 2", "Kahneman"],
     "fixes": []
   },
-  "jev": { "model": "typesafe/jev-1.13", "utteranceTimeoutMs": 3000, "segmentTimeoutMs": 5000, "maxAttempts": 2, "concurrency": 8 },
+  "jev": { "model": "typesafe/jev-1.13", "utteranceTimeoutMs": 3000, "segmentTimeoutMs": 5000, "maxAttempts": 2,
+           "backgroundTimeoutMs": 30000, "backgroundMaxAttempts": 5, "concurrency": 8, "segmentConcurrency": 4 },
   "segmentation": { "boundaryThreshold": 0.6, "speakerChangeGapMs": 1500, "speakerChangeBonus": 0.1,
                     "minSegmentMs": 12000, "maxSegmentMs": 75000, "reorderTimeoutMs": 8000 },
   "timeline": { "noulMarkerThreshold": 0.7, "clipWorthyMin": 3, "fadedBelowConfidence": 0.5,
@@ -220,21 +398,26 @@ Tests that need `models/` or `fixtures/` fail with the message "run npm run mode
           "provider": { "order": ["openai"], "allow_fallbacks": false, "require_parameters": true },
           "web": { "engine": "exa", "max_results": 5 },
           "effort": { "research": "medium", "audit": "low", "rewrite": "medium" },
-          "timeoutMs": 90000, "researchConcurrency": 2, "maxResearchPerHour": 30, "maxResearchPerSession": 40,
+          "timeoutMs": 90000, "maxAttempts": 2, "researchConcurrency": 2, "maxResearchPerHour": 30, "maxResearchPerSession": 40,
           "staleAfterMs": 600000 },
-  "factcheck": { "claimThreshold": 0.7, "worthMin": 2, "hedgedThreshold": 0.6, "attentionThreshold": 0.7,
-                 "knownMatchThreshold": 0.8, "maxKnownQuestions": 40, "auditIntervalMs": 300000, "auditSample": 10,
+  "factcheck": { "hedgedThreshold": 0.6, "knownMatchThreshold": 0.8, "maxKnownQuestions": 40,
+                 "auditIntervalMs": 300000, "auditMinUtterances": 10, "auditSample": 10,
                  "rewriteOnFalseAlarms": 3, "rewriteOnMisses": 2, "rewriteCooldownMs": 180000, "replayMaxItems": 300 }
 }
 ```
 
+The three thresholds that System 2 may change (`claimThreshold`, `worthMin`, `attentionThreshold`) do not live here. They belong to each System 1 version, so they sit in `config/factcheck.s1.default.json` (§4.8a). Code never writes to `config/app.json` at runtime.
+
 `transcription.fixes` is a list of `{ "pattern": "<whole-word regex>", "replace": "…" }` entries applied to transcripts. It ships empty. Do not add "Jeff" → "Jev": real people are called Jeff.
 
-**Done when:** a test loads all three files, and rejects both a config where `segmentation.minSegmentMs > maxSegmentMs` and a label set with a `choice` that has no criteria.
+**Done when:** a test loads all three files against zod schemas for the shapes in §4.2, §4.8a, and §4.9. It rejects:
+- a config where `segmentation.minSegmentMs > maxSegmentMs`;
+- a label set with a `choice` that has no criteria, or no fallback option (a key equal to `none`, or starting with `other`, such as `other_topics`);
+- a `score` with fewer than 2 levels.
 
 #### §4.3 Audio source, WAV codec, VAD, fixtures
 
-**`src/audio/wav.ts`** reads and writes PCM16 mono WAV, and converts to and from Float32 in [−1, 1].
+**`src/audio/wav.ts`** encodes a Float32 utterance as an in-memory PCM16 mono WAV for uploads. It also provides a streaming WAV writer for session recordings, which patches the header on close. Read WAV files with `sherpa.readWave`, and resample anything that is not 16 kHz with `sherpa.LinearResampler` (§2.5).
 
 **`src/audio/source.ts`** defines:
 
@@ -253,7 +436,11 @@ interface AudioSource {
 **`src/audio/vad.ts`** creates one `sherpa.Vad` per stream:
 - Config: `{ sileroVad: { model: "models/silero_vad.onnx", threshold, minSpeechDuration, minSilenceDuration, maxSpeechDuration, windowSize: 512 }, sampleRate: 16000, numThreads: 1, debug: false }`, with a 60 s buffer.
 - Feed it 512-sample windows through `acceptWaveform(samples)`, and drain it with `while (!vad.isEmpty()) { const seg = vad.front(); vad.pop(); … }`.
-- Emit `Utterance { id: "u_<n>", stream, startMs, endMs, samples }`, where `startMs = streamStartMs + seg.start / 16` and `endMs = startMs + seg.samples.length / 16`.
+- Emit `Utterance { id: "u_<n>", stream, startMs, endMs, samples }`.
+  - `<n>` comes from one session-wide counter, not a counter per stream.
+  - `seg.start` is a sample index counted from the first sample given to that VAD. `streamStartMs` is the `sessionMs` of that first frame.
+  - So `startMs = streamStartMs + seg.start / 16` and `endMs = startMs + seg.samples.length / 16`.
+- The session feeds all sources to their VADs in `sessionMs` order, merging the streams frame by frame. Files at `speed: "max"` therefore stay aligned across streams; live sources arrive in real time. Each stream's **watermark** is the `sessionMs` of the last frame given to its VAD.
 - At end of stream, call `vad.flush()` if it exists; otherwise feed 1 s of silence.
 
 **`src/audio/tags.ts`** adds two tags:
@@ -323,7 +510,7 @@ The lines, in this order:
 
 **Handling:**
 - Concurrency and timeout come from config, with one retry on 429, 5xx, or timeout.
-- Cost is `durationSeconds / 60 × 0.0045`, logged with `estimated: true`.
+- Cost is `durationSeconds / 60 × 0.0045`, recorded in the budget (§4.6). Log one row per call: `{ kind: "transcription", utterance_id, ok, latency_ms, attempts, audio_seconds, cost_usd, estimated: true, error? }`.
 - Apply `fixes` to the text.
 - Mark the utterance `filler: true` when the trimmed text matches `/^(uh|um|mm|hmm|mm-hmm|yeah|yes|no|okay|ok|right|so)\W*$/i` or is shorter than 4 characters.
 - Drop utterances with empty text.
@@ -332,41 +519,67 @@ The lines, in this order:
 - A unit test with a fake `fetch` checks the multipart fields.
 - Smoke check 1 (§4.11) transcribes the first Daniel line, and the text contains "Jev".
 
-**Stop and ask if:** the API rejects `keywords[]` and also rejects one retry that sends `keywords` repeated without brackets.
+**Stop and ask if:** the API rejects the bracketed fields (`keywords[]`, `languages[]`), and also rejects one retry that sends `keywords` and `languages` repeated without brackets.
 
 #### §4.6 Jev client
 
-`src/jev/client.ts` makes raw `fetch` calls to the Decisions endpoint with:
-- `AbortSignal.timeout` and a bounded number of attempts, from config;
-- the retry classification from §2.2;
+`src/jev/client.ts` makes raw `fetch` calls to the Decisions endpoint (recipe in §2.5) with:
+- `AbortSignal.timeout` and a bounded number of attempts, from config, using live or background settings by purpose;
+- the retry and backoff rules from §2.5;
 - a shared concurrency limit;
-- a budget guard that refuses calls once the session cap is reached and emits `budget.exhausted`.
+- a check against the shared budget (`src/budget.ts`, below) before every call.
 
 It writes one log row per call:
 
 ```
-{ kind: "jev_call", purpose, request_hash, state, question_set_version, ok, latency_ms, attempts, model_returned, usage, cost_usd, error? }
+{ kind: "jev_call", purpose, utterance_id?, segment_id?, request_hash, state, question_ids, question_set_version,
+  ok, latency_ms, attempts, id, model_returned, provider_returned, answers, usage, cost_usd, error? }
 ```
 
-`state` is stored so the replay gate can ask again. `src/jev/types.ts` holds the question and answer types from §2.2.
+`state` and `answers` are stored so the replay gate can ask again and compare. The fields `id`, `model_returned`, `provider_returned`, and `usage` are the audit fields listed in `openrouter-integration.md` §6.
 
-Reference for the retry logic only (do not copy): `classifyError` at jev-xp's `src/policy/jevClient.ts:77`, and `backoffMs` at line 107.
+**`src/budget.ts`** is the one spending ledger for the whole process. Every external caller (transcription, Jev, System 2) uses it:
+- **Before each call:** `assertCanSpend(purpose)`. It throws and emits `budget.exhausted` once either cap is reached:
+  - the session total reaches `budget.sessionCapUsd`;
+  - the dev total reaches `budget.devCapUsd`.
+- **After each call:** `record(bucket, cost_usd)`, with bucket `transcription`, `jev`, or `s2`. This drives the `cost` event.
+- **Dev total.** At process start, it sums `cost_usd` over the rows in `sessions/**/*.jsonl` whose `kind` is `jev_call`, `s2_call`, or `transcription`. Only call rows count, never events or totals, which would count a cost twice.
+- **Where the dev cap applies.** Development runs (`smoke`, `replay`, `serve --replay`, and the calibration CLIs) enforce it. Live sessions (Tier 2 onward) enforce only `sessionCapUsd`. A CLI flag `--allow-over-dev-cap` lifts only the dev cap, and you use it only with the user's approval.
+- **Where rows go.** Every CLI that spends money writes its rows into a session folder; smoke uses `sessions/smoke-<YYYYMMDD-HHMMSS>/`. `src/jev/types.ts` holds the question and answer types from §2.2.
 
-**Done when:** tests with a fake `fetch` cover success, a 429 followed by success, a 400 that fails immediately, a timeout, a response without `usage.cost` being rejected, and a call refused by the budget guard.
+Port, don't reinvent: the §2.5 rules are the logic of `classifyError` (jev-xp's `src/policy/jevClient.ts:77`) and `backoffMs` (line 107), and of the shared pause and priority queue in `JevClient` (line 142), adapted from the SDK to `fetch`.
+
+**Done when:** tests with a fake `fetch` cover:
+- success;
+- a 429 followed by success (background purpose);
+- a 429 on a live purpose going straight to the fallback;
+- a 400 that fails immediately;
+- a timeout;
+- a 2xx with an error body, retried;
+- a response without `usage.cost` being rejected;
+- `retry-after` in seconds and as an HTTP date;
+- a call refused by the budget;
+- the dev total being summed from existing session files.
 
 #### §4.7 Segmenter
 
-`src/pipeline/segmenter.ts` consumes transcribed utterances in `startMs` order across both streams, through a reorder buffer. An utterance is released once every utterance that started earlier has been transcribed, or once `reorderTimeoutMs` has passed.
+`src/pipeline/segmenter.ts` consumes transcribed utterances in `startMs` order across both streams, through a reorder buffer. Utterance u is released when either:
+- **Everything earlier is settled.** Every already-emitted utterance with a smaller `startMs` has finished transcription (successfully or not), and every other stream has a watermark ≥ `u.startMs` and is not mid-speech (`vad.isDetected()` false).
+- **Timeout.** `reorderTimeoutMs` has passed since u's transcription finished.
+
+A stream that is absent, or whose source has ended and whose VAD has been flushed, counts as watermark +∞ and never mid-speech.
+
+An utterance that arrives after a later one has been processed joins the open segment in arrival order; closed segments are never reopened. The `overlap` tag (§4.3) is computed at release time. An utterance whose transcription fails after its retry is released as `failed`: it is logged, skips Jev like a filler, and adds no text.
 
 It processes one utterance at a time:
-1. A filler skips Jev and joins the open segment.
+1. A filler skips Jev and joins the open segment. If adding it would exceed `maxSegmentMs`, close the segment first (`forced: true`), as for any utterance.
 2. Any other utterance gets one Jev request (`purpose: "utterance"`, timeout `utteranceTimeoutMs`). The request carries the state below plus these questions: `boundary` (§4.9), the active fact-check System 1 set (§4.8), and its memory questions.
 3. Close the open segment before this utterance when either:
    - `boundary ≥ boundaryThreshold` and the segment is at least `minSegmentMs` long. The threshold drops by `speakerChangeBonus` when the speaker changes after a gap of at least `speakerChangeGapMs`.
    - Adding the utterance would exceed `maxSegmentMs`. Mark this close `forced: true`.
 
    The first utterance opens the first segment.
-4. If the Jev request fails, treat the boundary as 0, skip fact-checking for this utterance, and log `jev_timeout`.
+4. If the Jev request fails, treat the boundary as 0 and skip fact-checking for this utterance. The failed `jev_call` row records the error, and an `error` event with `component: "jev"` is emitted.
 5. Pass the fact-check answers to §4.8.
 
 The state holds display names, text, and tags only, never timestamps or ids:
@@ -391,7 +604,18 @@ The state holds display names, text, and tags only, never timestamps or ids:
 
 ##### §4.8a System 1: questions, flags, memory
 
-`config/factcheck.s1.default.json` (version `s1@1`) holds these questions:
+`config/factcheck.s1.default.json` has this JSON shape. Question objects are exactly the Decisions API shapes from §2.2.
+
+```json
+{ "id": "s1@1",
+  "questions": { "claim": { "type": "noul", "instructions": "…", "criteria": { "true": "…", "false": "…" } },
+                 "claim_type": { "type": "choice", "instructions": "…", "criteria": { "number_or_price": "…" } },
+                 "hedged": { "type": "noul", "instructions": "…" },
+                 "worth": { "type": "score", "instructions": "…", "criteria": ["…", "…", "…", "…", "…"] } },
+  "thresholds": { "claimThreshold": 0.7, "worthMin": 2, "attentionThreshold": 0.7 } }
+```
+
+A **System 1 version** is this object plus `parent`, `kind` (`default` or `criteria`), `createdAt`, `rationale`, and `gate` (metrics, or null). Versions are immutable, and `s1_versions.jsonl` holds every one. The question text for `s1@1`:
 
 ```yaml
 claim:      noul  "Judge only new_utterance. It states a specific factual claim that could be checked against public sources, such as a number, price, date, ranking, quote, attribution, release, or product capability."
@@ -410,7 +634,7 @@ worth:      score "Judge only new_utterance. How much would listeners care wheth
                        "Central to the speaker's argument", "Surprising or high-stakes if wrong"]
 ```
 
-**Flag rule.** Flag the utterance when all three hold: `claim ≥ claimThreshold`, `claim_type ≠ none`, and `worth ≥ worthMin`. Its priority is:
+**Flag rule.** Using the active version's thresholds, flag the utterance when all three hold: `claim ≥ claimThreshold`, `claim_type ≠ none`, and `worth ≥ worthMin`. Its priority is:
 
 ```
 priority = worth
@@ -425,7 +649,7 @@ priority = worth
 - A match at or above `knownMatchThreshold` links the utterance to that claim instead of flagging it:
   - if the claim is verified, emit `claim.repeat` with its verdict (an instant card);
   - if it is still pending, emit `claim.duplicate`.
-- Adding or evicting a memory question bumps the System 1 version with kind `memory`. It does not go through the gate.
+- Memory questions are not part of any System 1 version. Adding or evicting one emits `s1.memory` and never goes through the gate. Promotions and rollbacks keep the current memory set.
 
 **Done when:** unit tests with fake Jev answers cover the flag rule, priority order, memory-question eviction, and both the repeat and duplicate paths.
 
@@ -443,7 +667,7 @@ priority = worth
 
 The system message:
 
-> You fact-check one spoken claim from a live English-language AI podcast. Today is <date>. Use the web results and judge the claim as a listener would understand it. Verdicts:
+> You fact-check one spoken claim from a live English-language AI podcast. Today is <date>. Your own knowledge ends in May 2026, so rely on the web results for anything after that, and never call something false only because you have not heard of it. Judge the claim as a listener would understand it. Verdicts:
 > - supported: accurate.
 > - contradicted: false.
 > - misleading: technically true but missing context that changes its meaning, or a vendor's own claim presented as fact.
@@ -465,10 +689,17 @@ The schema has every field required and no extra properties:
 | `false_alarm_reason` | `none`, `hyperbole`, `joke`, `opinion`, `too_vague`, `trivial`, or `not_factual` |
 | `sources` | up to 3 of `{ url, title }` |
 
+Keep length and count limits out of the strict schema: OpenAI's strict mode has historically rejected `maxLength` and `maxItems`. Declare plain strings and arrays. Nullable fields are not needed here.
+
 After the call:
-- Merge `message.annotations[].url_citation` into `sources`, deduplicated by URL.
+- Parse the content and validate it with zod.
+- Enforce the limits in code:
+  - truncate `restated_claim` to 200 characters;
+  - truncate `correction` to 25 words;
+  - keep the first 3 sources, counted after the merge below.
+- Merge `message.annotations[].url_citation` into `sources`, deduplicated by URL, before the 3-source limit is applied.
 - A `supported`, `contradicted`, or `misleading` verdict with no source at all becomes `unverifiable`, marked `downgraded: true`.
-- Log `usage.cost`.
+- Record `usage.cost` in the budget, and log one row per System 2 call (research, audit, and rewrite alike): `{ kind: "s2_call", purpose, claim_id?, ok, latency_ms, attempts, id, model_returned, provider_returned, usage, cost_usd, error? }`.
 
 **Grade.**
 - `false_alarm` when the verdict is `not_a_claim` or `false_alarm_reason ≠ none`; otherwise `good_flag`.
@@ -483,23 +714,54 @@ After the call:
 ##### §4.8c Feedback loop: audit, rewrite, replay gate
 
 **Audit.**
-- Every `auditIntervalMs`, if at least 10 unflagged, non-filler utterances have accumulated, send up to `auditSample` of them to GPT-6 Luna.
+- Every `auditIntervalMs`, if at least `auditMinUtterances` unflagged, non-filler utterances have accumulated, send a random sample of up to `auditSample` of them to GPT-6 Luna.
 - No web search, effort `effort.audit`.
-- Schema: `{ items: [{ utterance_id, has_checkable_claim, worth: "low" | "medium" | "high" }] }`.
+- System message:
+
+  > You audit a live AI podcast's fact-checker. For each utterance, say whether it contains a specific factual claim that could be checked against public sources, and how much listeners would care whether it is accurate. Opinions, jokes, exaggerations, and vague statements are not checkable claims.
+
+- The user message lists `{ utterance_id, speaker, text }` for each utterance.
+- Strict schema: `{ items: [{ utterance_id: string, has_checkable_claim: boolean, worth: "low" | "medium" | "high" }] }`.
 - An item with `has_checkable_claim` true and `worth ≠ low` is a **miss**.
 
 **Criteria rewrite.**
 
 *Trigger.* All of:
-- false alarms since the active version reach `rewriteOnFalseAlarms`, or misses reach `rewriteOnMisses`;
+- counting from the moment the active version became active, false alarms reach `rewriteOnFalseAlarms` or misses reach `rewriteOnMisses` (memory changes do not reset the count);
 - no rewrite ran within the last `rewriteCooldownMs`.
 
-*Call.* Ask GPT-6 Luna (no web search, effort `effort.rewrite`) for `{ changes: [{ op, target, value }], rationale }`. Give it:
+*Call.* Ask GPT-6 Luna (no web search, effort `effort.rewrite`) for a rewrite. System message:
+
+> You improve the questions a fast classifier uses to flag checkable factual claims in a live AI podcast. You get the active questions and thresholds, false alarms (flagged but not checkable) with reasons, correctly flagged examples, and missed claims. Propose at most 3 changes that remove false alarms or catch misses without losing correct flags. Follow these question rules: one narrow judgment per question, concrete true and false descriptions for yes/no questions, never ask for counting or arithmetic.
+
+The user message holds:
 - the active question set and thresholds;
 - the false alarms with their reasons;
-- up to 10 good flags and up to 10 misses.
+- up to 10 good flags and up to 10 misses, as utterance texts.
 
-*Allowed ops.* Code rejects anything else:
+The strict schema has every field required and no extra properties. Fields shown with `| null` are declared as `type: ["…", "null"]`.
+
+```json
+{ "changes": [ { "op": "set_instructions | set_criteria | add_attention | remove_attention | set_threshold",
+                 "target": "string",
+                 "text": "string | null",
+                 "true_text": "string | null", "false_text": "string | null",
+                 "options": [ { "key": "string", "description": "string" } ] | null,
+                 "levels": [ "string" ] | null,
+                 "number": "number | null" } ],
+  "rationale": "string" }
+```
+
+Which fields each op must fill (all others null). Code rejects the whole rewrite if it has more than 3 changes or if any change breaks these rules:
+- `set_instructions`: `text`.
+- `set_criteria` on `claim` or `hedged`: `true_text` and `false_text`.
+- `set_criteria` on `claim_type`: `options`, listing exactly its 7 existing keys.
+- `set_criteria` on `worth`: `levels`, exactly 5, lowest first.
+- `add_attention`: `target` is `"new"`, plus `text` and optionally `true_text` and `false_text`. Code assigns the id `attention_<n>`.
+- `remove_attention`: `target` is an existing `attention_<n>`.
+- `set_threshold`: `number`.
+
+*Allowed ops and limits:*
 
 | Op | May target | Limits |
 | --- | --- | --- |
@@ -510,7 +772,7 @@ After the call:
 
 **Replay gate** (`gate.ts`).
 
-*Evaluation items.* Logged utterance states, newest first, up to `replayMaxItems`, falling into three sets:
+*Evaluation items.* Logged utterance states (`jev_call` rows with `purpose: "utterance"`, joined by `utterance_id`), newest first, up to `replayMaxItems`, falling into three sets:
 - `G`: flagged utterances graded good flags;
 - `F`: flagged utterances graded false alarms;
 - `M`: utterances an audit found missed.
@@ -521,23 +783,47 @@ After the call:
 3. Count how many items in each set it flags: `G'`, `F'`, `M'`.
 
 *Decision.*
-- Promote when `G' ≥ floor(0.9 × |G|)`, `F' ≤ |F|`, and either `F' < |F|` or `M' > 0`. Otherwise reject.
+- Promote when `G' ≥ floor(0.9 × |G|)` and either `F' < |F|` or `M' > 0`. Otherwise reject.
+- Re-asked calls use the background settings and count against the budget.
 - Record both outcomes in `s1_versions.jsonl` with their metrics and rationale.
 - A promoted version applies from the next utterance.
-- `POST /api/s1/rollback` restores any earlier version.
+- `POST /api/s1/rollback` may restore `s1@1` or any promoted version, never a rejected candidate.
+- The active version id is recorded in `session.json` at start and in every `s1.version` event, including rollbacks.
+- Every session starts from `s1@1` in the file; in v1, versions do not carry over between sessions.
+- A grade counts toward the version that was active when its claim was flagged.
 
-**Done when:** unit tests with fake Jev and fake System 2 cover the audit trigger and miss rule, the rewrite trigger and cooldown, rejection of every disallowed op, and the gate arithmetic (one promote case and one reject case), with the promoted version applied from the next utterance.
+**Done when:** unit tests with fake Jev and fake System 2 cover:
+- the audit trigger and the miss rule;
+- the rewrite trigger and cooldown, including that memory changes do not reset the count;
+- the per-op field rules and every rejected change (wrong fields, keys, level count, range, length, more than 3 changes);
+- the gate arithmetic, with one promote case and one reject case;
+- the promoted version applying from the next utterance;
+- rollback keeping the memory set.
 
 #### §4.9 Timeline labels
 
-`config/labels.default.json` holds the label set; its version is a hash of its content. The state is `{ "previous_segment": [...], "segment": [...] }`, using the utterance shape from §4.7.
+`config/labels.default.json` has this JSON shape. Question objects are exactly the Decisions API shapes from §2.2.
 
-Each closed segment gets one Jev request (`purpose: "segment"`, concurrency 4, timeout `segmentTimeoutMs`). If it fails, the segment is marked `unlabeled` and can be relabelled later.
+```json
+{ "prefix": "Judge only segment; previous_segment is context only.",
+  "boundary": { "type": "noul", "instructions": "…", "criteria": { "true": "…", "false": "…" } },
+  "questions": { "subject": { "type": "choice", "instructions": "…", "criteria": { "ai_models": "…" } } },
+  "story": { "instructions": "Which of tonight's stories is the current segment about?", "none": "None of these stories." } }
+```
 
-Every timeline instruction below is prefixed with "Judge only segment; previous_segment is context only." The `boundary` question is also defined in this file, but it is asked per utterance (§4.7).
+Code rules for this file:
+- **Prefix.** At request time, `prefix` plus a space is prepended to the instructions of every timeline question, meaning every `questions.*` entry and the generated `story` question. It is never prepended to `boundary`, which is asked per utterance (§4.7) against `{ current_segment, new_utterance }`.
+- **Story question.** When `timeline.stories` is non-empty, code adds a `story` choice. Its criteria are `s1`…`sN`, mapped to the typed headlines, plus `none` mapped to `story.none`.
+- **Version.** The label-set version is the first 12 hex characters of SHA-256 over the canonical JSON (sorted keys) of `{ prefix, questions, story, stories }`.
+
+**Requests.** The code lives in `src/pipeline/timeline.ts`. The state is `{ "previous_segment": [...], "segment": [...] }`, using the utterance shape from §4.7. Each closed segment gets one Jev request (`purpose: "segment"`, up to `jev.segmentConcurrency` in parallel, timeout `segmentTimeoutMs`). If it fails, the segment is marked `unlabeled` and can be relabelled later.
+
+The default content, with every timeline instruction getting the prefix:
 
 ```yaml
 boundary: noul "The new_utterance moves on to a different point or subject than current_segment, rather than continuing, elaborating, answering, or reacting to it."
+  criteria: { true: "It starts a new topic, a new story, or a clearly different point.",
+              false: "It continues, adds detail to, answers, jokes about, or reacts to the preceding discussion." }
 subject: choice "What is the current segment mainly about?"
   ai_models: New AI models, labs, benchmarks, research papers or capabilities
   ai_tools: AI apps, agents, coding assistants or developer tools, and how people build with or use them
@@ -554,6 +840,7 @@ mode: choice "What are the speakers mainly doing in the current segment?"
   explainer: Explaining how something works or defining a concept
   banter: Joking, teasing or casual chat with little information
   transition: Introducing, wrapping up or moving between topics
+  other: None of the above
 disagreement: noul "In the current segment, a speaker disputes or pushes back on another speaker's view."
 heat: score "How heated is the exchange in the current segment?" [Calm, Lively, Animated, Heated, Very heated]
 hype: score "How do the speakers in the current segment feel about the subject they are discussing?" [Very skeptical, Skeptical, Neutral or mixed, Positive, Very enthusiastic]
@@ -574,7 +861,7 @@ story: choice, only when timeline.stories is non-empty: "Which of tonight's stor
 - The display lane `ai` for the three `ai_*` subjects.
 
 **Editing:**
-- `PUT /api/labels` validates a new label set and activates it from the next segment.
+- `PUT /api/labels` takes the same JSON shape, validates it (§4.2 rules), and activates it from the next segment. It returns 409 if `boundary` differs from the active one: the boundary question is calibrated (§4.12), so changing it needs a config edit and a restart.
 - `POST /api/labels/relabel` asks the active set again on closed segments, in the background.
 
 **Done when:**
@@ -583,7 +870,12 @@ story: choice, only when timeline.stories is non-empty: "Which of tonight's stor
 
 #### §4.10 Session orchestration, store, events, API, replay
 
-**`src/pipeline/session.ts`** wires the pipeline together: sources → VAD → tags → speakers → transcription → segmenter → timeline and fact-checker → store and events. At end of input it drains every queue for at most 180 s, then emits `session.ended`.
+**`src/pipeline/session.ts`** wires the pipeline together: sources → VAD → tags → speakers → transcription → segmenter → timeline and fact-checker → store and events. At end of input, in order:
+1. Flush every VAD (§4.3).
+2. Wait for transcription and the segmenter to drain.
+3. Close the open segment (`forced: false`, `final: true`) and label it.
+4. Drain research, audits, and rewrites for at most 180 s.
+5. Emit `stats` and `session.ended`.
 
 **`src/store/sessionStore.ts`** writes to `sessions/<YYYYMMDD-HHMMSS>/`:
 - `host.wav` and `remote.wav`: the full streams as received, for exact replay.
@@ -600,7 +892,7 @@ Files are append-only and flushed on every write.
 | Session | `session.started`, `session.ended`, `health` (per stream, every second: RMS dBFS, ms since last frame, utterances in the last minute) |
 | Speech | `utterance`, `speaker.created`, `speaker.updated`, `speaker.merged` |
 | Timeline | `segment.closed`, `segment.labels`, `section.updated` |
-| Fact-check | `claim.flagged`, `claim.duplicate`, `claim.repeat`, `claim.researching`, `claim.verdict`, `claim.dropped`, `claim.disputed`, `audit`, `s1.version` |
+| Fact-check | `claim.flagged`, `claim.duplicate`, `claim.repeat`, `claim.researching`, `claim.verdict`, `claim.dropped`, `claim.disputed`, `audit`, `s1.version`, `s1.memory` |
 | Accounting | `cost` (running totals for transcription, Jev, and System 2), `budget.exhausted`, `stats` (§4.12), `error` |
 
 **`src/server/main.ts`** uses Node's `http` module, no framework, and binds to 127.0.0.1 only:
@@ -634,14 +926,16 @@ Files are append-only and flushed on every write.
 1. Transcribe the fixture's first Daniel line. The text contains "Jev".
 2. Send one per-utterance Jev request (boundary plus `s1@1`) on a fixture state. Every answer is typed, `usage.cost` is present, and the returned model starts with `typesafe/jev-1.13`.
 3. Send one segment request with the full label set. Every answer is present.
-4. Send 50 sequential per-utterance requests and report p50 and p95. FAIL if more than 2 time out at `utteranceTimeoutMs`.
+4. Send 50 sequential worst-case per-utterance requests: boundary plus `s1@1` plus 3 synthetic `attention_` questions plus `maxKnownQuestions` synthetic `known_` questions (48 questions at the default of 40). Use the live timeout (`utteranceTimeoutMs`) and a single attempt with no retry. Report p50 and p95. FAIL if more than 2 of the 50 exceed `utteranceTimeoutMs`, or if p95 is above 1,500 ms. On the first FAIL, set `maxKnownQuestions` to 20 and rerun this check once.
+
+Checks 2, 3, 5, and 6 use the background settings (§2.5).
 5. Research "Jev is 445 times cheaper than GPT" with the configured web engine. The verdict is schema-valid with ≥ 1 source; report latency and cost. Then try `engine: "native"` once and print whether it works, without changing config.
 6. Send one audit call and one rewrite call with canned inputs. Both are schema-valid.
 
 **Done when:** all checks pass and total cost is ≤ $0.50.
 
 **Stop and ask if:**
-- Check 4 fails. The alpha endpoint would be too slow for live use, and TypeSafe's direct API needs a key the user does not have yet.
+- Check 4 fails again after the rerun with `maxKnownQuestions` at 20. The alpha endpoint would be too slow for live use. The fallback, TypeSafe's direct API (§2.5), needs a TypeSafe key and the user's approval.
 - Check 5 fails with both engines.
 
 #### §4.12 Stats and calibration
@@ -793,16 +1087,17 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 | --- | --- | --- |
 | 1 | Capture method and front end are undecided. | Hold the §4.13 gate; never choose for the user. |
 | 2 | Unknown whether Riverside's tab audio contains only the remote participants. | Test in §4.14 before relying on it; stop if the host's voice is in it. |
-| 3 | Per-utterance Jev latency with 5–48 questions is unmeasured. Small requests measured p95 838 ms. | Smoke check 4. If p95 exceeds 1.5 s, lower `maxKnownQuestions` and measure again before asking. |
+| 3 | Per-utterance Jev latency with 5–48 questions is unmeasured. Small requests measured p95 838 ms. | Follow smoke check 4 and its stop rule (§4.11). |
 | 4 | OpenRouter's Decisions endpoint is alpha. A third party reported about 15% of calls hanging; this Mac saw 0 failures in 10,120 calls. | Short timeouts, one retry, the boundary fallback. Stop per §4.11 if timeouts exceed the limit. |
 | 5 | Unconfirmed whether the web plugin works together with strict `json_schema` and reasoning on GPT-6 Luna, and which engine is better. | Smoke check 5. If strict output fails with the plugin, retry with `response_format: { type: "json_object" }` and a zod parse. If that also fails, stop and ask. |
 | 6 | The exact multipart encoding of `keywords` and `languages` for `gpt-transcribe`. | The §4.5 fallback, then stop. |
-| 7 | `sherpa-onnx-node`'s README says macOS needs `DYLD_LIBRARY_PATH`. Neither `Vad.flush()` nor the `maxSpeechDuration` key is confirmed in the Node typings; the C++ default for maximum speech duration is 20 s. | Keep the prefix. Feature-detect `flush`. If `maxSpeechDuration` is ignored, split long utterances in code at 20 s. |
+| 7 | `sherpa-onnx-node`'s README says macOS needs `DYLD_LIBRARY_PATH`. macOS strips `DYLD_*` variables when a program starts through a `/usr/bin/env` shebang, which is how `tsx` and `vitest` start. Neither `Vad.flush()` nor the `maxSpeechDuration` key is confirmed in the Node typings; the C++ default for maximum speech duration is 20 s. | Follow the §4.1 loading test. Feature-detect `flush`. If `maxSpeechDuration` is ignored, split long utterances in code at 20 s. |
 | 8 | Speaker-ID accuracy on short utterances and through Riverside's audio codec. | Calibrate (§4.12, §4.16). Inferred speakers are marked, and rename and merge exist. |
 | 9 | Jev's accuracy on casual, sarcastic speech for `disagreement`, `hype`, and `heat` is unmeasured. | Thresholds live in config, low-confidence labels are faded, and you calibrate on an old episode. |
 | 10 | System 2 verdicts can be wrong on air. Jev answers are not bit-reproducible, so the gate compares a re-asked candidate with the incumbent's recorded outcomes. | Show sources; provide the host dispute button and rollback. |
 | 11 | Native web search price through OpenRouter is passed through and not listed. | Log `usage.cost`; cap research by count. |
 | 12 | Unknown whether `gpt-transcribe` returns usage. | Estimate cost from audio seconds and mark it `estimated`. |
+| 13 | The user has not chosen a privacy setting for podcast content sent to OpenRouter, TypeSafe, and OpenAI (§2.5). | Use account defaults for development with fixtures. Ask the user before the first session with real voices whether to add `provider: { data_collection: "deny" }` to OpenRouter calls. |
 
 ## §7 Anti-hallucination guardrails
 
@@ -812,7 +1107,7 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 4. **Jev state.** Speaker display names, text, and tags only. No timestamps, ids, costs, or scores.
 5. **System 2's reach.** It may change only the fact-check System 1 set, only through the §4.8 ops. Never `boundary`, never timeline labels, never thresholds outside their ranges, never budgets.
 6. **Logging.** Every external call is logged with purpose, latency, attempts, and cost. Keys never appear in any log, event, or file.
-7. **Budgets.** Enforce caps in code before each call, not after.
+7. **Budgets.** Every external call goes through `src/budget.ts`: `assertCanSpend` before the call, `record` after. Never bypass it, and never raise a cap without the user.
 8. **Network.** Tests never call the network. Live calls happen only in `smoke`, `replay`, `serve`, `preflight`, and the calibration CLIs.
 9. **Commits.** Commit only with the user's §0 yes, one conventional commit per §4 task. Never commit `models/`, `fixtures/`, `sessions/`, or `.env`.
 10. **Scope.** Do not push, deploy, or open pull requests, and do not edit `specs/`. If this spec has a gap, stop and tell the user instead of patching it.
@@ -824,7 +1119,7 @@ These requirements hold whatever the technology. Everything comes from `GET /api
 node --version            # v24.x
 sw_vers -productVersion   # 26.x
 say -v '?' | grep -E '^(Samantha|Daniel|Karen) '
-git status                # "not a git repository": ask the user, then `git init -b main`
+git status                # on master, remote origin; do not touch uncommitted edits under specs/
 
 # Setup (the user fills OPENROUTER_API_KEY and OPENAI_API_KEY in .env; never print .env)
 cp .env.example .env && chmod 600 .env
@@ -864,7 +1159,7 @@ npm run calibrate:boundary -- boundary.jsonl
 | Filler | A short utterance such as "yeah" that skips the per-utterance Jev request. |
 | Segment | Consecutive utterances making one point, closed by the boundary rule. The unit the timeline labels. |
 | Section | Consecutive segments with the same subject. |
-| System 1 version | An immutable fact-check question set plus thresholds (`s1@N`), of kind `default`, `memory`, or `criteria`. |
+| System 1 version | An immutable fact-check question set plus its three thresholds (`s1@N`), of kind `default` or `criteria`. Memory questions sit outside versions. |
 | Flag / good flag / false alarm / miss | System 1 marks a claim / System 2 confirms it was worth checking / System 2 finds it was not a checkable claim / an audit finds an unflagged claim. |
 | Memory question | `known_<claimId>`: recognises a repeat of a claim already queued or checked. |
 | Attention question | `attention_<n>`: a noul question that System 2 adds to prioritise a kind of claim. |
@@ -876,10 +1171,10 @@ npm run calibrate:boundary -- boundary.jsonl
 
 **In this folder:** `BACKGROUND.md` covers why each decision was made, the rejected alternatives, the measured numbers, and the capture research. It is optional.
 
-**Design background** (read-only, optional), in the private jev-xp research repository:
-- `specs/260922-01-xp/jev-as-primitive.md`: Jev's value proposition (§1), evidence, the hallucination claim, confidence, and calibration (§2).
-- `specs/260922-01-xp/openrouter-integration.md`: the Decisions API (§4.1–4.6), authoring rules (§4.8), GPT-6 Luna facts (§5.0), request fields (§5.3), and errors and key limits (§5.6).
-- `specs/260922-01-xp/models-research.md`: Jev operational facts (rate limits, latency, consistency).
+**Design background and integration references** (read-only), in the private jev-xp research repository. The section-by-section map is at the end of §2.5.
+- `specs/260922-01-xp/openrouter-integration.md`: the authoritative OpenRouter, Jev, and GPT-6 Luna integration reference.
+- `specs/260922-01-xp/models-research.md`: Jev's operational facts.
+- `specs/260922-01-xp/jev-as-primitive.md`: Jev's value proposition, the hallucination claim, confidence, and calibration.
 - `src/policy/jevClient.ts`: a working Decisions client built on the OpenRouter SDK. See `sdkTransport` (line 47), `classifyError` (line 77), `backoffMs` (line 107), and `JevClient` (line 142).
 - `src/s2/researcher.ts`: `sdkS2Transport` (line 52), GPT-6 Luna calls with provider pinning.
 
@@ -893,10 +1188,13 @@ npm run calibrate:boundary -- boundary.jsonl
 ### §A Anchors (the Tier 1 file set)
 
 ```
+package.json, tsconfig.json, vitest.config.ts, .env.example, README.md   scaffold (§4.1)
 config/app.json                                  thresholds, caps, models (§4.2)
 config/labels.default.json                       boundary + timeline questions (§4.9)
 config/factcheck.s1.default.json                 s1@1 question set (§4.8)
 src/config.ts                                    config loading (§4.2)
+src/budget.ts                                    shared spending ledger and caps (§4.6)
+tests/setup.ts                                   disables the network in tests (§4.1)
 src/audio/{wav,source,vad,tags}.ts               audio in (§4.3)
 src/speakers/registry.ts                         speakers (§4.4)
 src/transcribe/openai.ts                         transcription (§4.5)
