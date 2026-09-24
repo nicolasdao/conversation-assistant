@@ -1,0 +1,33 @@
+{
+  "name": "podcast-assistant",
+  "version": "0.1.0",
+  "description": "Live podcast transcript, Jev timeline, and fact-checker",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "models": "sh scripts/download-models.sh",
+    "fixtures": "node --import tsx scripts/make-fixtures.ts",
+    "smoke": "node --env-file=.env --import tsx src/cli/smoke.ts",
+    "replay": "node --env-file=.env --import tsx src/cli/replay.ts",
+    "serve": "node --env-file=.env --import tsx src/server/main.ts",
+    "preflight": "node --env-file=.env --import tsx src/cli/preflight.ts",
+    "calibrate:boundary": "node --import tsx src/cli/calibrateBoundary.ts",
+    "calibrate:speakers": "node --env-file=.env --import tsx src/cli/calibrateSpeakers.ts"
+  },
+  "dependencies": {
+    "sherpa-onnx-node": "^1.13.8",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}
