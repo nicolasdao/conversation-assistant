@@ -63,6 +63,13 @@ describe("transcription", () => {
     expect(rows[0]).toMatchObject({ ok: false, attempts: 2, cost_usd: 0 });
   });
 
+  test("does not retry a 429 for exhausted credits", async () => {
+    const { f, calls } = fakeFetch([json(429, { error: { type: "insufficient_quota", code: "credit_balance_exhausted" } }), json(200, { text: "x" })]);
+    const t = new Transcriber(cfg.transcription, { fetch: f, apiKey: "k", budget: budget(), log: () => {} });
+    expect((await t.transcribe("u_1", oneSecond)).ok).toBe(false);
+    expect(calls.length).toBe(1);
+  });
+
   test("does not retry a 400", async () => {
     const { f, calls } = fakeFetch([json(400, { error: { message: "bad file" } })]);
     const t = new Transcriber(cfg.transcription, { fetch: f, apiKey: "k", budget: budget(), log: () => {} });

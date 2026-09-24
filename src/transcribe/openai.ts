@@ -126,7 +126,9 @@ export class Transcriber {
             styleRetried = true;
             continue;
           }
-          const retryable = e instanceof HttpFailure && (e.status === null || e.status === 429 || e.status >= 500);
+          // A 429 for exhausted credits (insufficient_quota) is not transient.
+          const noCredits = e instanceof HttpFailure && e.status === 429 && /insufficient_quota|credit_balance_exhausted/.test(e.body);
+          const retryable = e instanceof HttpFailure && !noCredits && (e.status === null || e.status === 429 || e.status >= 500);
           if (!retryable) break;
         }
       }
