@@ -46,6 +46,14 @@ enum Devices {
     static func uid(_ id: AudioDeviceID) -> String? { string(id, kAudioDevicePropertyDeviceUID) }
     static func name(_ id: AudioDeviceID) -> String { string(id, kAudioObjectPropertyName) ?? "Unknown" }
 
+    /// A device's nominal sample rate, or 0 when it cannot be read.
+    static func nominalRate(_ id: AudioObjectID) -> Double {
+        var rate = Float64(0)
+        var addr = address(kAudioDevicePropertyNominalSampleRate)
+        var size = UInt32(MemoryLayout<Float64>.size)
+        return AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &rate) == noErr ? rate : 0
+    }
+
     static func transportType(_ id: AudioDeviceID) -> UInt32 {
         var addr = address(kAudioDevicePropertyTransportType)
         var t: UInt32 = 0

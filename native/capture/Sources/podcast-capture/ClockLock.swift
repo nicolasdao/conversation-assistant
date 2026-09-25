@@ -48,6 +48,23 @@ final class MonoConverter {
     }
 }
 
+/// A MonoConverter that follows the input: when buffers arrive at a new sample rate (a Bluetooth headset switching
+/// to its call profile, an output device change), it rebuilds for that rate instead of resampling from a stale one.
+final class AdaptiveConverter {
+    private var current: MonoConverter?
+    private var rate: Double = 0
+
+    func convert(_ input: AVAudioPCMBuffer) -> [Float] {
+        let r = input.format.sampleRate
+        guard r > 0 else { return [] }
+        if r != rate || current == nil {
+            current = MonoConverter(sourceRate: r)
+            rate = r
+        }
+        return current?.convert(input) ?? []
+    }
+}
+
 /// Level statistics for --probe.
 struct Levels {
     var peak: Float = 0

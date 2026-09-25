@@ -13,9 +13,13 @@ final class SystemTap {
     private var tapUID = ""
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
     private var procID: AudioDeviceIOProcID?
-    private var converter: MonoConverter?
-    private var tapFormat: AVAudioFormat?
+    private let converter = AdaptiveConverter()
     private var listener: AudioObjectPropertyListenerBlock?
+    /// Watches the current output device's sample rate: a Bluetooth headset entering its call profile changes it.
+    private var rateListener: AudioObjectPropertyListenerBlock?
+    private var watchedOutput = AudioObjectID(kAudioObjectUnknown)
+    private var watchedRate: Double = 0
+    private(set) var sampleRate: Double = 0
     private weak var clock: ClockLock?
     private var stream: UInt8 = 1
     private let status: ([String: Any]) -> Void
@@ -37,16 +41,6 @@ final class SystemTap {
         guard st == noErr, id != kAudioObjectUnknown else { throw CaptureError.message("AudioHardwareCreateProcessTap failed (OSStatus \(st))") }
         tapID = id
         tapUID = desc.uuid.uuidString
-
-        var addr = Devices.address(kAudioTapPropertyFormat)
-        var asbd = AudioStreamBasicDescription()
-        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
-        let fst = AudioObjectGetPropertyData(tapID, &addr, 0, nil, &size, &asbd)
-        guard fst == noErr, let fmt = AVAudioFormat(streamDescription: &asbd), let conv = MonoConverter(sourceRate: asbd.mSampleRate) else {
-            throw CaptureError.message("could not read the tap format (OSStatus \(fst))")
-        }
-        tapFormat = fmt
-        converter = conv
         try buildAggregate()
         listenForOutputChanges()
     }
@@ -69,7 +63,19 @@ final class SystemTap {
         guard st == noErr, agg != kAudioObjectUnknown else { throw CaptureError.message("AudioHardwareCreateAggregateDevice failed (OSStatus \(st))") }
         aggregateID = agg
 
-        guard let fmt = tapFormat, let conv = converter else { throw CaptureError.message("tap format missing") }
+        // The tap's buffers arrive at the aggregate's rate, which follows the output device: 48 kHz normally, 16 or 24 kHz
+        // for a Bluetooth headset in its call profile. Read both now (never cache them), or the audio comes out sped up.
+        var addr = Devices.address(kAudioTapPropertyFormat)
+        var asbd = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout<AudioStreamBasicDescription>.size)
+        let fst = AudioObjectGetPropertyData(tapID, &addr, 0, nil, &size, &asbd)
+        guard fst == noErr else { throw CaptureError.message("could not read the tap format (OSStatus \(fst))") }
+        let aggRate = Devices.nominalRate(agg)
+        if aggRate > 0 { asbd.mSampleRate = aggRate }
+        guard let fmt = AVAudioFormat(streamDescription: &asbd) else { throw CaptureError.message("unusable tap format") }
+        sampleRate = asbd.mSampleRate
+        watchRate(of: out)
+        let conv = converter
         let stream = self.stream
         var proc: AudioDeviceIOProcID?
         let pst = AudioDeviceCreateIOProcIDWithBlock(&proc, agg, queue) { [weak self] _, inInputData, inInputTime, _, _ in
@@ -97,6 +103,40 @@ final class SystemTap {
         aggregateID = AudioObjectID(kAudioObjectUnknown)
     }
 
+    /// Rebuilds the aggregate (and so re-reads the rate) when the output device's sample rate changes.
+    private func watchRate(of device: AudioObjectID) {
+        if watchedOutput == device, rateListener != nil { return }
+        unwatchRate()
+        watchedRate = Devices.nominalRate(device)
+        var addr = Devices.address(kAudioDevicePropertyNominalSampleRate)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self, self.aggregateID != kAudioObjectUnknown else { return }
+            // compare with the output's own last rate: rebuilding the aggregate must not retrigger this
+            let rate = Devices.nominalRate(device)
+            if rate <= 0 || rate == self.watchedRate { return }
+            self.watchedRate = rate
+            self.destroyAggregate()
+            do {
+                try self.buildAggregate()
+                self.status(["type": "warning", "message": "system audio now runs at \(Int(self.sampleRate)) Hz (the output device changed mode); capture follows it"])
+            } catch {
+                self.status(["type": "error", "message": "rebuilding the system tap after a sample-rate change failed: \(error)"])
+            }
+        }
+        rateListener = block
+        watchedOutput = device
+        AudioObjectAddPropertyListenerBlock(device, &addr, queue, block)
+    }
+
+    private func unwatchRate() {
+        if let block = rateListener, watchedOutput != kAudioObjectUnknown {
+            var addr = Devices.address(kAudioDevicePropertyNominalSampleRate)
+            AudioObjectRemovePropertyListenerBlock(watchedOutput, &addr, queue, block)
+        }
+        rateListener = nil
+        watchedOutput = AudioObjectID(kAudioObjectUnknown)
+    }
+
     private func listenForOutputChanges() {
         var addr = Devices.address(kAudioHardwarePropertyDefaultOutputDevice)
         let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
@@ -119,7 +159,7 @@ final class SystemTap {
             AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, queue, block)
             listener = nil
         }
-        queue.sync { destroyAggregate() }
+        queue.sync { destroyAggregate(); unwatchRate() }
         if tapID != kAudioObjectUnknown {
             AudioHardwareDestroyProcessTap(tapID)
             tapID = AudioObjectID(kAudioObjectUnknown)
