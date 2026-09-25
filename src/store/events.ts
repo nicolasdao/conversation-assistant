@@ -9,6 +9,7 @@ export const EVENT_SCHEMAS = {
   "session.started": obj({ sessionId: str, mode: z.enum(["replay", "live"]), s1Version: str, labelSetVersion: str }),
   "session.ended": obj({ sessionId: str, reason: str }),
   health: obj({ stream: z.enum(["host", "remote"]), rmsDbfs: num, msSinceLastFrame: num, utterancesLastMinute: num }),
+  "utterance.partial": obj({ stream: z.enum(["host", "remote"]), itemId: str, text: str, utteranceId: str.nullable(), final: z.boolean() }),
   utterance: obj({ id: str, stream: str, startMs: num, endMs: num, speakerId: str, speakerName: str, text: str, tags: z.array(str) }),
   "speaker.created": obj({ id: str, displayName: str, stream: str }),
   "speaker.updated": obj({ id: str, displayName: str }),
@@ -60,14 +61,15 @@ export class EventBus {
 
   constructor(private readonly opts: { redact?: (s: string) => string; onInvalid?: (type: string, message: string) => void } = {}) {}
 
-  emit(type: EventType, data: Record<string, unknown>): AppEvent {
+  /** A transient event (live partial text) reaches subscribers but is never kept in the replayable history. */
+  emit(type: EventType, data: Record<string, unknown>, opts: { transient?: boolean } = {}): AppEvent {
     const schema = EVENT_SCHEMAS[type];
     if (!schema) throw new Error(`unknown event type ${type}`);
     const r = schema.safeParse(data);
     if (!r.success) this.opts.onInvalid?.(type, z.prettifyError(r.error));
     const clean = this.opts.redact ? JSON.parse(this.opts.redact(JSON.stringify(data))) : data;
     const e: AppEvent = { seq: ++this.seq, type, at: new Date().toISOString(), data: clean };
-    this.events.push(e);
+    if (!opts.transient) this.events.push(e);
     for (const s of this.subs) {
       try { s(e); } catch { /* a broken subscriber must not break the pipeline */ }
     }

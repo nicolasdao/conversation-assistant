@@ -93,11 +93,13 @@ export class Engine implements EngineApi {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
     let sources: AudioSource[];
     let mode: "replay" | "live";
+    let liveText = false;
     if (req?.mode === "replay") {
       if (typeof req.dir !== "string" || !req.dir) throw new ApiError(400, "dir is required");
       const speed: Speed = req.speed === "max" ? "max" : 1;
       sources = replaySources(req.dir, speed);
       mode = "replay";
+      liveText = speed === 1; // streaming text only makes sense at real-time pace
     } else if (req?.mode === "live") {
       if (!this.opts.live) throw new ApiError(501, "live capture is not available");
       this.captureDetail = null;
@@ -107,13 +109,14 @@ export class Engine implements EngineApi {
       });
       sources = this.capture.sources;
       mode = "live";
+      liveText = true;
     } else {
       throw new ApiError(400, "mode must be replay or live");
     }
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, ...this.opts.session,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, ...this.opts.session,
     });
     const s = this.session;
     s.run().catch((e) => console.error("session failed:", e));

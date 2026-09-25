@@ -7,6 +7,7 @@ import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
 import { Embedder, SpeakerRegistry } from "../speakers/registry.ts";
 import { Transcriber, type TranscriptionResult } from "../transcribe/openai.ts";
+import { LiveTranscriber, type LiveDeps } from "../transcribe/live.ts";
 import { JevClient, type JevCallMeta, type JevCallRow } from "../jev/client.ts";
 import type { JevResponse, QuestionSet } from "../jev/types.ts";
 import { S2Client } from "../factcheck/s2.ts";
@@ -43,6 +44,10 @@ export interface SessionOptions {
   statsIntervalMs?: number;
   /** Extra detail for health events, such as the capture helper's device names. */
   healthDetail?: () => Record<string, unknown> | null;
+  /** Streaming display text (live sessions and speed-1 replays); needs transcription.live.enabled. */
+  liveText?: boolean;
+  /** Test seam for the realtime WebSocket. */
+  liveConnect?: LiveDeps["connect"];
 }
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
@@ -70,6 +75,7 @@ export class Session {
   private readonly timers: NodeJS.Timeout[] = [];
   private stopRequested = false;
   private exportRows: unknown[] = [];
+  private live: LiveTranscriber | null = null;
   private done: Promise<void> | null = null;
 
   constructor(private readonly opts: SessionOptions) {
@@ -94,6 +100,18 @@ export class Session {
       if (file === "jev_calls" && r.purpose === "utterance" && r.ok && r.utterance_id) this.states.set(r.utterance_id, r.state);
     };
     this.services = opts.services ? opts.services({ budget: this.budget, log }) : this.realServices(log);
+    const liveCfg = opts.config.app.transcription.live;
+    if (opts.liveText && liveCfg?.enabled) {
+      this.live = new LiveTranscriber(opts.config.app.transcription, liveCfg, {
+        apiKey: opts.keys?.openai ?? process.env.OPENAI_API_KEY ?? "",
+        budget: this.budget,
+        log: (r) => this.store.append("transcriptions", r),
+        onPartial: (p) => this.emit("utterance.partial", { ...p }),
+        onError: (m) => this.emit("error", { component: "live-transcription", message: m }),
+        connect: opts.liveConnect,
+      });
+      for (const s of streams) this.live.warm(s);
+    }
 
     this.speakers = new SpeakerRegistry(cfg.app.speakers, opts.embedder ?? new Embedder());
     for (const s of streams) {
@@ -165,8 +183,9 @@ export class Session {
   }
 
   emit(type: EventType, data: Record<string, unknown>): void {
-    const e = this.bus.emit(type, data);
-    this.store.append("events", e);
+    const transient = type === "utterance.partial";
+    const e = this.bus.emit(type, data, { transient });
+    if (!transient) this.store.append("events", e);
   }
 
   /** Runs the whole session; resolves at session.ended. */
@@ -201,7 +220,10 @@ export class Session {
         h.lastFrameAt = Date.now();
         h.recent.push(f.samples);
         if (h.recent.length > 32) h.recent.shift();
-        for (const u of this.vads.get(f.stream)!.accept(f.samples, f.sessionMs)) this.onUtterance(u);
+        const vad = this.vads.get(f.stream)!;
+        const utts = vad.accept(f.samples, f.sessionMs);
+        this.live?.feed(f.stream, f.samples, vad.isDetected());
+        for (const u of utts) this.onUtterance(u);
         this.segmenter.poll();
         if (++n % 64 === 0) await new Promise<void>((r) => setImmediate(r)); // let network I/O progress at speed max
       }
@@ -227,6 +249,7 @@ export class Session {
       speaker_inferred: a.inferred, tags,
     });
     this.segmenter.emitted(u);
+    this.live?.commit(u.stream, u.id);
     const p = this.services.transcribe(u.id, u.samples)
       .catch((e): TranscriptionResult => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       .then((r) => {
@@ -305,6 +328,7 @@ export class Session {
     if (!drained) this.emit("error", { component: "factcheck", message: "fact-check work still running after 180 s; ending anyway" });
     this.factcheck.stop();
     for (const t of this.timers) clearInterval(t);
+    this.live?.close();
     this.emitStats(); // 5.
     this.store.writeJson("speakers.json", this.speakers.list());
     if (this.opts.exportBoundary) {

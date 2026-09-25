@@ -161,6 +161,25 @@ export function renderTranscript(st: State) {
       u.tags.map((t) => h("span", { class: "tag ghost small" }, t)),
       flagged.has(u.id) ? h("span", { class: "flag", title: "Flagged for fact-checking" }, "⚑") : null));
   }
+  // Streaming text: shown until its final line arrives (a finished partial whose utterance was dropped fades after 8 s).
+  const now = Date.now();
+  for (const [k, p] of st.partials) if (p.final && now - p.receivedAt > 8000) st.partials.delete(k);
+  if (!labelFilter) {
+    // Who is speaking is only known when the final line lands; name them only if the stream has had one speaker.
+    const soleSpeaker = (stream: string) => {
+      const ids = new Set(utts.filter((u) => u.stream === stream).map((u) => resolveSpeaker(st, u.speakerId)?.id));
+      return ids.size === 1 ? resolveSpeaker(st, [...ids][0]!) : undefined;
+    };
+    for (const p of [...st.partials.values()].sort((a, b) => a.receivedAt - b.receivedAt)) {
+      if (!p.text) continue;
+      const sp = soleSpeaker(p.stream);
+      if (filters.speaker && sp?.id !== filters.speaker) continue;
+      rows.push(h("div", { class: "utt live" },
+        h("span", { class: "utt-time" }, h("span", { class: "live-dot", title: "Live text: the final line replaces it" })),
+        h("span", { class: `utt-speaker s-${p.stream}` }, sp?.displayName ?? (p.stream === "host" ? "Host" : "Call")),
+        h("span", { class: "utt-text" }, p.text)));
+    }
+  }
   if (rows.length === 0) rows.push(h("div", { class: "empty" }, st.session ? "Waiting for speech…" : "Start a live session or a replay."));
   replace(box, rows);
   if (nearBottom) box.scrollTop = box.scrollHeight;

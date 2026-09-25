@@ -32,12 +32,15 @@ export interface S1Outcome { active: string; candidate: string | null; outcome: 
 export interface Cost { transcription: number; jev: number; s2: number; session: number; sessionCapUsd: number }
 export interface LabelQuestion { type: "noul" | "choice" | "score"; instructions: string; criteria?: any }
 export interface LabelSet { prefix: string; boundary: LabelQuestion; questions: Record<string, LabelQuestion>; story: { instructions: string; none: string } }
+export interface LivePartial { stream: Stream; itemId: string; text: string; utteranceId: string | null; final: boolean; receivedAt: number }
 export interface ErrorItem { component: string; message: string; at: string }
 
 export interface State {
   session: { id: string; mode: string; status: string; dir?: string; startedAt?: string; streams?: Stream[] } | null;
   speakers: Map<string, Speaker>;
   utterances: Map<string, Utterance>;
+  /** Streaming text not yet replaced by its final utterance, by realtime item id. */
+  partials: Map<string, LivePartial>;
   segments: Map<string, Segment>;
   sections: Section[];
   claims: Map<string, Claim>;
@@ -52,7 +55,7 @@ export interface State {
 
 export function emptyState(): State {
   return {
-    session: null, speakers: new Map(), utterances: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
+    session: null, speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0 },
     labels: { set: null, stories: [], version: "" },
     cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 5 },
@@ -118,8 +121,14 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       dirty.add("health");
       break;
     }
+    case "utterance.partial":
+      if (d.utteranceId && s.utterances.has(d.utteranceId)) break; // the final line already landed
+      s.partials.set(d.itemId, { ...d, receivedAt: Date.now() });
+      dirty.add("transcript");
+      break;
     case "utterance":
       s.utterances.set(d.id, d);
+      for (const [k, p] of s.partials) if (p.utteranceId === d.id) s.partials.delete(k);
       dirty.add("transcript");
       break;
     case "speaker.created":

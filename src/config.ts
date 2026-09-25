@@ -23,6 +23,15 @@ export const AppConfigSchema = z.object({
     prompt: z.string(),
     keywords: z.array(z.string().min(1)),
     fixes: z.array(z.object({ pattern: z.string().min(1), replace: z.string() }).strict()),
+    /** Streaming text for the display only (OpenAI realtime transcription); final text still comes from `model`. */
+    live: z.object({
+      enabled: z.boolean(),
+      model: z.string().min(1),
+      delay: z.enum(["minimal", "low", "medium", "high", "xhigh"]),
+      prerollMs: nonNegative,
+      hangoverMs: nonNegative,
+      usdPerMinute: nonNegative,
+    }).strict().optional(),
   }).strict(),
   jev: z.object({
     model: z.string().min(1), utteranceTimeoutMs: int, segmentTimeoutMs: int, maxAttempts: int,

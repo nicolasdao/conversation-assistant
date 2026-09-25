@@ -8,7 +8,9 @@
     "prompt": "Three friends co-host an English-language podcast about AI news, tech and marketing.",
     "keywords": ["Jev", "TypeSafe", "OpenRouter", "Riverside", "GPT-6 Luna", "GPT-6 Sol", "OpenAI", "Anthropic",
                  "Claude", "DeepSeek", "Gemini", "Hugging Face", "Nvidia", "System 1", "System 2", "Kahneman"],
-    "fixes": []
+    "fixes": [],
+    "live": { "enabled": true, "model": "gpt-live-transcribe", "delay": "low", "prerollMs": 600, "hangoverMs": 700,
+              "usdPerMinute": 0.017 }
   },
   "jev": { "model": "typesafe/jev-1.13", "utteranceTimeoutMs": 3000, "segmentTimeoutMs": 5000, "maxAttempts": 2,
            "backgroundTimeoutMs": 30000, "backgroundMaxAttempts": 5, "concurrency": 8, "segmentConcurrency": 4,

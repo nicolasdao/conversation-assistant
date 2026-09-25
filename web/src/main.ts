@@ -82,7 +82,7 @@ function connect() {
     if (e.type === "s1.version") void api.state().then((snap) => { st.s1.versions = snap?.s1?.versions ?? st.s1.versions; dirty.add("s1"); schedule(); });
     schedule();
   };
-  for (const t of ["session.started", "session.ended", "health", "utterance", "speaker.created", "speaker.updated", "speaker.merged",
+  for (const t of ["session.started", "session.ended", "health", "utterance", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
     "segment.closed", "segment.labels", "section.updated", "claim.flagged", "claim.duplicate", "claim.repeat", "claim.researching",
     "claim.verdict", "claim.dropped", "claim.disputed", "audit", "s1.version", "s1.memory", "cost", "budget.exhausted", "stats", "error"]) {
     es.addEventListener(t, (ev) => void handle(ev as MessageEvent));
