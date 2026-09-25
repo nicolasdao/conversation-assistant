@@ -1,5 +1,17 @@
 # Podcast Assistant
 
+## Table of Contents
+
+<!-- BEGIN toc -->
+- [Setup](#setup)
+- [Scripts](#scripts)
+- [Using it](#using-it)
+- [Documentation](#documentation)
+- [Design decisions](#design-decisions)
+- [License](#license)
+<!-- END toc -->
+
+
 A local app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio), transcribes it live, labels the conversation on a timeline with Jev, and fact-checks claims with a System 1 / System 2 loop.
 
 ## Setup
@@ -10,7 +22,7 @@ Requires Node 24 and macOS on Apple Silicon.
 npm install
 cp .env.example .env && chmod 600 .env   # fill OPENROUTER_API_KEY and OPENAI_API_KEY; never commit it
 npm run models                           # Silero VAD + WeSpeaker speaker-embedding models into models/
-npm run fixtures                         # a scripted ~100 s test conversation into fixtures/conversation/
+npm run fixtures                         # a scripted ~77 s test conversation into fixtures/conversation/
 ```
 
 Use a dedicated OpenRouter key for this project with a credit limit (for example $10).
@@ -35,6 +47,22 @@ Use a dedicated OpenRouter key for this project with a credit limit (for example
 Development runs stop at a $3 total spend (summed from `sessions/**/*.jsonl`); `--allow-over-dev-cap` lifts that cap.
 
 macOS asks once for **Microphone** and once for **System Audio Recording**; both are granted to the terminal app that starts the server (System Settings → Privacy & Security). A denied permission delivers silence, which `capture:test` and `preflight` detect.
+
+## Using it
+
+`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in). The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the System 1 panel. Every session is saved under `sessions/`; the **Recordings** tab lists, names, searches, reopens, and replays them.
+
+Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.03 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($5) in `config/app.json`. OpenRouter calls send `provider: { data_collection: "deny" }`.
+
+## Documentation
+
+<!-- BEGIN doc-index -->
+- [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.
+- [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, and replays past sessions.
+- [Rehearsal kit](docs/rehearsal.md) — The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.
+- [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, why the threshold is 0.65, how short utterances are handled, and how to rename, merge, and calibrate.
+- [Transcription](docs/transcription.md) — How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.
+<!-- END doc-index -->
 
 ## Design decisions
 

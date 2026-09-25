@@ -1,3 +1,11 @@
+---
+description: The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.
+tags: [show, checklist, rehearsal, calibration, preflight]
+source:
+  - src/cli/preflight.ts
+  - scripts/capture-test.sh
+---
+
 # Rehearsal kit
 
 Everything to check before going on air with Podcast Assistant, the lines to plant, and how to calibrate on an old episode.
@@ -5,9 +13,8 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 ## The day before
 
 1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys, the config, the OpenRouter credit, one live call per service (about $0.02), and 2 GB of free disk.
-2. Record a fallback: run a live rehearsal session (below), stop it, then check that it replays:
-   `npm run serve -- --replay sessions/<id> --speed 1` and open http://127.0.0.1:4317.
-3. Keep that session folder. If anything fails on air, stop the live session and start this replay at `--speed 1`.
+2. Record a fallback: run a live rehearsal session (below), stop it, and name it in the **Recordings** tab (for example "Fallback — Ep 12").
+3. Check that it works as a fallback: in the Recordings tab, **Open** shows it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about twice its original cost, because live text streams again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 
 ## Pre-show checklist
 
@@ -16,10 +23,10 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
 - [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $5), and a credit limit on the OpenRouter key.
 - [ ] **Tonight's stories** are typed in (Labels tab → Stories → Save stories).
-- [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use the Speakers tab). Merge duplicates there.
+- [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use the Speakers tab). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
-- [ ] A **fallback session** was recorded the day before and replays at `--speed 1`.
-- [ ] Privacy: decide whether OpenRouter calls should add `provider: { data_collection: "deny" }` before the first session with real voices (spec §6 row 13).
+- [ ] A **fallback session** was recorded the day before and is named in the Recordings tab.
+- [ ] Privacy: OpenRouter calls already send `provider: { data_collection: "deny" }` (`config/app.json`). Podcast audio still goes to OpenAI for transcription.
 
 ## Starting the show
 
@@ -27,7 +34,7 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 npm run serve        # builds the page, then serves http://127.0.0.1:4317
 ```
 
-Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream has been silent for more than 10 s.
+Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream has been silent for more than 10 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
 
 ## Planted lines to say on air
 

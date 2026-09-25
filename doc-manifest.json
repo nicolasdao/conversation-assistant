@@ -1,0 +1,244 @@
+{
+  "diagnostics": {
+    "gotchas": {
+      "dead_hub_links": [],
+      "format": "monolithic",
+      "orphaned_domain_files": [],
+      "oversized_domain_files": []
+    }
+  },
+  "generated_from": "README.md + docs/**/*.md (excl docs/manual/)",
+  "nodes": [
+    {
+      "dangling": false,
+      "description": null,
+      "has_frontmatter": false,
+      "headings": [
+        "Podcast Assistant",
+        "Table of Contents",
+        "Setup",
+        "Scripts",
+        "Using it",
+        "Documentation",
+        "Design decisions",
+        "License"
+      ],
+      "line_count": 91,
+      "links_to": [
+        "docs/gotchas.md",
+        "docs/recordings.md",
+        "docs/rehearsal.md",
+        "docs/speakers.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "README.md",
+      "source": [],
+      "source_unresolved": [],
+      "tags": [],
+      "toc": {
+        "linked": true,
+        "present": true,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.",
+      "has_frontmatter": true,
+      "headings": [
+        "Gotchas",
+        "Capture (macOS)",
+        "sherpa-onnx",
+        "OpenAI",
+        "OpenRouter and GPT-6 Luna",
+        "Jev questions",
+        "Test fixture"
+      ],
+      "line_count": 45,
+      "links_to": [],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/gotchas.md",
+      "source": [
+        "native/capture/**",
+        "src/audio/nativeSource.ts",
+        "src/transcribe/**",
+        "src/factcheck/s1.ts",
+        "src/factcheck/s2.ts",
+        "scripts/make-fixtures.ts"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "gotchas",
+        "macos",
+        "openai",
+        "openrouter",
+        "jev",
+        "sherpa-onnx"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, and replays past sessions.",
+      "has_frontmatter": true,
+      "headings": [
+        "Recordings",
+        "Session folders",
+        "The library — `src/store/library.ts`",
+        "Open vs Replay",
+        "API"
+      ],
+      "line_count": 64,
+      "links_to": [
+        "docs/rehearsal.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/recordings.md",
+      "source": [
+        "src/store/sessionStore.ts",
+        "src/store/library.ts",
+        "src/store/events.ts",
+        "src/server/main.ts"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "sessions",
+        "storage",
+        "library",
+        "replay",
+        "api"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.",
+      "has_frontmatter": true,
+      "headings": [
+        "Rehearsal kit",
+        "The day before",
+        "Pre-show checklist",
+        "Starting the show",
+        "Planted lines to say on air",
+        "Calibration on an old episode"
+      ],
+      "line_count": 65,
+      "links_to": [
+        "docs/recordings.md",
+        "docs/speakers.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/rehearsal.md",
+      "source": [
+        "src/cli/preflight.ts",
+        "scripts/capture-test.sh"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "show",
+        "checklist",
+        "rehearsal",
+        "calibration",
+        "preflight"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "How each utterance gets a speaker from local voice embeddings, why the threshold is 0.65, how short utterances are handled, and how to rename, merge, and calibrate.",
+      "has_frontmatter": true,
+      "headings": [
+        "Speakers",
+        "Assignment rules",
+        "Threshold",
+        "Rename and merge"
+      ],
+      "line_count": 50,
+      "links_to": [
+        "docs/gotchas.md",
+        "docs/recordings.md",
+        "docs/rehearsal.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/speakers.md",
+      "source": [
+        "src/speakers/registry.ts",
+        "src/cli/calibrateSpeakers.ts"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "speakers",
+        "diarization",
+        "embeddings",
+        "calibration"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.",
+      "has_frontmatter": true,
+      "headings": [
+        "Transcription",
+        "Utterances: what triggers a transcript",
+        "Final layer — `src/transcribe/openai.ts`",
+        "Live layer — `src/transcribe/live.ts`",
+        "Cost",
+        "Configuration (`config/app.json` → `transcription`)"
+      ],
+      "line_count": 72,
+      "links_to": [
+        "docs/gotchas.md",
+        "docs/recordings.md",
+        "docs/speakers.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/transcription.md",
+      "source": [
+        "src/transcribe/openai.ts",
+        "src/transcribe/live.ts",
+        "src/audio/vad.ts",
+        "config/app.json"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "transcription",
+        "openai",
+        "realtime",
+        "latency",
+        "cost"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    }
+  ]
+}
