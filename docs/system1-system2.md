@@ -233,7 +233,7 @@ Both outcomes are appended to `s1_versions.jsonl` with their metrics and rationa
 | `audit` | An audit finished (sample size, misses) |
 | `s1.version` | A rewrite was promoted, rejected, invalid, or failed its gate, or a rollback happened |
 
-Files in the session folder: `claims.jsonl` (one row per status change), `verdicts.jsonl`, `s1_versions.jsonl`, `audits.jsonl`, `s2_calls.jsonl`, and `jev_calls.jsonl` (see [Recordings](recordings.md)).
+Files in the session folder: `claims.jsonl` (one row per status change), `verdicts.jsonl`, `s1_versions.jsonl`, `audits.jsonl`, `s2_calls.jsonl`, and `jev_calls.jsonl` (see [Recordings](recordings.md)). Each `s2_calls.jsonl` row also keeps the prompt as sent (`request: { system, user }`) and the model's reply text (`response`), so the page's **Fast · slow thinking** tab can show System 2 at work; rows from before this was added have neither. Every Jev and System 2 call also streams to the page as transient `call.started` / `call` events.
 
 ## Measured so far
 

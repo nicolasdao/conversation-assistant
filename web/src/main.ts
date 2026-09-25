@@ -6,7 +6,8 @@ import {
   renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
-import { applyEvent, emptyState, fromSnapshot, type Dirty, type State } from "./state.js";
+import { renderThinking } from "./calls.js";
+import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
 
 let st: State = emptyState();
 const dirty: Dirty = new Set();
@@ -39,13 +40,14 @@ function schedule() {
     if (all || dirty.has("cost")) renderCost(st);
     if (all || dirty.has("stats")) renderStats(st);
     if (all || dirty.has("errors")) renderErrors(st);
+    if (all || dirty.has("calls") || dirty.has("claims")) renderThinking(st);
     renderMenu(st);
     dirty.clear();
   });
 }
 
 function markAll() {
-  for (const k of ["session", "health", "transcript", "timeline", "claims", "speakers", "s1", "labels", "cost", "stats", "errors"] as const) dirty.add(k);
+  for (const k of ["session", "health", "transcript", "timeline", "claims", "speakers", "s1", "labels", "cost", "stats", "errors", "calls"] as const) dirty.add(k);
   schedule();
 }
 
@@ -75,6 +77,42 @@ async function reload() {
     st = emptyState();
   }
   markAll();
+  void loadCalls(st);
+}
+
+/** The calls made before this page connected (or all of an opened recording's); later ones arrive live. */
+async function loadCalls(target: State) {
+  if (!target.session) return;
+  try {
+    const [s1, s2] = await Promise.all([api.calls("s1", 1000), api.calls("s2", 200)]);
+    if (target !== st) return; // a newer session took over meanwhile
+    const rows = [...(s1.rows as CallRow[]), ...(s2.rows as CallRow[])].sort((a, b) => a.at.localeCompare(b.at));
+    for (const r of rows) addCall(st, r);
+    for (const list of [st.calls.s1, st.calls.s2]) list.sort((a, b) => a.at.localeCompare(b.at));
+    st.calls.models = { s1: s1.models.s1, s2: s1.models.s2 };
+    dirty.add("calls");
+    schedule();
+  } catch { /* an older server has no /api/calls */ }
+}
+
+/** Right column tabs: Fact-check, Fast · slow thinking, Jev log. */
+function bindTabs() {
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>(".tabs .tab")];
+  const show = (tab: HTMLButtonElement) => {
+    for (const t of tabs) {
+      t.setAttribute("aria-selected", String(t === tab));
+      $(`#${t.dataset.pane}`)!.hidden = t !== tab;
+    }
+    $("#tally")!.hidden = tab.dataset.pane !== "pane-fc";
+    try { localStorage.setItem("pa.rightTab", tab.dataset.pane!); } catch { /* storage may be unavailable */ }
+    dirty.add("calls");
+    schedule();
+  };
+  for (const t of tabs) t.addEventListener("click", () => show(t));
+  try {
+    const saved = tabs.find((t) => t.dataset.pane === localStorage.getItem("pa.rightTab"));
+    if (saved) show(saved);
+  } catch { /* storage may be unavailable */ }
 }
 
 function connect() {
@@ -94,7 +132,7 @@ function connect() {
     if (e.type === "s1.version") void api.state().then((snap) => { st.s1.versions = snap?.s1?.versions ?? st.s1.versions; dirty.add("s1"); schedule(); });
     schedule();
   };
-  for (const t of ["session.started", "session.ended", "session.paused", "session.resumed", "health", "utterance", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
+  for (const t of ["session.started", "session.ended", "session.paused", "session.resumed", "call.started", "call", "health", "utterance", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
     "segment.closed", "segment.labels", "section.updated", "claim.flagged", "claim.duplicate", "claim.repeat", "claim.researching",
     "claim.verdict", "claim.dropped", "claim.disputed", "audit", "s1.version", "s1.memory", "cost", "budget.exhausted", "stats", "error"]) {
     es.addEventListener(t, (ev) => void handle(ev as MessageEvent));
@@ -110,6 +148,7 @@ function connect() {
 bindControls(onOpen, () => void reload());
 bindSessionName(() => st, () => { dirty.add("session"); schedule(); });
 bindSplit();
+bindTabs();
 void checkEngine();
 setInterval(() => void checkEngine(), 15_000);
 bindTimeline(() => { dirty.add("timeline"); schedule(); });
@@ -118,4 +157,11 @@ void loadDevices();
 await reload();
 connect();
 window.addEventListener("resize", () => { dirty.add("timeline"); schedule(); });
-setInterval(() => { dirty.add("health").add("timeline"); schedule(); }, 1000);
+setInterval(() => {
+  dirty.add("health").add("timeline");
+  // a start whose finished call never arrived (a dropped connection) must not leave a system "thinking" forever
+  for (const [sys, limit] of [["s1", 30_000], ["s2", 120_000]] as const) {
+    if (st.calls.active[sys] > 0 && Date.now() - st.calls.lastStart[sys] > limit) { st.calls.active[sys] = 0; dirty.add("calls"); }
+  }
+  schedule();
+}, 1000);

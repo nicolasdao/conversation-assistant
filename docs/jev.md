@@ -160,7 +160,7 @@ No LLM writes or changes these labels: the host is System 2 for the timeline, be
 - **Concurrency** is shared (`jev.concurrency`, 8); live calls queue ahead of background calls.
 - **Budget:** `assertCanSpend` before every call (a refused call is logged with 0 attempts and never reaches the network) and `record("jev", usage.cost)` after.
 
-Every call writes one row to `jev_calls.jsonl`: `purpose`, `utterance_id` / `segment_id`, a 16-hex `request_hash`, the full `state` and `question_ids`, `question_set_version` (the System 1 version or label-set version), `ok`, `latency_ms`, `attempts`, the returned `id`, `model_returned`, `provider_returned`, `answers`, `usage`, `cost_usd`, and `error`. The logged states are what the replay gate re-asks. Separately, `replay --export` writes each utterance's boundary probability for `calibrate:boundary`.
+Every call writes one row to `jev_calls.jsonl`: `purpose`, `utterance_id` / `segment_id`, a 16-hex `request_hash`, the full `state` and `question_ids`, `question_set_version` (the System 1 version or label-set version), `ok`, `latency_ms`, `attempts`, the returned `id`, `model_returned`, `provider_returned`, `answers`, `usage`, `cost_usd`, and `error`. The logged states are what the replay gate re-asks. The same rows stream to the page as they complete (with the question definitions added, for display only) and fill its **Jev log** tab; `onStart` marks each call as it is sent, so the page can show System 1 thinking. Separately, `replay --export` writes each utterance's boundary probability for `calibrate:boundary`.
 
 ## Measured performance and cost
 

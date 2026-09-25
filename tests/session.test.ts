@@ -92,9 +92,22 @@ describe("session (offline, fake services)", () => {
         mode: "replay", config: loadConfig(), bus, sessionsDir: root, fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI },
         sources: [new FileSource(`${FIXTURE_DIR}/host.wav`, "host", "max"), new FileSource(`${FIXTURE_DIR}/remote.wav`, "remote", "max")],
       });
+      const live: any[] = [];
+      bus.subscribe((e) => { if (e.type === "call" || e.type === "call.started") live.push(e); });
       await s.run();
 
       const dir = s.store.dir;
+      // every Jev and System 2 call streams to the page as it happens, but stays out of the stored history
+      const jevRows = readFileSync(join(dir, "jev_calls.jsonl"), "utf8").trim().split("\n").length;
+      expect(live.filter((e) => e.type === "call" && e.data.kind === "jev_call").length).toBe(jevRows);
+      expect(live.filter((e) => e.type === "call.started" && e.data.system === "s1").length).toBeGreaterThan(0);
+      expect(live.find((e) => e.type === "call" && e.data.kind === "jev_call" && e.data.ok)?.data.questions).toBeTruthy();
+      expect(live.some((e) => e.type === "call.started" && e.data.system === "s2")).toBe(true);
+      expect(bus.history().some((e) => e.type === "call" || e.type === "call.started")).toBe(false);
+      const s2rows = readFileSync(join(dir, "s2_calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+      const researched = s2rows.find((r) => r.purpose === "research" && r.ok);
+      expect(researched.request.user.length).toBeGreaterThan(0);
+      expect(JSON.parse(researched.response).verdict).toBe("supported");
       for (const f of ["host.wav", "remote.wav", "session.json", "speakers.json", ...JSONL_FILES.map((x) => `${x}.jsonl`)]) {
         expect(existsSync(join(dir, f)), f).toBe(true);
       }

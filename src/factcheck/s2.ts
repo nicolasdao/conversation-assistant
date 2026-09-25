@@ -219,6 +219,9 @@ export interface S2CallRow {
   cost_usd: number;
   response_format: "json_schema" | "json_object";
   web_engine: string | null;
+  /** The prompt as sent and the model's reply, so the page can show System 2 at work. */
+  request?: { system: string; user: string };
+  response?: string;
   error?: string;
   at: string;
 }
@@ -228,6 +231,8 @@ export interface S2Deps {
   apiKey: string;
   budget: Budget;
   log: (row: S2CallRow) => void;
+  /** Called when a call is about to be sent (after the budget check), so a page can show System 2 working. */
+  onStart?: (purpose: S2Purpose) => void;
   sleep?: (ms: number) => Promise<void>;
   rand?: () => number;
   today?: () => string;
@@ -325,6 +330,7 @@ export class S2Client {
 
   private async chat(req: ChatRequest, format: "json_schema" | "json_object"): Promise<ChatResult> {
     this.deps.budget.assertCanSpend(`s2:${req.purpose}`);
+    this.deps.onStart?.(req.purpose);
     const started = Date.now();
     const body = JSON.stringify(this.body(req, format));
     let attempt = 0;
@@ -334,10 +340,10 @@ export class S2Client {
         const raw = await this.send(body);
         const cost = raw.usage.cost;
         this.deps.budget.record("s2", cost);
-        this.log(req, format, { ok: true, raw, attempts: attempt, started });
         const msg = raw.choices?.[0]?.message;
         const content = typeof msg?.content === "string" ? msg.content
           : Array.isArray(msg?.content) ? msg.content.map((c: any) => c?.text ?? "").join("") : "";
+        this.log(req, format, { ok: true, raw, attempts: attempt, started, content });
         return { content, annotations: msg?.annotations };
       } catch (e) {
         const cls = classifyError(e);
@@ -387,7 +393,10 @@ export class S2Client {
     return json;
   }
 
-  private log(req: ChatRequest, format: "json_schema" | "json_object", r: { ok: boolean; raw?: any; attempts: number; started: number; error?: string }) {
+  private log(
+    req: ChatRequest, format: "json_schema" | "json_object",
+    r: { ok: boolean; raw?: any; attempts: number; started: number; error?: string; content?: string },
+  ) {
     const u = r.raw?.usage;
     this.deps.log({
       kind: "s2_call",
@@ -409,6 +418,8 @@ export class S2Client {
       cost_usd: u?.cost ?? 0,
       response_format: format,
       web_engine: req.web?.engine ?? null,
+      request: { system: req.system, user: req.user },
+      ...(r.content !== undefined ? { response: r.content } : {}),
       ...(r.error ? { error: r.error } : {}),
       at: new Date().toISOString(),
     });

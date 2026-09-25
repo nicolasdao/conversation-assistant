@@ -27,6 +27,8 @@ export interface SessionSummary {
 
 export const api = {
   state: () => call<any>("GET", "/api/state"),
+  calls: (system: "s1" | "s2", limit = 300) =>
+    call<{ rows: unknown[]; models: { s1: string | null; s2: string | null } }>("GET", `/api/calls?system=${system}&limit=${limit}`),
   engine: () => call<{ startedAt: string; stale: boolean }>("GET", "/api/engine"),
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),

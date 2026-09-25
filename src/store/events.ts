@@ -33,6 +33,9 @@ export const EVENT_SCHEMAS = {
   "budget.exhausted": obj({ cap: str, message: str }),
   stats: obj({ roganIndex: num }),
   error: obj({ component: str, message: str }),
+  // transient: live view of every Jev (System 1) and System 2 call; the call logs on disk are the record
+  "call.started": obj({ system: z.enum(["s1", "s2"]), purpose: str }),
+  call: obj({ kind: z.enum(["jev_call", "s2_call"]), purpose: str, ok: z.boolean() }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

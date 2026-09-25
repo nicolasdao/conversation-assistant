@@ -41,6 +41,7 @@ export interface EngineApi {
   updateSession(id: string, patch: { name?: string; notes?: string }): unknown;
   openSession(id: string): { sessionId: string; events: number };
   deleteSession(id: string): { deleted: string };
+  callLog(system: "s1" | "s2", limit?: number): unknown;
   pause(): { paused: boolean };
   resume(): { paused: boolean };
 }
@@ -148,6 +149,13 @@ export class Engine implements EngineApi {
       this.bus.reset();
     }
     return { deleted: id };
+  }
+
+  /** The session on screen's recent Jev or System 2 calls (none without a session). */
+  callLog(system: "s1" | "s2", limit?: number) {
+    const id = this.archived ?? this.session?.id;
+    if (!id) return { rows: [], models: { s1: this.config.app.jev.model, s2: this.config.app.s2.model } };
+    return this.libraryCall(() => this.library.calls(id, system, limit));
   }
 
   pause() {
@@ -379,6 +387,11 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
         return;
       }
       if (m === "GET" && path === "/api/state") return send(res, 200, engine.state());
+      if (m === "GET" && path === "/api/calls") {
+        const system = url.searchParams.get("system") === "s2" ? "s2" : "s1";
+        const limit = Number(url.searchParams.get("limit")) || undefined;
+        return send(res, 200, engine.callLog(system, limit));
+      }
       if (m === "GET" && path === "/api/engine") return send(res, 200, { startedAt: new Date(BOOTED_AT).toISOString(), stale: engineStale() });
       if (m === "GET" && path === "/api/stats") return send(res, 200, engine.stats());
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());

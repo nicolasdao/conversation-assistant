@@ -21,6 +21,9 @@ import { SessionStore, type JsonlFile } from "../store/sessionStore.ts";
 export type SessionMode = "replay" | "live";
 
 /** The external services, injectable so tests never touch the network. */
+/** Streamed to the page but never stored in the replayable history or events.jsonl. */
+const TRANSIENT = new Set<EventType>(["utterance.partial", "call.started", "call"]);
+
 export interface Services {
   transcribe(utteranceId: string, samples: Float32Array): Promise<TranscriptionResult>;
   ask(state: unknown, questions: QuestionSet, meta: JevCallMeta): Promise<JevResponse>;
@@ -36,7 +39,7 @@ export interface SessionOptions {
   sessionPrefix?: string;
   allowOverDevCap?: boolean;
   /** Real services are built from fetch and the keys unless given. */
-  services?: (ctx: { budget: Budget; log: (file: JsonlFile, row: unknown) => void }) => Services;
+  services?: (ctx: { budget: Budget; log: (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => void }) => Services;
   fetch?: typeof fetch;
   keys?: { openrouter?: string; openai?: string };
   embedder?: Embedder;
@@ -97,10 +100,12 @@ export class Session {
       onCost: (t) => this.emit("cost", { ...t, sessionCapUsd: cfg.app.budget.sessionCapUsd }),
     });
 
-    const log = (file: JsonlFile, row: unknown) => {
+    const log = (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => {
       this.store.append(file, row);
       const r = row as JevCallRow;
       if (file === "jev_calls" && r.purpose === "utterance" && r.ok && r.utterance_id) this.states.set(r.utterance_id, r.state);
+      // every Jev and System 2 call also streams to the page, as it completes
+      if (file === "jev_calls" || file === "s2_calls") this.emit("call", { ...(row as Record<string, unknown>), ...(live ?? {}) });
     };
     this.services = opts.services ? opts.services({ budget: this.budget, log }) : this.realServices(log);
     const liveCfg = opts.config.app.transcription.live;
@@ -170,14 +175,21 @@ export class Session {
     return this.opts.mode;
   }
 
-  private realServices(log: (file: JsonlFile, row: unknown) => void): Services {
+  private realServices(log: (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => void): Services {
     const f = this.opts.fetch ?? fetch;
     const cfg = this.opts.config.app;
     const openrouter = this.opts.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "";
     const openai = this.opts.keys?.openai ?? process.env.OPENAI_API_KEY ?? "";
     const transcriber = new Transcriber(cfg.transcription, { fetch: f, apiKey: openai, budget: this.budget, log: (r) => log("transcriptions", r) });
-    const jev = new JevClient(cfg.jev, { fetch: f, apiKey: openrouter, budget: this.budget, log: (r) => log("jev_calls", r) });
-    const s2 = new S2Client(cfg.s2, { fetch: f, apiKey: openrouter, budget: this.budget, log: (r) => log("s2_calls", r) });
+    const jev = new JevClient(cfg.jev, {
+      fetch: f, apiKey: openrouter, budget: this.budget,
+      log: (r, questions) => log("jev_calls", r, questions ? { questions } : undefined),
+      onStart: (purpose) => this.emit("call.started", { system: "s1", purpose }),
+    });
+    const s2 = new S2Client(cfg.s2, {
+      fetch: f, apiKey: openrouter, budget: this.budget, log: (r) => log("s2_calls", r),
+      onStart: (purpose) => this.emit("call.started", { system: "s2", purpose }),
+    });
     return {
       transcribe: (id, samples) => transcriber.transcribe(id, samples),
       ask: (s, q, m) => jev.ask(s, q, m),
@@ -186,7 +198,7 @@ export class Session {
   }
 
   emit(type: EventType, data: Record<string, unknown>): void {
-    const transient = type === "utterance.partial";
+    const transient = TRANSIENT.has(type);
     const e = this.bus.emit(type, data, { transient });
     // Commands after the end (a speaker rename or merge) are still recorded, so a reopened recording shows them.
     if (!transient) this.store.append("events", e, { afterClose: this.status === "ended" });

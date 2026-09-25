@@ -35,6 +35,30 @@ export interface LabelSet { prefix: string; boundary: LabelQuestion; questions: 
 export interface LivePartial { stream: Stream; itemId: string; text: string; utteranceId: string | null; final: boolean; receivedAt: number }
 export interface ErrorItem { component: string; message: string; at: string }
 
+/** One Jev (System 1) or System 2 call, as logged in jev_calls.jsonl / s2_calls.jsonl and streamed live. */
+export interface CallRow {
+  kind: "jev_call" | "s2_call"; purpose: string; ok: boolean; latency_ms: number; attempts: number; cost_usd: number; at: string;
+  id: string | null; model_returned: string | null; error?: string;
+  // Jev
+  state?: any; question_ids?: string[]; answers?: Record<string, any> | null; question_set_version?: string | null;
+  usage?: any; utterance_id?: string; segment_id?: string; request_hash?: string;
+  /** Question definitions: only on calls streamed live. */
+  questions?: Record<string, { type: string; instructions: string; criteria?: unknown }>;
+  // System 2
+  claim_id?: string; web_engine?: string | null; request?: { system: string; user: string }; response?: string;
+}
+export type SystemId = "s1" | "s2";
+export interface Calls {
+  s1: CallRow[]; s2: CallRow[];
+  /** Calls in flight, from call.started to its logged row. */
+  active: Record<SystemId, number>;
+  lastStart: Record<SystemId, number>;
+  models: Record<SystemId, string | null>;
+  /** Question definitions seen on live calls, by id, so older calls can show their wording too. */
+  questions: Record<string, { type: string; instructions: string }>;
+  keys: Set<string>;
+}
+
 export interface State {
   session: { id: string; mode: string; status: string; paused?: boolean; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null } | null;
   /** Paused stretches of session time; `endMs` is null while still paused. */
@@ -53,6 +77,25 @@ export interface State {
   stats: any | null;
   errors: ErrorItem[];
   budgetExhausted: string | null;
+  calls: Calls;
+}
+
+const emptyCalls = (): Calls => ({
+  s1: [], s2: [], active: { s1: 0, s2: 0 }, lastStart: { s1: 0, s2: 0 }, models: { s1: null, s2: null }, questions: {}, keys: new Set(),
+});
+
+/** Keeps at most this many System 1 calls in the page: about 20 minutes of a show. */
+const MAX_S1_CALLS = 1000;
+
+/** Adds a call once (history and the live stream can overlap), newest last. */
+export function addCall(s: State, row: CallRow) {
+  const key = `${row.kind}|${row.at}|${row.id ?? ""}|${row.purpose}`;
+  if (s.calls.keys.has(key)) return;
+  s.calls.keys.add(key);
+  for (const [id, q] of Object.entries(row.questions ?? {})) s.calls.questions[id] = { type: q.type, instructions: q.instructions };
+  const list = row.kind === "jev_call" ? s.calls.s1 : s.calls.s2;
+  list.push(row);
+  if (list.length > MAX_S1_CALLS) list.splice(0, list.length - MAX_S1_CALLS);
 }
 
 export function emptyState(): State {
@@ -61,7 +104,7 @@ export function emptyState(): State {
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
     cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 5 },
-    stats: null, errors: [], budgetExhausted: null,
+    stats: null, errors: [], budgetExhausted: null, calls: emptyCalls(),
   };
 }
 
@@ -99,7 +142,7 @@ export function fromSnapshot(snap: any): State {
   return s;
 }
 
-export type Dirty = Set<"session" | "health" | "transcript" | "timeline" | "claims" | "speakers" | "s1" | "labels" | "cost" | "stats" | "errors">;
+export type Dirty = Set<"session" | "health" | "transcript" | "timeline" | "claims" | "speakers" | "s1" | "labels" | "cost" | "stats" | "errors" | "calls">;
 
 /** Applies one SSE event. Returns what needs re-rendering, or "reset" when a new session started. */
 export function applyEvent(s: State, type: string, d: any, at: string, dirty: Dirty): "reset" | void {
@@ -247,6 +290,20 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       s.stats = d;
       dirty.add("stats");
       break;
+    case "call.started": {
+      const sys = d.system as SystemId;
+      s.calls.active[sys]++;
+      s.calls.lastStart[sys] = Date.now();
+      dirty.add("calls");
+      break;
+    }
+    case "call": {
+      const sys: SystemId = d.kind === "jev_call" ? "s1" : "s2";
+      s.calls.active[sys] = Math.max(0, s.calls.active[sys] - 1);
+      addCall(s, d as CallRow);
+      dirty.add("calls");
+      break;
+    }
     case "error":
       s.errors.unshift({ component: d.component, message: d.message, at });
       s.errors.length = Math.min(s.errors.length, 30);

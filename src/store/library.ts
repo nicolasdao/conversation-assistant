@@ -230,6 +230,17 @@ export class SessionLibrary {
   }
 
   /**
+   * The most recent Jev (System 1) or System 2 calls of a session, oldest first, with the models its config named.
+   * Works for the running session too: its folder is in the library from the start.
+   */
+  calls(id: string, system: "s1" | "s2", limit = 300): { rows: unknown[]; models: { s1: string | null; s2: string | null } } {
+    const dir = this.dirOf(id);
+    const rows = readJsonl(join(dir, system === "s1" ? "jev_calls.jsonl" : "s2_calls.jsonl"));
+    const cfg = readJson(join(dir, "session.json"))?.config;
+    return { rows: rows.slice(-Math.max(1, limit)), models: { s1: cfg?.jev?.model ?? null, s2: cfg?.s2?.model ?? null } };
+  }
+
+  /**
    * Deletes a recording's folder for good. Its spend is first appended to deleted-spend.jsonl beside the folders, so the
    * development budget (sumDevSpend) still counts it.
    */

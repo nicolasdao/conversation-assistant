@@ -71,7 +71,7 @@ At end of input, in order: flush every VAD; wait for transcriptions and the segm
 
 ## Event bus and API — `src/store/events.ts`, `src/server/main.ts`
 
-Every result is an event with a payload checked against a zod schema (a failed check is logged, the event still goes out), a sequence number, and a timestamp. The bus keeps the session's history (replayed to every new SSE connection), and the session appends each event to `events.jsonl`; `utterance.partial` is the one transient type, streamed but never stored.
+Every result is an event with a payload checked against a zod schema (a failed check is logged, the event still goes out), a sequence number, and a timestamp. The bus keeps the session's history (replayed to every new SSE connection), and the session appends each event to `events.jsonl`. Three types are transient, streamed but never stored: `utterance.partial`, and `call.started` / `call`, the live view of every Jev and System 2 call (the call logs on disk are their record).
 
 | Group | Events |
 | --- | --- |
@@ -80,6 +80,7 @@ Every result is an event with a payload checked against a zod schema (a failed c
 | Timeline | `segment.closed`, `segment.labels`, `section.updated` |
 | Fact-check | `claim.flagged`, `claim.duplicate`, `claim.repeat`, `claim.researching`, `claim.verdict`, `claim.dropped`, `claim.disputed`, `audit`, `s1.version`, `s1.memory` |
 | Accounting | `cost`, `budget.exhausted`, `stats`, `error` |
+| Calls (transient) | `call.started` (`system`: `s1` or `s2`, `purpose`) when a Jev or System 2 call is sent; `call` with the logged row when it completes (a Jev row also carries the question definitions, for display) |
 
 The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one session at a time (an `Engine` owns it):
 
@@ -95,6 +96,7 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | PUT | `/api/labels`, `/api/stories`; POST `/api/labels/relabel` | Timeline label set, tonight's stories, relabelling (see [Jev](jev.md)) |
 | POST | `/api/claims/:id/override`, `/api/s1/rollback` | Host dispute, System 1 rollback (see [System 1 and System 2](system1-system2.md)) |
 | GET | `/api/stats` | Current stats |
+| GET | `/api/calls?system=s1\|s2&limit=` | The session on screen's most recent Jev (`s1`) or System 2 (`s2`) call rows, oldest first, and the models its config named |
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
 
@@ -109,7 +111,9 @@ The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Ba
 - **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover; for an opened recording, labelled Cost: what that recording cost when it ran), and the controls: microphone picker, Start live, Pause / Resume (live sessions), Stop, a replay popover (folder and 1× / max speed), and a settings cog.
 - **Transcript and fact-checks (two columns)**, split by a divider you can drag (25–75 %, arrow keys too; double-click resets; the split is remembered in the browser):
   - the transcript, caption style, with segment dividers, live text, filters (markers, speaker, subject), and click-to-rename; a speaker's name tag appears once per run of consecutive lines, and inferred speakers show as a muted "name *";
-  - the fact-check cards as lower-thirds: a solid verdict block (False, Supported, Misleading…, or Queued / Checking / Dropped), queued → researching → verdict steps, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; a tally of verdicts sits in the column header, and the most recently active card is on top.
+  - the right column has three tabs. **Fact-check**: a solid verdict block (False, Supported, Misleading…, or Queued / Checking / Dropped), queued → researching → verdict steps, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; a tally of verdicts sits in the column header, and the most recently active card is on top.
+  - **Fast · slow thinking**: System 1 (Jev) and System 2 (the configured model, GPT-6 Luna) side by side with their models, calls, spend, average time, and cost per call, joined by "flags claims" and "rewrites its questions". A system glows and reads Thinking while one of its calls is in flight, and the "flags claims" link animates while System 2 works. Below, the cost of System 1's judgments is compared with System 2's average price and speed ("N× cheaper with System 1"). Clicking a system shows its own live call feed.
+  - **Jev log**: every Jev call, newest first: session time, purpose, what Jev was shown, each answer as a chip (a yes-probability, a choice with its confidence, or a score level), latency, and cost. Clicking a call shows the full request (the new line and its context, each question with its wording when known) and response (probabilities per answer), tokens, and the raw JSON. A System 2 call shows its purpose, the claim, tokens, web search, and the verdict, with the prompt and reply on click.
 - **Timeline (bottom, full width):** HTML lanes positioned in percent of the session length, with an inline-SVG heat and hype chart: section brackets, the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines on 0–4, marker pins (disagreement, hot take, prediction, recommendation, clip-worthy, humour), a dashed "in progress" block for the open segment, hatched paused stretches, the axis, and a now line. Faded labels are dimmed; clicking a segment or marker jumps to the transcript. A dotted line follows the pointer with the exact time. Zoom with − / + / Fit or ⌘/Ctrl + scroll (a trackpad pinch), from the whole session down to about 30 s across; zoomed in, the strip scrolls sideways (the wheel scrolls through time), segment labels stay in view, axis ticks adapt to the zoom, and a live session stays pinned to the newest moment while scrolled to the end. Dragging the strip's top edge (or its arrow keys) makes the heat · hype chart taller or shorter; double-click resets it, and the height is remembered in the browser.
 - **Settings (the cog menu), each in a modal:** Recordings, System 1 (active version, counters, last promotion or rejection with its gate, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log.
 

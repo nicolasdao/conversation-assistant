@@ -106,7 +106,10 @@ export interface JevClientDeps {
   fetch: typeof fetch;
   apiKey: string;
   budget: Budget;
-  log: (row: JevCallRow) => void;
+  /** `questions` rides along for live display only; the logged row keeps just their ids. */
+  log: (row: JevCallRow, questions?: QuestionSet) => void;
+  /** Called when a call is about to be sent (after the budget check), so a page can show System 1 working. */
+  onStart?: (purpose: JevPurpose) => void;
   sleep?: (ms: number) => Promise<void>;
   rand?: () => number;
 }
@@ -169,6 +172,7 @@ export class JevClient {
       this.log(state, questions, meta, { ok: false, attempts: 0, started, error: errorText(e) });
       throw e;
     }
+    this.deps.onStart?.(meta.purpose);
     for (;;) {
       attempt++;
       if (!live) {
@@ -273,7 +277,7 @@ export class JevClient {
       cost_usd: r.res?.usage.cost ?? 0,
       ...(r.error ? { error: r.error } : {}),
       at: new Date().toISOString(),
-    });
+    }, questions);
   }
 }
 

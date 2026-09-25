@@ -88,12 +88,25 @@
     </section>
     <div id="split" class="split" role="separator" aria-orientation="vertical" aria-label="Resize the transcript and fact-checks" tabindex="0"
       title="Drag to resize · double-click to reset"><span></span></div>
-    <section class="col" aria-label="Fact-checks">
+    <section class="col" aria-label="Fact-checks and thinking">
       <div class="col-head">
-        <span class="col-title">Fact-check <span id="claims-count" class="n"></span></span>
+        <div class="tabs" role="tablist" aria-label="Right column">
+          <button role="tab" class="tab" aria-selected="true" aria-controls="pane-fc" data-pane="pane-fc">Fact-check <span id="claims-count" class="n"></span></button>
+          <button role="tab" class="tab" aria-selected="false" aria-controls="pane-think" data-pane="pane-think">Fast · slow thinking</button>
+          <button role="tab" class="tab" aria-selected="false" aria-controls="pane-jev" data-pane="pane-jev">Jev log <span id="jev-count" class="n"></span></button>
+        </div>
         <div id="tally" class="tally"></div>
       </div>
-      <div id="claims" class="scroll cards"></div>
+      <div id="pane-fc" class="pane" role="tabpanel"><div id="claims" class="scroll cards"></div></div>
+      <div id="pane-think" class="pane scroll" role="tabpanel" hidden>
+        <div id="think" class="think"></div>
+        <div id="think-log-h" class="feed-h"></div>
+        <div id="think-log" class="calls"></div>
+      </div>
+      <div id="pane-jev" class="pane" role="tabpanel" hidden>
+        <p class="feed-note">Every call to Jev, live: what it was shown, the typed questions it was asked, its answers, time, and cost. Click a call for the full request and response.</p>
+        <div id="jev-log" class="scroll calls"></div>
+      </div>
     </section>
   </main>
 

@@ -39,6 +39,7 @@ class FakeEngine implements EngineApi {
   openSession(id: string) { this.calls.push(["open", id]); return { sessionId: id, events: 12 }; }
   deleteSession(id: string) { this.calls.push(["delete", id]); return { deleted: id }; }
   pause() { this.calls.push(["pause"]); return { paused: true }; }
+  callLog(system: "s1" | "s2", limit?: number) { return { rows: [{ system, limit }], models: { s1: "typesafe/jev-1.13", s2: "openai/gpt-6-luna" } }; }
   resume() { this.calls.push(["resume"]); return { paused: false }; }
 }
 
@@ -111,6 +112,11 @@ describe("HTTP API", () => {
     expect((await call("POST", "/api/session/resume")).json).toEqual({ paused: false });
     expect((await call("DELETE", "/api/sessions/20260925-120000")).json).toEqual({ deleted: "20260925-120000" });
     expect(engine.calls.slice(-3)).toEqual([["pause"], ["resume"], ["delete", "20260925-120000"]]);
+  });
+
+  test("the call log of System 1 or System 2", async () => {
+    expect((await call("GET", "/api/calls?system=s2&limit=50")).json.rows).toEqual([{ system: "s2", limit: 50 }]);
+    expect((await call("GET", "/api/calls")).json).toMatchObject({ rows: [{ system: "s1" }], models: { s1: "typesafe/jev-1.13" } });
   });
 
   test("the page can tell when the engine code changed after the server started", async () => {
