@@ -54,6 +54,23 @@ describe("speaker registry", () => {
     expect(second.created).toBeUndefined();
   });
 
+  test("a placeholder speaker from short utterances adopts the first voiceprint on its stream", () => {
+    const reg = new SpeakerRegistry(cfg.app.speakers, embedder);
+    const dim = embedder.dim;
+    const host = new Float32Array(dim).map((_, i) => (i % 2 ? 1 : 0));
+    const ai = new Float32Array(dim).map((_, i) => (i % 2 ? 0 : 1));
+    expect(reg.assignEmbedding("host", host).speakerId).toBe("spk_1");
+    const short = reg.assignEmbedding("remote", null); // "Loud and clear." — too short to embed
+    expect(short.created?.id).toBe("spk_2");
+    const long = reg.assignEmbedding("remote", ai); // the same voice, now long enough
+    expect(long).toEqual({ speakerId: "spk_2", inferred: false });
+    expect(reg.assignEmbedding("remote", ai).speakerId).toBe("spk_2");
+    expect(reg.active().map((s) => s.id)).toEqual(["spk_1", "spk_2"]);
+    // a speaker that already has a voiceprint is never overwritten: a new voice still creates a new speaker
+    const other = new Float32Array(dim).map((_, i) => (i % 4 < 2 ? 1 : -1));
+    expect(reg.assignEmbedding("remote", other).created?.id).toBe("spk_3");
+  });
+
   test("rename and merge", () => {
     const reg = new SpeakerRegistry(cfg.app.speakers, embedder);
     const dim = embedder.dim;

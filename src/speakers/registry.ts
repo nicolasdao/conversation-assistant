@@ -78,6 +78,15 @@ export class SpeakerRegistry {
       this.lastOnStream.set(stream, id);
       return { speakerId: id, inferred: false };
     }
+    // The stream's current speaker may be a placeholder made from utterances too short to embed ("Loud and clear."):
+    // it adopts this first voiceprint instead of the same voice becoming a second speaker.
+    const last = this.lastOnStream.get(stream);
+    const placeholder = last ? this.resolve(last) : undefined;
+    if (placeholder && (this.embeddings.get(placeholder)?.length ?? 0) === 0) {
+      this.addEmbedding(placeholder, v);
+      this.speakers.get(placeholder)!.utterances++;
+      return { speakerId: placeholder, inferred: false };
+    }
     const created = this.create(stream, [v]);
     return { speakerId: created.id, inferred: false, created };
   }
