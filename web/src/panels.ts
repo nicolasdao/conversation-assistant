@@ -1,5 +1,5 @@
-import { api, type SessionSummary } from "./api.js";
-import { $, clock, h, pretty, replace, usd } from "./dom.js";
+import { api, ApiError, type SessionSummary } from "./api.js";
+import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
 import { resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
 
@@ -7,9 +7,17 @@ export interface Filters { markers: Set<string>; speaker: string; subject: strin
 export const filters: Filters = { markers: new Set(), speaker: "", subject: "" };
 
 export function toast(message: string, kind: "error" | "ok" = "error") {
-  const t = h("div", { class: `toast ${kind}` }, message);
-  $("#toasts")?.append(t);
-  setTimeout(() => t.remove(), 6000);
+  const box = $("#toasts");
+  if (!box) return;
+  const t = h("div", { class: `toast ${kind}`, role: kind === "error" ? "alert" : "status" }, message);
+  box.append(t);
+  // Re-open the popover so it stacks above any modal opened since.
+  if (box.matches(":popover-open")) box.hidePopover();
+  box.showPopover();
+  setTimeout(() => {
+    t.remove();
+    if (!box.children.length && box.matches(":popover-open")) box.hidePopover();
+  }, 6000);
 }
 
 async function run(fn: () => Promise<unknown>, ok?: string) {
@@ -21,7 +29,37 @@ async function run(fn: () => Promise<unknown>, ok?: string) {
   }
 }
 
-// ---------- session controls ----------
+/** True while the user is typing inside `box`, so a re-render would throw away their input. */
+function editing(box: Element | null): boolean {
+  const a = document.activeElement;
+  return !!box && !!a && box.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+}
+
+// ---------- in-page prompt and confirm ----------
+
+/**
+ * Asks in the page's own dialog. With `input`, resolves to the typed text (or null when cancelled);
+ * without, resolves to "" when confirmed (or null).
+ */
+export function ask(title: string, opts: { message?: string; input?: boolean; value?: string; placeholder?: string; ok?: string; danger?: boolean } = {}): Promise<string | null> {
+  const dlg = $<HTMLDialogElement>("#dlg-ask")!;
+  const input = $<HTMLInputElement>("#ask-input")!;
+  replace($("#h-ask"), title);
+  replace($("#ask-message"), opts.message ?? "");
+  input.hidden = !opts.input;
+  input.value = opts.value ?? "";
+  input.placeholder = opts.placeholder ?? "";
+  replace($("#ask-ok"), opts.ok ?? "OK");
+  $("#ask-ok")!.className = `btn ${opts.danger ? "danger" : "primary"}`;
+  dlg.returnValue = "";
+  return new Promise((resolve) => {
+    dlg.addEventListener("close", () => resolve(dlg.returnValue === "ok" ? (opts.input ? input.value : "") : null), { once: true });
+    dlg.showModal();
+    if (opts.input) input.select(); else $<HTMLButtonElement>("#ask-ok")?.focus();
+  });
+}
+
+// ---------- header: session, controls, menu ----------
 
 let devicesLoaded = false;
 export async function loadDevices() {
@@ -34,39 +72,195 @@ export async function loadDevices() {
     replace(sel, h("option", { value: "builtin" }, "Built-in microphone"),
       devices.filter((d) => d.transport !== "builtin").map((d) => h("option", { value: d.uid }, `${d.name} (${d.transport})`)));
   } catch (e) {
-    replace(sel, h("option", { value: "" }, "capture helper unavailable"));
+    replace(sel, h("option", { value: "" }, "Capture helper unavailable"));
     sel.title = e instanceof Error ? e.message : String(e);
   }
 }
 
-export function bindControls() {
+let replaySpeed: 1 | "max" = 1;
+
+let onViewGone: () => void = () => {};
+
+/**
+ * Opens and closes the replay popover and the settings menu; `onOpen` renders a settings dialog before it shows, and
+ * `viewGone` reloads the page's state after the recording on screen was deleted.
+ */
+export function bindControls(onOpen: (dialogId: string) => void, viewGone: () => void) {
+  onViewGone = viewGone;
+  $("#onair")?.addEventListener("animationend", (e) => {
+    if (e.animationName === "onair-sweep") { entering = false; $("#onair")!.classList.remove("enter"); }
+  });
+  $("#pause")?.addEventListener("click", () => {
+    const paused = $("#pause")!.dataset.paused === "1";
+    void run(() => (paused ? api.resume() : api.pause()), paused ? "Resumed" : "Paused: nothing is heard or transcribed until you resume");
+  });
   $("#start-live")?.addEventListener("click", () => run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined)));
   $("#start-replay")?.addEventListener("click", () => {
     const dir = $<HTMLInputElement>("#replay-dir")!.value.trim();
-    const speed = $<HTMLSelectElement>("#replay-speed")!.value === "max" ? "max" : 1;
-    void run(() => api.startReplay(dir, speed));
+    closePops();
+    void run(() => api.startReplay(dir, replaySpeed));
   });
   $("#stop")?.addEventListener("click", () => run(() => api.stop(), "Stopping: in-flight work will finish"));
+  document.querySelectorAll<HTMLButtonElement>("#replay-speed button").forEach((b) => b.addEventListener("click", () => {
+    replaySpeed = b.dataset.speed === "max" ? "max" : 1;
+    document.querySelectorAll("#replay-speed button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  }));
+
+  const pops: [string, string][] = [["#replay-btn", "#replay-pop"], ["#cog-btn", "#cog-menu"]];
+  for (const [btnSel, popSel] of pops) {
+    $(btnSel)?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const pop = $(popSel)!;
+      const opening = pop.hidden;
+      closePops();
+      pop.hidden = !opening;
+      $(btnSel)!.setAttribute("aria-expanded", String(opening));
+      if (opening) pop.querySelector<HTMLElement>("input, button")?.focus();
+    });
+  }
+  document.addEventListener("click", (e) => {
+    for (const [, popSel] of pops) if (!$(popSel)?.contains(e.target as Node)) closePops(popSel);
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePops(); });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((b) => b.addEventListener("click", () => {
+    closePops();
+    const id = b.dataset.open!;
+    onOpen(id);
+    $<HTMLDialogElement>(`#${id}`)?.showModal();
+  }));
+  document.querySelectorAll<HTMLDialogElement>("dialog").forEach((d) => {
+    d.querySelectorAll("[data-close]").forEach((x) => x.addEventListener("click", () => d.close()));
+    d.querySelectorAll("[data-cancel]").forEach((x) => x.addEventListener("click", () => d.close("cancel")));
+    d.addEventListener("click", (e) => { if (e.target === d) d.close(); }); // a click on the backdrop
+  });
 }
+
+function closePops(only?: string) {
+  for (const [btnSel, popSel] of [["#replay-btn", "#replay-pop"], ["#cog-btn", "#cog-menu"]]) {
+    if (only && only !== popSel) continue;
+    const pop = $(popSel);
+    if (pop && !pop.hidden) { pop.hidden = true; $(btnSel)?.setAttribute("aria-expanded", "false"); }
+  }
+}
+
+/**
+ * Edits a name in place: `target` is hidden and an input takes its spot. Enter or leaving the field saves,
+ * Escape cancels; `save` gets the trimmed text and runs only when it changed.
+ */
+function editInPlace(target: HTMLElement, opts: { value: string; placeholder: string; cls: string; save: (name: string) => Promise<void> }) {
+  const input = h("input", { class: opts.cls, value: opts.value, placeholder: opts.placeholder, maxlength: 120, "aria-label": "Name" });
+  target.hidden = true;
+  target.after(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (save: boolean) => {
+    if (done) return;
+    done = true;
+    const name = input.value.trim();
+    input.remove();
+    target.hidden = false;
+    if (save && name !== opts.value) void opts.save(name);
+    else target.focus();
+  };
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener("blur", () => finish(true));
+}
+
+/** Click the session name in the header to rename it in place. */
+export function bindSessionName(getState: () => State, onRenamed: () => void) {
+  const btn = $<HTMLButtonElement>("#session-name");
+  btn?.addEventListener("click", () => {
+    const s = getState().session;
+    if (!s || btn.hidden) return;
+    editInPlace(btn, {
+      value: s.name ?? "", placeholder: s.id, cls: "name-input",
+      save: (name) => run(async () => {
+        const r = await api.renameSession(s.id, name);
+        const cur = getState().session;
+        if (cur?.id === s.id) cur.name = r.name;
+        onRenamed();
+      }, name ? `Session renamed to ${name}` : "Session name cleared"),
+    });
+  });
+}
+
+/** The block at the header's left, only while a session is capturing: [class, label]. */
+const ONAIR: Record<string, [string, string]> = {
+  live: ["", "On air"], paused: ["paused", "Paused"], replay: ["replay", "Replay"],
+};
+/** The block shown on the previous render; undefined before the first, so a page opened mid-show does not animate. */
+let shownBlock: string | null | undefined;
+let entering = false;
 
 export function renderSession(st: State) {
   const s = st.session;
   const running = s?.status === "running" || s?.status === "ending";
-  replace($("#session-status"), s
-    ? h("span", { class: `pill ${s.status}` }, s.status === "archived" ? "recording" : `${s.mode} · ${s.status}`,
-      h("span", { class: "muted" }, ` ${s.name || s.id}`))
-    : h("span", { class: "pill" }, "no session"));
+  const block = !running ? null : s!.mode === "replay" ? "replay" : s!.paused ? "paused" : "live";
+  const onair = $("#onair")!;
+  $("#top")!.classList.toggle("no-onair", !block);
+  onair.hidden = !block;
+  if (block) {
+    const [cls, label] = ONAIR[block]!;
+    if (shownBlock === null) entering = true; // off → on: the breaking-news entrance
+    onair.className = `onair${cls ? ` ${cls}` : ""}${entering ? " enter" : ""}`;
+    replace($("#onair-label"), s?.status === "ending" ? "Stopping" : label);
+  }
+  shownBlock = block;
+  const name = s ? s.name || s.id : "No session";
+  const nameBtn = $<HTMLButtonElement>("#session-name")!;
+  replace(nameBtn, name);
+  nameBtn.disabled = !s;
+  nameBtn.title = s ? `Click to rename · ${s.mode} session ${s.id}` : "";
   for (const id of ["#start-live", "#start-replay"]) $<HTMLButtonElement>(id)!.disabled = running;
   $<HTMLButtonElement>("#stop")!.disabled = !running;
+  const pause = $<HTMLButtonElement>("#pause")!;
+  pause.hidden = !(running && s?.mode === "live");
+  pause.disabled = s?.status !== "running";
+  pause.dataset.paused = s?.paused ? "1" : "0";
+  pause.setAttribute("aria-pressed", String(!!s?.paused));
+  replace(pause, glyph(s?.paused ? "play" : "pause"), s?.paused ? "Resume" : "Pause");
+  pause.title = s?.paused ? "Resume listening" : "Pause: audio becomes silence until you resume; Stop still works";
+  replace($("#replay-note"), running ? "Stop the current session first." : "");
+}
+
+/** The elapsed clock: 05:39, or 1:05:39 past an hour. */
+export function renderClock(ms: number) {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  const hh = Math.floor(t / 3600);
+  const mm = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
+  const ss = String(t % 60).padStart(2, "0");
+  replace($("#clock"), hh ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`);
+}
+
+/** One-line summaries under each settings menu item. */
+export function renderMenu(st: State) {
+  const c = s1Counters(st);
+  const voices = [...st.speakers.values()].filter((s) => !s.mergedInto).length;
+  replace($("#m-recordings"), "Open, rename, replay");
+  replace($("#m-s1"), `${st.s1.active} · ${c.flags} flag${c.flags === 1 ? "" : "s"}`);
+  replace($("#m-speakers"), `${voices} voice${voices === 1 ? "" : "s"}`);
+  replace($("#m-labels"), st.labels.version || "–");
+  replace($("#m-stats"), st.stats ? `Rogan index ${Math.round((st.stats.roganIndex ?? 0) * 100)}%` : "Every minute");
+  replace($("#m-log"), st.errors.length ? `${st.errors.length} error${st.errors.length === 1 ? "" : "s"}` : "No errors");
 }
 
 // ---------- stream health ----------
 
+const minus = (n: number) => n.toFixed(0).replace("-", "−");
+
 export function renderHealth(st: State) {
   if (st.session?.status === "archived") {
-    return replace($("#health"), h("div", { class: "muted" }, "Recorded session: showing what was captured. Start live or replay to capture again."));
+    return replace($("#health")); // an opened recording has no live streams
   }
-  const running = st.session?.status === "running";
+  const paused = !!st.session?.paused;
+  const running = st.session?.status === "running" && !paused;
   const streams: Stream[] = st.session?.streams ?? ["host", "remote"];
   replace($("#health"), (["host", "remote"] as Stream[]).map((stream) => {
     const hl = st.health[stream];
@@ -76,12 +270,17 @@ export function renderHealth(st: State) {
     const silentFor = hl ? now - hl.lastSoundAt : 0;
     const red = running && present && (!hl || silentFor > 10_000 || age > 3000);
     const pct = hl ? Math.max(0, Math.min(100, ((hl.rmsDbfs + 60) / 60) * 100)) : 0;
-    const device = stream === "host" ? hl?.detail?.host?.device : hl?.detail?.remote?.outputDevice;
-    return h("div", { class: `meter${red ? " alert" : ""}${present ? "" : " absent"}` },
-      h("div", { class: "meter-name" }, stream, device ? h("span", { class: "muted small" }, ` ${device}`) : null),
-      h("div", { class: "meter-bar" }, h("div", { class: "meter-fill", style: `width:${pct}%` })),
-      h("div", { class: "meter-meta small" },
-        !present ? "absent" : hl ? `${hl.rmsDbfs.toFixed(0)} dBFS · last frame ${age < 0 ? "–" : age < 1000 ? `${age} ms` : `${(age / 1000).toFixed(1)} s`}${red && silentFor > 10_000 ? ` · silent ${(silentFor / 1000).toFixed(0)} s` : ""}` : "waiting…"));
+    const device: string | undefined = stream === "host" ? hl?.detail?.host?.device : hl?.detail?.remote?.outputDevice;
+    const ageText = age < 0 ? "–" : age < 1000 ? `${age} ms` : `${(age / 1000).toFixed(1)} s`;
+    const meta = !present ? "absent" : paused ? "paused" : !hl ? "waiting…"
+      : `${minus(hl.rmsDbfs)} dBFS · ${red && silentFor > 10_000 ? `silent ${(silentFor / 1000).toFixed(0)} s` : ageText}`;
+    return h("div", {
+      class: `meter${red ? " alert" : ""}${present ? "" : " absent"}${paused ? " paused" : ""}`,
+      title: `${stream === "host" ? "Host" : "Remote"}${device ? ` · ${device}` : ""} · last frame ${ageText}`,
+    },
+      h("div", { class: "row1" }, h("span", { class: `who ${stream}` }, stream === "host" ? "Host" : "Remote"), device ? h("span", { class: "dev" }, device) : null),
+      h("div", { class: "bar" }, h("b", { style: `width:${pct}%` })),
+      h("div", { class: "meta" }, meta));
   }));
 }
 
@@ -107,21 +306,21 @@ export function segmentMatches(g: Segment): boolean {
 export function renderFilters(st: State, onChange: () => void) {
   const chips = Object.entries(MARKERS).filter(([k]) => k !== "humour").map(([k, m]) =>
     h("button", {
-      class: `chip${filters.markers.has(k) ? " on" : ""}`,
+      class: "chip", "aria-pressed": String(filters.markers.has(k)),
       onclick: () => { filters.markers.has(k) ? filters.markers.delete(k) : filters.markers.add(k); onChange(); },
-    }, `${m.icon} ${m.label}`));
+    }, glyph(k), m.label));
   const speakers = [...st.speakers.values()].filter((s) => !s.mergedInto);
   replace($("#filters"),
     chips,
-    h("select", { class: "chip-select", onchange: (e: Event) => { filters.speaker = (e.target as HTMLSelectElement).value; onChange(); } },
+    h("select", { class: "select", "aria-label": "Speaker filter", onchange: (e: Event) => { filters.speaker = (e.target as HTMLSelectElement).value; onChange(); } },
       h("option", { value: "" }, "All speakers"),
       speakers.map((s) => h("option", { value: s.id, selected: filters.speaker === s.id }, s.displayName))),
-    h("select", { class: "chip-select", onchange: (e: Event) => { filters.subject = (e.target as HTMLSelectElement).value; onChange(); } },
+    h("select", { class: "select", "aria-label": "Subject filter", onchange: (e: Event) => { filters.subject = (e.target as HTMLSelectElement).value; onChange(); } },
       h("option", { value: "" }, "All subjects"),
       h("option", { value: "ai", selected: filters.subject === "ai" }, "AI (all)"),
       Object.keys(SUBJECT_COLORS).map((k) => h("option", { value: k, selected: filters.subject === k }, pretty(k)))),
     filters.markers.size || filters.speaker || filters.subject
-      ? h("button", { class: "chip clear", onclick: () => { filters.markers.clear(); filters.speaker = ""; filters.subject = ""; onChange(); } }, "Clear")
+      ? h("button", { class: "linkbtn", onclick: () => { filters.markers.clear(); filters.speaker = ""; filters.subject = ""; onChange(); } }, "Clear")
       : null);
 }
 
@@ -129,7 +328,7 @@ export function renderFilters(st: State, onChange: () => void) {
 
 async function promptRename(st: State, id: string) {
   const current = speakerName(st, id);
-  const name = prompt(`Rename ${current} to:`, current);
+  const name = await ask(`Rename ${current}`, { input: true, value: current, ok: "Rename" });
   if (name && name.trim() && name.trim() !== current) await run(() => api.rename(resolveSpeaker(st, id)?.id ?? id, name.trim()));
 }
 
@@ -141,6 +340,7 @@ export function renderTranscript(st: State) {
   const utts = [...st.utterances.values()].sort((a, b) => a.startMs - b.startMs);
   const rows: HTMLElement[] = [];
   let lastSeg: string | undefined;
+  let lastSpeaker: string | undefined;
   const flagged = new Set([...st.claims.values()].map((c) => c.utteranceId));
   for (const u of utts) {
     const seg = bySeg.get(u.id);
@@ -149,21 +349,31 @@ export function renderTranscript(st: State) {
     if (filters.speaker && sp?.id !== filters.speaker) continue;
     if (seg && seg.id !== lastSeg) {
       const l = seg.labels;
-      rows.push(h("div", { class: "seg-divider", id: `seg-${seg.id}` },
-        h("span", {}, `${clock(seg.startMs)}`),
-        l?.choices.subject ? h("span", { class: "tag", style: `background:${SUBJECT_COLORS[l.choices.subject.choice] ?? "#555"}` }, pretty(l.choices.subject.choice)) : null,
-        l?.choices.mode ? h("span", { class: "tag ghost" }, pretty(l.choices.mode.choice)) : null,
-        (l?.markers ?? []).map((m) => MARKERS[m] ? h("span", { title: MARKERS[m].label }, MARKERS[m].icon) : null),
-        l?.mentions.length ? h("span", { class: "muted small" }, l.mentions.join(", ")) : null));
+      const subj = l?.choices.subject;
+      const md = l?.choices.mode;
+      rows.push(h("div", { class: "segdiv", id: `seg-${seg.id}` },
+        h("span", { class: "t" }, clock(seg.startMs)),
+        subj ? h("span", { class: `subj${subj.faded ? " faded" : ""}`, style: `background:${SUBJECT_COLORS[subj.choice] ?? "#6a7d98"}` }, pretty(subj.choice)) : null,
+        md ? h("span", { class: `mode${md.faded ? " faded" : ""}` }, pretty(md.choice)) : null,
+        (l?.markers ?? []).map((m) => MARKERS[m] ? h("span", { class: "mk", title: MARKERS[m].label }, glyph(m)) : null),
+        l?.mentions.length ? h("span", { class: "ment" }, l.mentions.join(", ")) : null));
       lastSeg = seg.id;
+      lastSpeaker = undefined;
     }
+    const name = speakerName(st, u.speakerId);
+    // Consecutive lines by the same speaker read like captions: the name tag appears once.
+    const who = u.speakerInferred
+      ? h("button", { class: "who-cont", title: "Speaker inferred from a short utterance. Click to rename", onclick: () => promptRename(st, u.speakerId) }, `${name} *`)
+      : sp?.id === lastSpeaker
+        ? h("span", {})
+        : h("button", { class: `who-tab ${u.stream}`, title: "Click to rename", onclick: () => promptRename(st, u.speakerId) }, name);
+    lastSpeaker = u.speakerInferred ? undefined : sp?.id;
     rows.push(h("div", { class: `utt${u.filler ? " filler" : ""}${flagged.has(u.id) ? " flagged" : ""}`, id: `utt-${u.id}`, "data-seg": seg?.id ?? "" },
-      h("span", { class: "utt-time" }, clock(u.startMs)),
-      h("button", { class: `utt-speaker s-${u.stream}`, title: "Click to rename", onclick: () => promptRename(st, u.speakerId) },
-        speakerName(st, u.speakerId), u.speakerInferred ? "*" : ""),
-      h("span", { class: "utt-text" }, u.text),
-      u.tags.map((t) => h("span", { class: "tag ghost small" }, t)),
-      flagged.has(u.id) ? h("span", { class: "flag", title: "Flagged for fact-checking" }, "⚑") : null));
+      h("span", { class: "time" }, clock(u.startMs)),
+      who,
+      h("span", { class: "text" }, u.text,
+        u.tags.map((t) => h("span", { class: "tag-loud" }, t)),
+        flagged.has(u.id) ? h("span", { class: "flag", title: "Flagged for fact-checking" }, glyph("flag")) : null)));
   }
   // Streaming text: shown until its final line arrives (a finished partial whose utterance was dropped fades after 8 s).
   const now = Date.now();
@@ -179,9 +389,9 @@ export function renderTranscript(st: State) {
       const sp = soleSpeaker(p.stream);
       if (filters.speaker && sp?.id !== filters.speaker) continue;
       rows.push(h("div", { class: "utt live" },
-        h("span", { class: "utt-time" }, h("span", { class: "live-dot", title: "Live text: the final line replaces it" })),
-        h("span", { class: `utt-speaker s-${p.stream}` }, sp?.displayName ?? (p.stream === "host" ? "Host" : "Call")),
-        h("span", { class: "utt-text" }, p.text)));
+        h("span", { class: "time" }, h("span", { class: "livedot", title: "Live text: the final line replaces it" })),
+        h("span", { class: `who-tab ${p.stream}` }, sp?.displayName ?? (p.stream === "host" ? "Host" : "Call")),
+        h("span", { class: "text" }, p.text)));
     }
   }
   if (rows.length === 0) rows.push(h("div", { class: "empty" }, st.session ? "Waiting for speech…" : "Start a live session or a replay."));
@@ -192,6 +402,7 @@ export function renderTranscript(st: State) {
 export function jumpToSegment(segmentId: string) {
   const el = document.getElementById(`seg-${segmentId}`);
   if (!el) return toast("That segment is hidden by the current filters");
+  document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach((d) => d.close());
   el.scrollIntoView({ behavior: "smooth", block: "start" });
   document.querySelectorAll(`[data-seg="${segmentId}"]`).forEach((u) => {
     u.classList.remove("flash");
@@ -209,29 +420,38 @@ const VERDICT_LABEL: Record<string, string> = {
 function card(st: State, c: Claim): HTMLElement {
   const v = c.verdict;
   const steps = ["queued", "researching", "verdict"];
-  const idx = c.status === "dropped" ? -1 : steps.indexOf(c.status);
+  const idx = steps.indexOf(c.status);
   const reps = c.repeats.length + c.duplicates.length;
-  return h("article", { class: `card v-${v?.verdict ?? c.status}${c.disputed ? " disputed" : ""}` },
-    h("header", {},
-      h("span", { class: "card-speaker" }, speakerName(st, c.speakerId)),
-      c.status === "dropped"
-        ? h("span", { class: "pill dropped" }, `dropped · ${pretty(c.dropReason ?? "")}`)
-        : h("span", { class: "steps" }, steps.map((s, i) => h("span", { class: `step${i <= idx ? " done" : ""}${i === idx ? " current" : ""}` }, s))),
-      reps ? h("span", { class: "badge repeat", title: "Said again: linked to this claim, not researched twice" }, `repeat ×${reps}`) : null,
-      c.disputed ? h("span", { class: "badge disputed" }, "host disputes") : null),
-    h("p", { class: "card-quote" }, `“${c.text}”`),
-    v ? h("div", { class: "card-verdict" },
-      h("span", { class: `verdict ${v.verdict}` }, VERDICT_LABEL[v.verdict] ?? v.verdict),
-      h("span", { class: "muted small" }, ` ${v.confidence} confidence${v.downgraded ? " · no source found" : ""}${c.latencyMs ? ` · ${(c.latencyMs / 1000).toFixed(1)} s` : ""}`),
-      h("p", { class: "card-restated" }, v.restated_claim),
-      v.correction ? h("p", { class: "card-correction" }, v.correction) : null,
-      v.sources.length ? h("ul", { class: "sources" }, v.sources.map((s) => h("li", {}, h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title || s.url)))) : null,
-      !c.disputed ? h("button", {
-        class: "link-button", onclick: () => {
-          const note = prompt("Why does the host dispute this verdict? (optional)") ?? undefined;
-          void run(() => api.override(c.id, note || undefined));
+  const stream = st.utterances.get(c.utteranceId)?.stream ?? "remote";
+  const block = v
+    ? [h("span", { class: "vw" }, VERDICT_LABEL[v.verdict] ?? pretty(v.verdict)),
+      h("span", { class: "vm" }, `${v.confidence[0]?.toUpperCase() ?? ""}${v.confidence.slice(1)} confidence`),
+      v.downgraded ? h("span", { class: "vm" }, "No source found") : null,
+      c.latencyMs ? h("span", { class: "vm" }, `${(c.latencyMs / 1000).toFixed(1)} s`) : null]
+    : c.status === "researching" ? [h("span", { class: "vw" }, "Checking"), h("span", { class: "vm" }, "Researching")]
+      : c.status === "dropped" ? [h("span", { class: "vw" }, "Dropped"), h("span", { class: "vm" }, pretty(c.dropReason ?? ""))]
+        : [h("span", { class: "vw" }, "Queued"), h("span", { class: "vm" }, "Waiting for research")];
+  return h("article", { class: `fc v-${v?.verdict ?? c.status}${c.disputed ? " disputed" : ""}` },
+    h("div", { class: "fc-verdict" }, block),
+    h("div", { class: "fc-body" },
+      h("div", { class: "fc-meta" },
+        h("span", { class: `who-tab ${stream}` }, speakerName(st, c.speakerId)),
+        c.status === "dropped" ? null
+          : h("ol", { class: "steps", "aria-label": `Status: ${c.status}` },
+            steps.map((s, i) => h("li", { class: `${i <= idx ? "done" : ""}${i === idx ? " cur" : ""}` }, pretty(s)))),
+        reps ? h("span", { class: "badge repeat", title: "Said again: linked to this claim, not researched twice" }, `Repeat ×${reps}`) : null,
+        c.disputed ? h("span", { class: "badge dispute" }, "Host disputes") : null),
+      h("blockquote", {}, `“${c.text}”`),
+      v ? h("p", { class: "restated" }, v.restated_claim) : null,
+      v?.correction ? h("p", { class: "correction" }, v.correction) : null,
+      v?.sources.length ? h("div", { class: "sources" }, h("span", { class: "lbl" }, "Sources"),
+        v.sources.map((s) => h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title || s.url))) : null,
+      v && !c.disputed ? h("div", { class: "fc-foot" }, h("button", {
+        class: "linkbtn", onclick: async () => {
+          const note = await ask("Host disputes this verdict", { message: "Why? (optional)", input: true, placeholder: "A note for System 2", ok: "Dispute" });
+          if (note !== null) void run(() => api.override(c.id, note.trim() || undefined));
         },
-      }, "Host disputes") : null) : null);
+      }, "Host disputes")) : null));
 }
 
 export function renderClaims(st: State) {
@@ -239,53 +459,82 @@ export function renderClaims(st: State) {
     (b.activity ?? "").localeCompare(a.activity ?? "") || Number(b.id.slice(2)) - Number(a.id.slice(2)));
   replace($("#claims"), claims.length ? claims.map((c) => card(st, c)) : h("div", { class: "empty" }, "Checkable claims appear here as they are said."));
   replace($("#claims-count"), claims.length ? String(claims.length) : "");
+  const count = (f: (c: Claim) => boolean) => claims.filter(f).length;
+  const tally: [string, number, string][] = [
+    ["false", count((c) => c.verdict?.verdict === "contradicted"), "var(--bad)"],
+    ["misleading", count((c) => c.verdict?.verdict === "misleading"), "var(--warn)"],
+    ["supported", count((c) => c.verdict?.verdict === "supported"), "var(--good)"],
+    ["checking", count((c) => c.status === "queued" || c.status === "researching"), "var(--accent)"],
+  ];
+  replace($("#tally"), tally.filter(([, n]) => n > 0).map(([k, n, color]) => h("span", {}, h("i", { style: `background:${color}` }), `${n} ${k}`)));
 }
 
 // ---------- speakers ----------
 
 export function renderSpeakers(st: State) {
+  const box = $("#speakers");
+  if (editing(box)) return;
   const active = [...st.speakers.values()].filter((s) => !s.mergedInto);
-  replace($("#speakers"), active.length === 0 ? h("div", { class: "empty" }, "Speakers appear as they talk.") : active.map((sp) => {
-    const input = h("input", { value: sp.displayName, "aria-label": `Rename ${sp.id}` });
-    const into = h("select", {}, h("option", { value: "" }, "Merge into…"), active.filter((o) => o.id !== sp.id).map((o) => h("option", { value: o.id }, o.displayName)));
+  replace(box, active.length === 0 ? h("div", { class: "empty" }, "Speakers appear as they talk.") : h("div", {}, active.map((sp) => {
+    const input = h("input", { class: "input", value: sp.displayName, "aria-label": `Rename ${sp.id}` });
+    const into = h("select", { class: "select", "aria-label": "Merge into" }, h("option", { value: "" }, "Merge into…"),
+      active.filter((o) => o.id !== sp.id).map((o) => h("option", { value: o.id }, o.displayName)));
+    const save = () => {
+      const name = input.value.trim();
+      if (!name) return toast("Type a name first.");
+      if (name === sp.displayName) return toast(`${sp.displayName} already has that name.`);
+      input.blur(); // lets the list re-render with the new name
+      void run(() => api.rename(sp.id, name), `Renamed ${sp.displayName} to ${name}`);
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
     const talk = st.stats?.speakers?.find((x: any) => x.speakerId === sp.id);
-    return h("div", { class: "speaker-row" },
-      h("span", { class: "muted small mono" }, sp.id),
+    return h("div", { class: "sp-row" },
+      h("span", { class: "id", title: sp.id }, sp.id),
       input,
-      h("button", { onclick: () => run(() => api.rename(sp.id, input.value.trim()), "Renamed") }, "Rename"),
+      h("button", { class: "btn", onclick: save }, "Rename"),
       into,
       h("button", {
-        onclick: () => {
-          if (!into.value) return;
+        class: "btn",
+        onclick: async () => {
+          if (!into.value) return toast(`Choose who to merge ${sp.displayName} into first.`);
           const target = st.speakers.get(into.value)?.displayName ?? into.value;
-          if (confirm(`Merge ${sp.displayName} into ${target}? Their utterances will be relabelled as ${target}.`)) void run(() => api.merge(sp.id, into.value));
+          const ok = await ask(`Merge ${sp.displayName} into ${target}?`, { message: `Their utterances will be relabelled as ${target}.`, ok: "Merge" });
+          if (ok !== null) void run(() => api.merge(sp.id, into.value), `Merged ${sp.displayName} into ${target}`);
         },
       }, "Merge"),
-      talk ? h("span", { class: "muted small" }, `${clock(talk.talkMs)} talk`) : null);
-  }));
+      h("span", { class: "talk" }, talk ? `${clock(talk.talkMs)} talk` : ""));
+  })));
 }
 
 // ---------- System 1 ----------
 
 export async function renderS1(st: State) {
+  const box = $("#s1");
+  if (editing(box)) return;
   const c = s1Counters(st);
   const last = st.s1.last;
   const restorable = st.s1.versions.filter((v) => v.id === "s1@1" || v.status === "promoted");
-  const sel = h("select", {}, restorable.map((v) => h("option", { value: v.id, selected: v.id === st.s1.active }, v.id)));
-  replace($("#s1"),
-    h("div", { class: "s1-head" }, h("span", { class: "muted" }, "Active version "), h("strong", { class: "mono" }, st.s1.active),
-      h("span", { class: "muted small" }, ` · ${st.s1.memorySize} memory questions`)),
-    h("div", { class: "counters" },
-      [["flags", c.flags], ["good flags", c.goodFlags], ["false alarms", c.falseAlarms], ["misses", c.misses], ["repeats", c.repeats]].map(([k, n]) =>
-        h("div", { class: "counter" }, h("div", { class: "counter-n" }, String(n)), h("div", { class: "counter-k" }, String(k))))),
-    last ? h("div", { class: `s1-last ${last.outcome}` },
-      h("div", {}, h("strong", {}, pretty(last.outcome)), last.candidate ? ` ${last.candidate}` : "", ` → active ${last.active}`),
-      last.gate ? h("div", { class: "small mono" }, `gate: G ${last.gate.G2}/${last.gate.G} · F ${last.gate.F2}/${last.gate.F} · M ${last.gate.M2}/${last.gate.M}`) : null,
-      last.rationale ? h("p", { class: "small" }, last.rationale) : null,
-      last.errors?.length ? h("p", { class: "small error-text" }, last.errors.join("; ")) : null)
-      : h("div", { class: "muted small" }, "No rewrite yet: System 2 rewrites System 1 after enough false alarms or misses."),
-    h("div", { class: "row" }, h("span", { class: "muted small" }, "Roll back to "), sel,
-      h("button", { onclick: () => run(() => api.rollback(sel.value), `Rolled back to ${sel.value}`) }, "Roll back")));
+  const sel = h("select", { id: "rollback", class: "select" }, (restorable.length ? restorable : [{ id: st.s1.active }]).map((v) =>
+    h("option", { value: v.id, selected: v.id === st.s1.active }, v.id)));
+  const counters: [string, number, string][] = [
+    ["Flags", c.flags, ""], ["Good flags", c.goodFlags, "good"], ["False alarms", c.falseAlarms, "bad"], ["Misses", c.misses, "bad"], ["Repeats", c.repeats, ""],
+  ];
+  replace(box,
+    h("div", { class: "kv" }, "Active version ", h("strong", {}, st.s1.active), ` · ${st.s1.memorySize} memory question${st.s1.memorySize === 1 ? "" : "s"}`),
+    h("div", { class: "counters" }, counters.map(([k, n, cls]) =>
+      h("div", { class: `counter ${cls}` }, h("div", { class: "n" }, String(n)), h("div", { class: "k" }, k)))),
+    last ? h("div", { class: `outcome ${last.outcome}` },
+      h("div", { class: "stamp" }, pretty(last.outcome), h("small", {}, `${last.candidate ? `${last.candidate} → ` : ""}active ${last.active}`)),
+      h("div", { class: "txt" },
+        last.gate ? h("div", { class: "gate" },
+          h("span", {}, "Good kept ", h("b", {}, `${last.gate.G2}/${last.gate.G}`)),
+          h("span", {}, "False alarms left ", h("b", {}, `${last.gate.F2}/${last.gate.F}`)),
+          h("span", {}, "Misses caught ", h("b", {}, `${last.gate.M2}/${last.gate.M}`))) : null,
+        last.rationale ? h("span", {}, last.rationale) : null,
+        last.errors?.length ? h("span", { class: "error-text" }, last.errors.join("; ")) : null))
+      : h("p", { class: "note" }, "No rewrite yet: System 2 rewrites System 1 after enough false alarms or misses."),
+    h("div", { class: "row" }, h("label", { class: "kv", for: "rollback" }, "Roll back to"), sel,
+      h("button", { class: "btn", onclick: () => run(() => api.rollback(sel.value), `Rolled back to ${sel.value}`) }, "Roll back")));
 }
 
 // ---------- label editor ----------
@@ -313,20 +562,20 @@ function parseCriteria(type: string, text: string): unknown {
 }
 
 function questionRow(id: string, q: LabelQuestion): HTMLElement {
-  const type = h("select", { class: "q-type" }, ["noul", "choice", "score"].map((t) => h("option", { value: t, selected: q.type === t }, t)));
-  const hint = h("div", { class: "muted small q-hint" });
+  const type = h("select", { class: "select q-type", "aria-label": "Question type" }, ["noul", "choice", "score"].map((t) => h("option", { value: t, selected: q.type === t }, t)));
+  const hint = h("span", { class: "hint" });
   const setHint = () => {
-    hint.textContent = type.value === "choice" ? "one option per line: key: description (include none or other…)"
-      : type.value === "score" ? "one level per line, lowest first (2–10)" : "optional: true: … and false: … lines";
+    hint.textContent = type.value === "choice" ? "One option per line: key: description (include none or other…)"
+      : type.value === "score" ? "One level per line, lowest first (2–10)" : "Optional: true: … and false: … lines";
   };
   setHint();
   type.addEventListener("change", setHint);
-  const row = h("div", { class: "q-row" },
+  const row = h("div", { class: "q" },
     h("div", { class: "row" },
-      h("input", { class: "q-id mono", value: id, "aria-label": "Question id (snake_case)" }), type,
-      h("button", { class: "link-button danger", onclick: () => { row.remove(); editorTouched = true; } }, "Remove")),
-    h("textarea", { class: "q-instructions", rows: 2, "aria-label": "Instructions" }, q.instructions),
-    h("textarea", { class: "q-criteria mono", rows: q.type === "noul" ? 2 : 4, "aria-label": "Criteria" }, criteriaText(q)),
+      h("input", { class: "input q-id", value: id, "aria-label": "Question id (snake_case)" }), type,
+      h("button", { class: "linkbtn danger", onclick: () => { row.remove(); editorTouched = true; } }, "Remove")),
+    h("textarea", { class: "input q-instructions", rows: 2, "aria-label": "Instructions" }, q.instructions),
+    h("textarea", { class: "input q-criteria", rows: q.type === "noul" ? 2 : 4, "aria-label": "Criteria" }, criteriaText(q)),
     hint);
   row.addEventListener("input", () => { editorTouched = true; });
   return row;
@@ -334,7 +583,7 @@ function questionRow(id: string, q: LabelQuestion): HTMLElement {
 
 function readEditor(base: LabelSet): LabelSet {
   const questions: Record<string, LabelQuestion> = {};
-  document.querySelectorAll<HTMLElement>("#label-questions .q-row").forEach((row) => {
+  document.querySelectorAll<HTMLElement>("#label-questions .q").forEach((row) => {
     const id = (row.querySelector(".q-id") as HTMLInputElement).value.trim();
     const type = (row.querySelector(".q-type") as HTMLSelectElement).value as LabelQuestion["type"];
     const instructions = (row.querySelector(".q-instructions") as HTMLTextAreaElement).value.trim();
@@ -347,27 +596,29 @@ function readEditor(base: LabelSet): LabelSet {
 
 export function renderLabels(st: State, force = false) {
   const set = st.labels.set;
-  if (!set) return;
+  if (!set) return replace($("#labels"), h("div", { class: "empty" }, "The label set loads with a session."));
   if (!force && (editorTouched || editorVersion === st.labels.version)) return;
   editorVersion = st.labels.version;
   editorTouched = false;
-  const stories = h("textarea", { id: "stories", rows: 3, placeholder: "Tonight's stories, one headline per line" }, st.labels.stories.join("\n"));
+  replace($("#h-lb")?.nextElementSibling ?? null, `Version ${st.labels.version} · changes apply from the next segment`);
+  const stories = h("textarea", { id: "stories", class: "input", rows: 3, placeholder: "Tonight's stories, one headline per line" }, st.labels.stories.join("\n"));
   replace($("#labels"),
-    h("div", { class: "row" }, h("span", { class: "muted small" }, "Version "), h("span", { class: "mono small" }, st.labels.version)),
-    h("label", { class: "small muted" }, "Stories", stories),
+    h("label", { class: "fieldlabel" }, "Tonight's stories, one headline per line", stories),
     h("div", { class: "row" }, h("button", {
+      class: "btn",
       onclick: () => run(async () => {
-        const r = await api.putStories(stories.value.split("\n").map((x) => x.trim()).filter(Boolean));
-        st.labels.stories = stories.value.split("\n").map((x) => x.trim()).filter(Boolean);
+        const headlines = stories.value.split("\n").map((x) => x.trim()).filter(Boolean);
+        const r = await api.putStories(headlines);
+        st.labels.stories = headlines;
         st.labels.version = r.version;
       }, "Stories saved: they apply from the next segment"),
     }, "Save stories")),
-    h("label", { class: "small muted" }, "Prefix", h("input", { id: "label-prefix", value: set.prefix })),
-    h("div", { id: "label-questions" }, Object.entries(set.questions).map(([id, q]) => questionRow(id, q))),
+    h("label", { class: "fieldlabel" }, "Prefix", h("input", { id: "label-prefix", class: "input", value: set.prefix })),
+    h("div", { id: "label-questions", style: "display:grid;gap:12px" }, Object.entries(set.questions).map(([id, q]) => questionRow(id, q))),
     h("div", { class: "row" },
-      h("button", { onclick: () => { $("#label-questions")!.append(questionRow("new_question", { type: "noul", instructions: "A speaker in the current segment …" })); editorTouched = true; } }, "Add question"),
+      h("button", { class: "btn", onclick: () => { $("#label-questions")!.append(questionRow("new_question", { type: "noul", instructions: "A speaker in the current segment …" })); editorTouched = true; } }, "Add question"),
       h("button", {
-        class: "primary", onclick: () => run(async () => {
+        class: "btn primary", onclick: () => run(async () => {
           const next = readEditor(set);
           const r = await api.putLabels(next);
           st.labels.set = next;
@@ -377,20 +628,32 @@ export function renderLabels(st: State, force = false) {
           renderLabels(st, true);
         }, "Label set applied from the next segment"),
       }, "Apply"),
-      h("button", { onclick: () => run(async () => { const r = await api.relabel(); toast(`Relabelling ${r.segments} segments in the background`, "ok"); }) }, "Relabel closed segments")),
-    h("p", { class: "muted small" }, "The boundary question is calibrated and cannot change live."));
+      h("button", { class: "btn", onclick: () => run(async () => { const r = await api.relabel(); toast(`Relabelling ${r.segments} segments in the background`, "ok"); }) }, "Relabel closed segments")),
+    h("p", { class: "note" }, "The boundary question is calibrated and cannot change live."));
 }
 
 // ---------- accounting and stats ----------
 
 export function renderCost(st: State) {
   const c = st.cost;
-  const pct = Math.min(100, (c.session / (c.sessionCapUsd || 5)) * 100);
-  replace($("#cost"),
-    h("div", { class: "cost-line" }, h("strong", {}, usd(c.session)), h("span", { class: "muted" }, ` of ${usd(c.sessionCapUsd || 5)} cap`)),
-    h("div", { class: "meter-bar small" }, h("div", { class: `meter-fill${pct > 80 ? " warn" : ""}`, style: `width:${pct}%` })),
-    h("div", { class: "muted small" }, `transcription ${usd(c.transcription)} · Jev ${usd(c.jev)} · System 2 ${usd(c.s2)}`),
-    st.budgetExhausted ? h("div", { class: "error-text small" }, `Budget exhausted: ${st.budgetExhausted}`) : null);
+  const cap = c.sessionCapUsd || 5;
+  const pct = Math.min(100, (c.session / cap) * 100);
+  const box = $("#cost")!;
+  box.classList.toggle("exhausted", !!st.budgetExhausted);
+  box.setAttribute("aria-label", `Session spend ${usd(c.session)} of ${usd(cap)} cap`);
+  const archived = st.session?.status === "archived";
+  box.title = archived ? "What this recording cost when it ran. Opening it costs nothing." : "";
+  replace(box,
+    h("span", { class: "k" }, archived ? "Cost" : "Spend"),
+    h("span", { class: "v" }, usd(c.session), " ", h("small", {}, `/ $${Number.isInteger(cap) ? cap : cap.toFixed(2)}`)),
+    h("span", { class: "bar" }, h("b", { class: pct > 80 ? "warn" : "", style: `width:${pct}%` })),
+    h("div", { class: "pop", role: "tooltip" },
+      h("div", { class: "pop-h" }, archived ? "This recording cost" : `Session spend · cap ${usd(cap)}`),
+      h("dl", {},
+        h("dt", {}, "Transcription"), h("dd", {}, usd(c.transcription)),
+        h("dt", {}, "Jev"), h("dd", {}, usd(c.jev)),
+        h("dt", {}, "System 2"), h("dd", {}, usd(c.s2))),
+      st.budgetExhausted ? h("p", { class: "error-text" }, `Budget exhausted: ${st.budgetExhausted}`) : null));
 }
 
 export function renderStats(st: State) {
@@ -398,22 +661,28 @@ export function renderStats(st: State) {
   if (!s) return replace($("#stats"), h("div", { class: "empty" }, "Stats arrive every minute and at the end of the show."));
   const fc = s.factcheck ?? {};
   const verdicts = Object.entries(fc.verdicts ?? {}).filter(([, n]) => (n as number) > 0).map(([k, n]) => `${VERDICT_LABEL[k] ?? k} ${n}`).join(" · ");
+  const list = (k: "predictions" | "recommendations" | "clips") => h("div", {},
+    h("h3", {}, pretty(k)),
+    (s[k] ?? []).length
+      ? h("ul", {}, s[k].map((x: any) => h("li", {}, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); jumpToSegment(x.segmentId); } }, x.text || x.segmentId))))
+      : h("p", { class: "note" }, "None yet"));
   replace($("#stats"),
-    h("div", { class: "rogan" }, h("span", { class: "rogan-n" }, `${Math.round((s.roganIndex ?? 0) * 100)}%`), h("span", { class: "muted" }, " Rogan index (personal life + other topics)")),
-    h("table", { class: "stats-table" },
+    h("div", { class: "big" }, h("span", { class: "n" }, `${Math.round((s.roganIndex ?? 0) * 100)}%`), h("span", { class: "k" }, "Rogan index: time spent on personal life and other topics")),
+    h("table", { class: "data" },
       h("thead", {}, h("tr", {}, h("th", {}, "Speaker"), h("th", {}, "Talk"), h("th", {}, "Disagreements"), h("th", {}, "Hype"))),
       h("tbody", {}, (s.speakers ?? []).map((sp: any) => h("tr", {},
         h("td", {}, speakerName(st, sp.speakerId)), h("td", {}, clock(sp.talkMs)), h("td", {}, String(sp.disagreements)),
         h("td", {}, sp.hype === null ? "–" : `${sp.hype.toFixed(1)} / 4`))))),
-    (["predictions", "recommendations", "clips"] as const).map((k) => (s[k] ?? []).length
-      ? h("div", {}, h("div", { class: "small muted" }, pretty(k)), h("ul", { class: "small" }, s[k].map((x: any) => h("li", {}, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); jumpToSegment(x.segmentId); } }, x.text || x.segmentId)))))
-      : null),
-    h("div", { class: "small" }, `Fact-check: ${fc.flagged ?? 0} flagged · ${fc.researched ?? 0} researched · ${verdicts || "no verdicts"} · ${fc.repeats ?? 0} repeats · ${fc.duplicates ?? 0} duplicates · ${fc.dropped ?? 0} dropped · ${fc.falseAlarms ?? 0} false alarms · ${fc.misses ?? 0} misses · System 1 versions ${fc.promoted ?? 0} promoted, ${fc.rejected ?? 0} rejected`));
+    h("div", { class: "lists" }, list("predictions"), list("recommendations"), list("clips")),
+    h("p", { class: "note" }, `Fact-check: ${fc.flagged ?? 0} flagged · ${fc.researched ?? 0} researched · ${verdicts || "no verdicts"} · ${fc.repeats ?? 0} repeats · ${fc.duplicates ?? 0} duplicates · ${fc.dropped ?? 0} dropped · ${fc.falseAlarms ?? 0} false alarms · ${fc.misses ?? 0} misses · System 1 versions ${fc.promoted ?? 0} promoted, ${fc.rejected ?? 0} rejected`));
 }
 
 export function renderErrors(st: State) {
   if (st.errors.length === 0) return replace($("#errors"), h("div", { class: "empty" }, "No errors."));
-  replace($("#errors"), st.errors.slice(0, 8).map((e) => h("div", { class: "err small" }, h("span", { class: "mono" }, e.component), ` ${e.message}`)));
+  replace($("#errors"), st.errors.map((e) => h("div", { class: "err" },
+    h("span", { class: "c" }, e.component),
+    h("span", { class: "t" }, new Date(e.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })),
+    h("span", {}, e.message))));
 }
 
 // ---------- recordings library ----------
@@ -426,30 +695,74 @@ function when(iso: string | null, id: string): string {
   return new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function recordingRow(st: State, r: SessionSummary, refresh: () => void): HTMLElement {
+/** `next` is the recording to show if this one is deleted while on screen: the one below it, else the one above. */
+function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undefined, refresh: () => void): HTMLElement {
   const current = st.session?.id === r.id;
   const running = st.session?.status === "running" || st.session?.status === "ending";
-  return h("div", { class: `rec${current ? " current" : ""}` },
+  const viewing = current && st.session?.status === "archived";
+  const label = r.name ?? when(r.startedAt, r.id);
+  const open = () => {
+    if (viewing) return $<HTMLDialogElement>("#dlg-recordings")?.close();
+    if (running) return toast("Stop the current session before opening a recording.");
+    void run(async () => {
+      await api.openSession(r.id);
+      $<HTMLDialogElement>("#dlg-recordings")?.close();
+    });
+  };
+  const title: HTMLButtonElement = h("button", {
+    class: "rec-title", title: "Click to rename",
+    onclick: (e: Event) => {
+      e.stopPropagation();
+      editInPlace(title, {
+        value: r.name ?? "", placeholder: when(r.startedAt, r.id), cls: "input rec-title-input",
+        save: (name) => run(async () => { await api.renameSession(r.id, name); refresh(); }, name ? `Renamed to ${name}` : "Name cleared"),
+      });
+    },
+  }, label);
+  return h("div", {
+    class: `rec${current ? " current" : ""}${running && !current ? " locked" : ""}`, role: "button", tabindex: 0,
+    title: viewing ? "You are viewing this recording" : running ? "Stop the current session first" : "Open this recording: nothing is re-processed or spent",
+    onclick: open, onkeydown: (e: Event) => { const k = (e as KeyboardEvent).key; if ((k === "Enter" || k === " ") && e.target === e.currentTarget) { e.preventDefault(); open(); } },
+  },
     h("div", { class: "rec-head" },
-      h("strong", {}, r.name ?? when(r.startedAt, r.id)),
-      current ? h("span", { class: "badge repeat" }, st.session?.status === "archived" ? "viewing" : "current") : null,
-      !r.ended && !current ? h("span", { class: "badge disputed", title: "No session.ended: the recording stopped abruptly" }, "incomplete") : null),
-    h("div", { class: "muted small" },
+      title,
+      current ? h("span", { class: "badge cur" }, viewing ? "Viewing" : "Current") : null,
+      !r.ended && !current ? h("span", { class: "badge inc", title: "No session.ended: the recording stopped abruptly" }, "Incomplete") : null,
+      h("button", {
+        class: "btn sm rec-replay", disabled: running,
+        title: running ? "Stop the current session first" : "Run the audio through the pipeline again (costs money: transcription, Jev, System 2)",
+        onclick: async (e: Event) => {
+          e.stopPropagation();
+          const ok = await ask(`Replay “${label}”?`, {
+            message: `This runs the audio through the pipeline again at real-time speed and calls the APIs again (about ${usd(r.costUsd || 0.02)}).`, ok: "Replay",
+          });
+          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
+        },
+      }, glyph("replay"), "Replay"),
+      h("button", {
+        class: "btn icon sm rec-delete", disabled: current && running, "aria-label": `Delete ${label}`,
+        title: current && running ? "Stop the session before deleting it" : "Delete this recording",
+        onclick: async (e: Event) => {
+          e.stopPropagation();
+          const ok = await ask(`Delete “${label}”?`, {
+            message: "Are you sure? This permanently removes its audio, transcript, fact-checks, and every other file. It can't be undone.",
+            ok: "Delete", danger: true,
+          });
+          if (ok === null) return;
+          void run(async () => {
+            await api.deleteSession(r.id);
+            if (viewing) {
+              if (next) await api.openSession(next.id); // show the recording that was below it
+              else onViewGone();
+            }
+            refresh();
+          }, `Deleted ${label}`);
+        },
+      }, glyph("trash"))),
+    h("div", { class: "meta" },
       [r.name ? when(r.startedAt, r.id) : null, clock(r.durationMs), r.mode, `${r.utterances} lines`, r.speakers.join(", ") || null,
         r.claims ? `${r.claims} claims` : null, usd(r.costUsd)].filter(Boolean).join(" · ")),
-    (r.matches ?? []).map((m) => h("div", { class: "rec-match small" }, h("span", { class: "mono" }, clock(m.startMs)), ` ${m.speaker}: `, m.snippet)),
-    h("div", { class: "row" },
-      h("button", {
-        onclick: () => {
-          const name = prompt("Name this recording:", r.name ?? "");
-          if (name !== null) void run(async () => { await api.renameSession(r.id, name); refresh(); });
-        },
-      }, "Rename"),
-      h("button", { disabled: running, title: "Show it exactly as recorded; nothing is re-processed or spent", onclick: () => run(() => api.openSession(r.id)) }, "Open"),
-      h("button", {
-        disabled: running, title: "Run the audio through the pipeline again (costs money: transcription, Jev, System 2)",
-        onclick: () => { if (confirm(`Replay "${r.name ?? r.id}" through the pipeline at real-time speed? This calls the APIs again (about ${usd(r.costUsd || 0.02)}).`)) void run(() => api.replaySession(r.id, 1)); },
-      }, "Replay")));
+    (r.matches ?? []).map((m) => h("div", { class: "match" }, h("span", { class: "t" }, clock(m.startMs)), `${m.speaker}: `, m.snippet)));
 }
 
 export async function renderRecordings(st: State) {
@@ -458,20 +771,84 @@ export async function renderRecordings(st: State) {
   const refresh = () => void renderRecordings(st);
   let search = box.querySelector<HTMLInputElement>("input.rec-search");
   if (!search) {
-    search = h("input", { class: "rec-search", type: "search", placeholder: "Search names and transcripts…", value: libraryQuery });
+    search = h("input", { class: "input rec-search", type: "search", placeholder: "Search names and transcripts…", "aria-label": "Search names and transcripts", value: libraryQuery });
     search.addEventListener("input", () => {
       libraryQuery = search!.value;
       clearTimeout(libraryTimer);
       libraryTimer = window.setTimeout(refresh, 250);
     });
-    replace(box, search, h("div", { class: "rec-list" }));
+    replace(box, search, h("div", { class: "rec-list" }),
+      h("p", { class: "note" }, "Click a recording to open it exactly as it was, for free. Click its name to rename it. Replay runs its audio through the pipeline again and costs about what it cost the first time."));
   }
   const list = box.querySelector(".rec-list")!;
   try {
     const rows = await api.sessions(libraryQuery.trim());
-    replace(list, rows.length ? rows.map((r) => recordingRow(st, r, refresh))
+    replace(list, rows.length ? rows.map((r, i) => recordingRow(st, r, rows[i + 1] ?? rows[i - 1], refresh))
       : h("div", { class: "empty" }, libraryQuery ? "No recording matches." : "No recordings yet."));
   } catch (e) {
-    replace(list, h("div", { class: "error-text small" }, e instanceof Error ? e.message : String(e)));
+    replace(list, h("div", { class: "error-text" }, e instanceof Error ? e.message : String(e)));
+  }
+}
+
+// ---------- layout: the transcript / fact-check divider ----------
+
+const SPLIT_DEFAULT = 56.5; // % of the width for the transcript
+const SPLIT_KEY = "pa.splitPct";
+
+function setSplit(pct: number) {
+  const next = Math.min(75, Math.max(25, pct));
+  $("#stage")?.style.setProperty("--split", `${next.toFixed(2)}%`);
+  $("#split")?.setAttribute("aria-valuenow", String(Math.round(next)));
+  try { localStorage.setItem(SPLIT_KEY, String(next)); } catch { /* storage may be unavailable */ }
+}
+
+/** Drag the divider between the transcript and the fact-checks (or use its arrow keys); double-click resets it. */
+export function bindSplit() {
+  const stage = $("#stage");
+  const split = $("#split");
+  if (!stage || !split) return;
+  try {
+    const saved = Number(localStorage.getItem(SPLIT_KEY));
+    if (saved) setSplit(saved);
+  } catch { /* storage may be unavailable */ }
+  split.setAttribute("aria-valuemin", "25");
+  split.setAttribute("aria-valuemax", "75");
+  split.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    split.setPointerCapture(e.pointerId);
+    split.classList.add("dragging");
+    document.body.classList.add("resizing-x");
+    const move = (ev: PointerEvent) => {
+      const r = stage.getBoundingClientRect();
+      setSplit(((ev.clientX - r.left) / r.width) * 100);
+    };
+    const up = () => {
+      split.classList.remove("dragging");
+      document.body.classList.remove("resizing-x");
+      split.removeEventListener("pointermove", move);
+      split.removeEventListener("pointerup", up);
+      split.removeEventListener("pointercancel", up);
+    };
+    split.addEventListener("pointermove", move);
+    split.addEventListener("pointerup", up);
+    split.addEventListener("pointercancel", up);
+  });
+  split.addEventListener("dblclick", () => setSplit(SPLIT_DEFAULT));
+  split.addEventListener("keydown", (e) => {
+    const cur = parseFloat(getComputedStyle(stage).getPropertyValue("--split")) || SPLIT_DEFAULT;
+    if (e.key === "ArrowLeft") { e.preventDefault(); setSplit(cur - 2); }
+    if (e.key === "ArrowRight") { e.preventDefault(); setSplit(cur + 2); }
+  });
+}
+
+// ---------- an out-of-date server ----------
+
+/** Shows a banner when the engine code changed after the server started, so a missing restart is never silent. */
+export async function checkEngine() {
+  try {
+    $("#stale")!.hidden = !(await api.engine()).stale;
+  } catch (e) {
+    // a server older than this check has no /api/engine: it is out of date too
+    if (e instanceof ApiError && e.status === 404) $("#stale")!.hidden = false;
   }
 }

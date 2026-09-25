@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { ApiError, createApiServer, type EngineApi, type StartRequest } from "../src/server/main.ts";
+import { ApiError, createApiServer, engineStale, type EngineApi, type StartRequest } from "../src/server/main.ts";
 import { EventBus } from "../src/store/events.ts";
 
 /** A fake pipeline: records every command and emits the events a real session would. */
@@ -37,6 +37,9 @@ class FakeEngine implements EngineApi {
   getSession(id: string) { if (id !== "20260925-120000") throw new ApiError(404, "unknown session"); return { id }; }
   updateSession(id: string, patch: unknown) { this.calls.push(["update", id, patch]); return { id, ...(patch as object) }; }
   openSession(id: string) { this.calls.push(["open", id]); return { sessionId: id, events: 12 }; }
+  deleteSession(id: string) { this.calls.push(["delete", id]); return { deleted: id }; }
+  pause() { this.calls.push(["pause"]); return { paused: true }; }
+  resume() { this.calls.push(["resume"]); return { paused: false }; }
 }
 
 let base = "";
@@ -46,9 +49,11 @@ const server = createApiServer(engine, { webRoot: web });
 
 beforeAll(async () => {
   mkdirSync(join(web, "dist"), { recursive: true });
+  mkdirSync(join(web, "fonts"), { recursive: true });
   writeFileSync(join(web, "index.html"), "<!doctype html><title>t</title>");
   writeFileSync(join(web, "styles.css"), "body{}");
   writeFileSync(join(web, "dist", "app.js"), "export {}");
+  writeFileSync(join(web, "fonts", "face.woff2"), "wOF2");
   writeFileSync(join(tmpdir(), "secret.txt"), "top secret");
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -101,12 +106,30 @@ describe("HTTP API", () => {
     expect(engine.calls[0][1]).toEqual({ mode: "replay", dir: "fixtures/conversation", speed: 1 });
   });
 
+  test("pause, resume, and delete a recording", async () => {
+    expect((await call("POST", "/api/session/pause")).json).toEqual({ paused: true });
+    expect((await call("POST", "/api/session/resume")).json).toEqual({ paused: false });
+    expect((await call("DELETE", "/api/sessions/20260925-120000")).json).toEqual({ deleted: "20260925-120000" });
+    expect(engine.calls.slice(-3)).toEqual([["pause"], ["resume"], ["delete", "20260925-120000"]]);
+  });
+
+  test("the page can tell when the engine code changed after the server started", async () => {
+    expect((await call("GET", "/api/engine")).json).toMatchObject({ stale: false });
+    const src = mkdtempSync(join(tmpdir(), "src-"));
+    mkdirSync(join(src, "store"));
+    writeFileSync(join(src, "store", "a.ts"), "export {}");
+    expect(engineStale(src, Date.now() + 60_000)).toBe(false);
+    expect(engineStale(src, Date.now() - 60_000)).toBe(true);
+  });
+
   test("static files are served from web/ only", async () => {
     const index = await call("GET", "/");
     expect(index.status).toBe(200);
     expect(index.type).toContain("text/html");
     expect((await call("GET", "/styles.css")).type).toContain("text/css");
     expect((await call("GET", "/dist/app.js")).type).toContain("text/javascript");
+    expect((await call("GET", "/fonts/face.woff2")).type).toBe("font/woff2");
+    expect((await call("GET", "/fonts/../../secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/../../secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/%2e%2e/%2e%2e/secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/..%2F..%2Fsecret.txt")).status).toBe(404);

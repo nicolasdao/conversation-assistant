@@ -27,6 +27,7 @@ export interface SessionSummary {
 
 export const api = {
   state: () => call<any>("GET", "/api/state"),
+  engine: () => call<{ startedAt: string; stale: boolean }>("GET", "/api/engine"),
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),
   startReplay: (dir: string, speed: 1 | "max") => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed }),
@@ -42,5 +43,8 @@ export const api = {
   renameSession: (id: string, name: string) => call<SessionSummary>("PATCH", `/api/sessions/${encodeURIComponent(id)}`, { name }),
   openSession: (id: string) => call<{ sessionId: string; events: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/open`),
   replaySession: (sessionId: string, speed: 1 | "max") => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed }),
+  pause: () => call<{ paused: boolean }>("POST", "/api/session/pause"),
+  resume: () => call<{ paused: boolean }>("POST", "/api/session/resume"),
+  deleteSession: (id: string) => call<{ deleted: string }>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),
   rollback: (version: string) => call<{ active: string }>("POST", "/api/s1/rollback", { version }),
 };

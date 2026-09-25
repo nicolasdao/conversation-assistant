@@ -18,6 +18,11 @@ export function s<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Attrs = {
   return el;
 }
 
+/** A drawn glyph from the symbols in index.html (`#g-<id>`). */
+export function glyph(id: string, cls = "g"): SVGSVGElement {
+  return s("svg", { class: cls, "aria-hidden": "true" }, s("use", { href: `#g-${id}` }));
+}
+
 function setAttrs(el: Element, attrs: Attrs) {
   for (const [k, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;
@@ -42,11 +47,13 @@ export function replace(el: Element | null, ...children: Child[]) {
 
 export const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector(sel) as T | null;
 
+/** Session time: 4:07, or 1:04:07 past an hour. */
 export function clock(ms: number): string {
   const t = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(t / 60);
-  const sec = t % 60;
-  return `${m}:${String(sec).padStart(2, "0")}`;
+  const hr = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const sec = String(t % 60).padStart(2, "0");
+  return hr ? `${hr}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
 export function usd(n: number): string {

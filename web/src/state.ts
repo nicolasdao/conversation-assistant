@@ -36,7 +36,9 @@ export interface LivePartial { stream: Stream; itemId: string; text: string; utt
 export interface ErrorItem { component: string; message: string; at: string }
 
 export interface State {
-  session: { id: string; mode: string; status: string; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null } | null;
+  session: { id: string; mode: string; status: string; paused?: boolean; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null } | null;
+  /** Paused stretches of session time; `endMs` is null while still paused. */
+  pauses: { startMs: number; endMs: number | null }[];
   speakers: Map<string, Speaker>;
   utterances: Map<string, Utterance>;
   /** Streaming text not yet replaced by its final utterance, by realtime item id. */
@@ -55,7 +57,7 @@ export interface State {
 
 export function emptyState(): State {
   return {
-    session: null, speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
+    session: null, pauses: [], speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
     cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 5 },
@@ -108,9 +110,22 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       dirty.add("session");
       break;
     case "session.ended":
-      if (s.session && s.session.status !== "archived") s.session.status = "ended";
-      dirty.add("session");
+      // an ended session is a recording: the engine now serves it as one, and the page shows it the same way
+      if (s.session) { s.session.status = "archived"; s.session.paused = false; }
+      dirty.add("session").add("health").add("cost");
       break;
+    case "session.paused":
+      if (s.session) s.session.paused = true;
+      if (!s.pauses.some((p) => p.startMs === d.atMs)) s.pauses.push({ startMs: d.atMs, endMs: null });
+      dirty.add("session").add("health").add("timeline");
+      break;
+    case "session.resumed": {
+      if (s.session) s.session.paused = false;
+      const open = s.pauses.find((p) => p.endMs === null);
+      if (open) open.endMs = d.atMs;
+      dirty.add("session").add("health").add("timeline");
+      break;
+    }
     case "health": {
       const prev = s.health[d.stream as Stream];
       const now = Date.now();

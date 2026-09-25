@@ -42,9 +42,9 @@ The placeholder rule fixes a real failure: in a ChatGPT voice-mode test, the fir
 
 ## Rename and merge
 
-- `POST /api/speakers/:id/rename { displayName }` changes the name; later events carry the new name. In the page, click a name in the transcript or use the Speakers tab.
+- `POST /api/speakers/:id/rename { displayName }` changes the name; later events carry the new name. In the page, click a name in the transcript or use **Speakers** in the settings menu (the cog).
 - `POST /api/speakers/merge { fromId, intoId }` moves `fromId`'s voiceprint into `intoId` and records `mergedInto`, so every later lookup of `fromId` resolves to `intoId`. The page asks for confirmation first.
 
-Both work on the current session, while it runs and after it ends; a reopened recording is read-only and returns 409 (see [Recordings](recordings.md)).
+Both work on the current session while it runs and after it ends, and on a reopened recording. After the end, the event is still appended to `events.jsonl` and `speakers.json` is rewritten. On a reopened recording, the engine appends the `speaker.updated` or `speaker.merged` event to that recording's `events.jsonl` and applies it to its `speakers.json`, so reopening shows the new names; a recording keeps no voiceprints, so a merge there relabels lines only (see [Recordings](recordings.md)).
 
 Related: [Transcription](transcription.md), [Gotchas](gotchas.md).

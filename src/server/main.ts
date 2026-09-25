@@ -1,6 +1,7 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { extname, join, resolve, sep } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
@@ -8,7 +9,7 @@ import { Session, type SessionOptions } from "../pipeline/session.ts";
 import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
-import { SessionLibrary } from "../store/library.ts";
+import { resolveRecorded, SessionLibrary } from "../store/library.ts";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -39,6 +40,9 @@ export interface EngineApi {
   getSession(id: string): unknown;
   updateSession(id: string, patch: { name?: string; notes?: string }): unknown;
   openSession(id: string): { sessionId: string; events: number };
+  deleteSession(id: string): { deleted: string };
+  pause(): { paused: boolean };
+  resume(): { paused: boolean };
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -135,6 +139,32 @@ export class Engine implements EngineApi {
     return { sessionId: id, events: events.length };
   }
 
+  /** Deletes a recording; the running session cannot be deleted. If it is the one on screen, the view is cleared. */
+  deleteSession(id: string) {
+    if (this.session && this.session.id === id) throw new ApiError(409, "stop the session before deleting it");
+    this.libraryCall(() => this.library.remove(id));
+    if (this.archived === id) {
+      this.archived = null;
+      this.bus.reset();
+    }
+    return { deleted: id };
+  }
+
+  pause() {
+    const s = this.need();
+    if (s.mode !== "live") throw new ApiError(409, "only a live session can be paused");
+    if (s.status !== "running") throw new ApiError(409, "the session is ending");
+    s.pause();
+    return { paused: true };
+  }
+
+  resume() {
+    const s = this.need();
+    if (s.status !== "running") throw new ApiError(409, "the session is ending");
+    s.resume();
+    return { paused: false };
+  }
+
   async start(req: StartRequest): Promise<{ sessionId: string }> {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
     let sources: AudioSource[];
@@ -168,7 +198,10 @@ export class Engine implements EngineApi {
     });
     const s = this.session;
     if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
-    s.run().catch((e) => console.error("session failed:", e));
+    // When it ends, the session becomes a recording: the page shows it exactly as a reopened one.
+    s.run()
+      .then(() => { if (this.session === s) { this.session = null; this.archived = s.id; } })
+      .catch((e) => console.error("session failed:", e));
     return { sessionId: s.id };
   }
 
@@ -188,6 +221,16 @@ export class Engine implements EngineApi {
   }
 
   renameSpeaker(id: string, displayName: string) {
+    if (this.archived) {
+      const rec = this.archived;
+      const sp = this.library.speakers(rec);
+      const target = resolveRecorded(sp, id);
+      if (!sp.names.has(target)) throw new ApiError(404, `unknown speaker ${id}`);
+      if (typeof displayName !== "string" || !displayName.trim()) throw new ApiError(400, "displayName is required");
+      const name = displayName.trim();
+      this.library.recordSpeakerEdit(rec, this.bus.emit("speaker.updated", { id: target, displayName: name }));
+      return { id: target, displayName: name };
+    }
     const s = this.need();
     if (!s.speakers.get(id)) throw new ApiError(404, `unknown speaker ${id}`);
     if (typeof displayName !== "string" || !displayName.trim()) throw new ApiError(400, "displayName is required");
@@ -195,6 +238,18 @@ export class Engine implements EngineApi {
   }
 
   mergeSpeakers(fromId: string, intoId: string) {
+    if (this.archived) {
+      const rec = this.archived;
+      const sp = this.library.speakers(rec);
+      const from = resolveRecorded(sp, fromId);
+      const into = resolveRecorded(sp, intoId);
+      if (!sp.names.has(from) || !sp.names.has(into)) throw new ApiError(404, "unknown speaker");
+      if (from === into) throw new ApiError(400, "cannot merge a speaker into itself");
+      const displayName = sp.names.get(into)!;
+      // A recording keeps no voiceprints, so the merge relabels lines only.
+      this.library.recordSpeakerEdit(rec, this.bus.emit("speaker.merged", { fromId: from, intoId: into, displayName }));
+      return { id: into, displayName };
+    }
     const s = this.need();
     if (!s.speakers.get(fromId) || !s.speakers.get(intoId)) throw new ApiError(404, "unknown speaker");
     return s.mergeSpeakers(fromId, intoId);
@@ -238,9 +293,25 @@ export class Engine implements EngineApi {
 
 // ---------- HTTP ----------
 
+const SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const BOOTED_AT = Date.now();
+
+/** True when engine code under src/ changed after this server started: the page asks for a restart. */
+export function engineStale(srcDir = SRC_DIR, since = BOOTED_AT): boolean {
+  const walk = (dir: string): boolean => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory() ? walk(p) : e.name.endsWith(".ts") && statSync(p).mtimeMs > since) return true;
+    }
+    return false;
+  };
+  try { return walk(srcDir); } catch { return false; }
+}
+
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
   ".map": "application/json", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
+  ".woff2": "font/woff2",
 };
 
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -270,12 +341,12 @@ function sse(res: ServerResponse, e: AppEvent) {
   res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
 }
 
-/** Serves web/index.html at /, and web/styles.css and web/dist/** as static files, confined to web/. */
+/** Serves web/index.html at /, and web/styles.css, web/dist/** and web/fonts/** as static files, confined to web/. */
 function serveStatic(webRoot: string, path: string, res: ServerResponse): boolean {
   let rel: string;
   if (path === "/" || path === "/index.html") rel = "index.html";
   else if (path === "/styles.css") rel = "styles.css";
-  else if (path.startsWith("/dist/")) rel = path.slice(1);
+  else if (path.startsWith("/dist/") || path.startsWith("/fonts/")) rel = path.slice(1);
   else return false;
   let decoded: string;
   try {
@@ -308,10 +379,13 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
         return;
       }
       if (m === "GET" && path === "/api/state") return send(res, 200, engine.state());
+      if (m === "GET" && path === "/api/engine") return send(res, 200, { startedAt: new Date(BOOTED_AT).toISOString(), stale: engineStale() });
       if (m === "GET" && path === "/api/stats") return send(res, 200, engine.stats());
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());
       if (m === "POST" && path === "/api/session/start") return send(res, 200, await engine.start(await readJson(req)));
       if (m === "POST" && path === "/api/session/stop") return send(res, 200, await engine.stop());
+      if (m === "POST" && path === "/api/session/pause") return send(res, 200, engine.pause());
+      if (m === "POST" && path === "/api/session/resume") return send(res, 200, engine.resume());
       if (m === "POST" && path === "/api/speakers/merge") {
         const b = await readJson(req);
         return send(res, 200, engine.mergeSpeakers(b.fromId, b.intoId));
@@ -329,6 +403,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       mm = path.match(/^\/api\/sessions\/([^/]+)$/);
       if (m === "GET" && mm) return send(res, 200, engine.getSession(decodeURIComponent(mm[1])));
       if (m === "PATCH" && mm) return send(res, 200, engine.updateSession(decodeURIComponent(mm[1]), await readJson(req)));
+      if (m === "DELETE" && mm) return send(res, 200, engine.deleteSession(decodeURIComponent(mm[1])));
       mm = path.match(/^\/api\/sessions\/([^/]+)\/open$/);
       if (m === "POST" && mm) return send(res, 200, engine.openSession(decodeURIComponent(mm[1])));
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));

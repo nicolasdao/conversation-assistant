@@ -52,7 +52,7 @@ macOS asks once for **Microphone** and once for **System Audio Recording**; both
 
 ## Using it
 
-`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in). The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the System 1 panel. Every session is saved under `sessions/`; the **Recordings** tab lists, names, searches, reopens, and replays them.
+`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in). The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/`; **Recordings** lists, names, searches, reopens, and replays them.
 
 Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($5) in `config/app.json`. OpenRouter calls send `provider: { data_collection: "deny" }`.
 

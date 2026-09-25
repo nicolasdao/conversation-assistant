@@ -8,6 +8,8 @@ import { FileSource } from "../src/audio/source.ts";
 import { Session } from "../src/pipeline/session.ts";
 import { EventBus, redactor } from "../src/store/events.ts";
 import { JSONL_FILES } from "../src/store/sessionStore.ts";
+import { Engine } from "../src/server/main.ts";
+import { sumDevSpend } from "../src/budget.ts";
 import { FIXTURE_DIR, loadScript, requireAssets } from "./helpers.ts";
 
 const OPENROUTER = "sk-or-v1-test-openrouter-key-0123456789";
@@ -124,6 +126,16 @@ describe("session (offline, fake services)", () => {
       expect(research.length).toBe(flagged);
       expect(flagged).toBe(3);
 
+      // a rename and a merge after the end are still saved, so reopening the recording shows them
+      const [a, b] = speakers.filter((x: any) => !x.mergedInto).map((x: any) => x.id);
+      s.renameSpeaker(a, "Nic");
+      s.mergeSpeakers(b, a);
+      const tail = readFileSync(join(dir, "events.jsonl"), "utf8").trim().split("\n").slice(-2).map((l) => JSON.parse(l));
+      expect(tail.map((e) => e.type)).toEqual(["speaker.updated", "speaker.merged"]);
+      const after = JSON.parse(readFileSync(join(dir, "speakers.json"), "utf8"));
+      expect(after.find((x: any) => x.id === a).displayName).toBe("Nic");
+      expect(after.find((x: any) => x.id === b).mergedInto).toBe(a);
+
       // the echoed key was redacted
       expect(bus.history().some((e) => JSON.stringify(e).includes("[redacted]"))).toBe(true);
       for (const file of readdirSync(dir)) {
@@ -141,5 +153,51 @@ describe("session (offline, fake services)", () => {
       process.env.OPENROUTER_API_KEY = prev.or;
       process.env.OPENAI_API_KEY = prev.oa;
     }
+  });
+
+  test("a paused session hears silence: nothing is transcribed and the recorded audio is silent", async () => {
+    requireAssets();
+    const root = mkdtempSync(join(tmpdir(), "sessions-"));
+    const { f, stats } = fakeFetch(loadScript());
+    const bus = new EventBus();
+    const s = new Session({
+      mode: "replay", config: loadConfig(), bus, sessionsDir: root, fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI },
+      sources: [new FileSource(`${FIXTURE_DIR}/host.wav`, "host", "max"), new FileSource(`${FIXTURE_DIR}/remote.wav`, "remote", "max")],
+    });
+    expect(s.pause()).toBe(true);
+    expect(s.pause()).toBe(false); // already paused
+    await s.run();
+    const types = bus.history().map((e) => e.type);
+    expect(types).toContain("session.paused");
+    expect(types).not.toContain("utterance");
+    expect(stats().transcribeCalls).toBe(0);
+    const rec = sherpa.readWave(join(s.store.dir, "host.wav")).samples;
+    expect(rec.length).toBeGreaterThan(16_000 * 60); // the file keeps its length, so times stay aligned
+    expect(rec.every((v: number) => v === 0)).toBe(true);
+    expect(s.resume()).toBe(false); // ended
+  });
+
+  test("an ended session becomes a recording, which can be deleted without lowering the development spend", async () => {
+    requireAssets();
+    const root = mkdtempSync(join(tmpdir(), "sessions-"));
+    const { f } = fakeFetch(loadScript());
+    const engine = new Engine({ sessionsDir: root, session: { fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI } } });
+    const { sessionId } = await engine.start({ mode: "replay", dir: FIXTURE_DIR, speed: "max" });
+    expect(() => engine.pause()).toThrow(/only a live session/);
+    await engine.current!.run();
+    await new Promise((r) => setImmediate(r));
+    expect(engine.current).toBeNull();
+    expect((engine.state() as any).session).toMatchObject({ id: sessionId, status: "archived" });
+    expect(() => engine.pause()).toThrow(/recorded session/);
+
+    const spent = sumDevSpend(root);
+    expect(spent).toBeGreaterThan(0);
+    expect(engine.deleteSession(sessionId)).toEqual({ deleted: sessionId });
+    expect(existsSync(join(root, sessionId))).toBe(false);
+    expect(sumDevSpend(root)).toBeCloseTo(spent, 6);
+    expect(engine.state()).toEqual({ session: null });
+    expect(engine.bus.history()).toEqual([]);
+    expect(() => engine.deleteSession(sessionId)).toThrow(/unknown session/);
+    expect(() => engine.deleteSession("../etc")).toThrow(/invalid/);
   });
 });

@@ -79,7 +79,44 @@ describe("session library", () => {
     expect(seen[0]).toBe("session.started");
     expect(engine.bus.history().length).toBe(8);
     expect(engine.state()).toMatchObject({ session: { id: "20260924-100000", status: "archived" }, archived: true });
-    expect(() => engine.renameSpeaker("spk_1", "X")).toThrow(/recorded session/);
+    expect(() => engine.override("c_1")).toThrow(/recorded session/);
     expect(() => engine.openSession("nope")).toThrow(/unknown|invalid/);
+  });
+
+  test("speakers can be renamed and merged on a reopened recording, and the edit is saved with it", () => {
+    const root = fixture();
+    const id = "20260924-100000";
+    const dir = join(root, id);
+    const events = readFileSync(join(dir, "events.jsonl"), "utf8");
+    writeFileSync(join(dir, "events.jsonl"), events + ev("speaker.created", { id: "spk_2", displayName: "Speaker 2", stream: "remote" }) + "\n");
+    writeFileSync(join(dir, "speakers.json"), JSON.stringify([
+      { id: "spk_1", displayName: "Nic", utterances: 2 }, { id: "spk_2", displayName: "Speaker 2", utterances: 1 },
+    ]));
+    const engine = new Engine({ sessionsDir: root });
+    const seen: string[] = [];
+    engine.openSession(id);
+    engine.bus.subscribe((e) => seen.push(e.type));
+
+    expect(engine.renameSpeaker("spk_1", "  Nicolas ")).toEqual({ id: "spk_1", displayName: "Nicolas" });
+    expect(engine.mergeSpeakers("spk_2", "spk_1")).toEqual({ id: "spk_1", displayName: "Nicolas" });
+    expect(seen).toEqual(["speaker.updated", "speaker.merged"]); // open pages update at once
+    // a merged speaker resolves to its target
+    expect(engine.renameSpeaker("spk_2", "Nico")).toEqual({ id: "spk_1", displayName: "Nico" });
+    expect(() => engine.mergeSpeakers("spk_2", "spk_1")).toThrow(/itself/);
+    expect(() => engine.renameSpeaker("spk_9", "X")).toThrow(/unknown speaker/);
+    expect(() => engine.renameSpeaker("spk_1", " ")).toThrow(/displayName/);
+
+    // saved: the events are appended, speakers.json and the library reflect them, and reopening replays them
+    expect(JSON.parse(readFileSync(join(dir, "speakers.json"), "utf8"))).toEqual([
+      { id: "spk_1", displayName: "Nico", utterances: 3 }, { id: "spk_2", displayName: "Speaker 2", utterances: 1, mergedInto: "spk_1" },
+    ]);
+    const lib = new SessionLibrary(root);
+    expect(lib.get(id).speakers).toEqual(["Nico"]);
+    expect(lib.list({ q: "surfing" })[0].matches?.[0].speaker).toBe("Nico");
+    const again = new Engine({ sessionsDir: root });
+    again.openSession(id);
+    const replayed = again.bus.history().filter((e) => e.type.startsWith("speaker."));
+    expect(replayed.map((e) => e.type)).toEqual(["speaker.created", "speaker.updated", "speaker.created", "speaker.updated", "speaker.merged", "speaker.updated"]);
+    expect(replayed.map((e) => e.seq)).toEqual([...replayed.map((e) => e.seq)].sort((x, y) => x - y));
   });
 });

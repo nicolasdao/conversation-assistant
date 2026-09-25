@@ -75,7 +75,7 @@ Every result is an event with a payload checked against a zod schema (a failed c
 
 | Group | Events |
 | --- | --- |
-| Session | `session.started`, `session.ended`, `health` (per stream, every second: RMS dBFS, ms since last frame, utterances in the last minute, capture device) |
+| Session | `session.started`, `session.ended`, `session.paused` / `session.resumed` (with the session time `atMs`), `health` (per stream, every second: RMS dBFS, ms since last frame, utterances in the last minute, capture device) |
 | Speech | `utterance.partial`, `utterance`, `speaker.created`, `speaker.updated`, `speaker.merged` |
 | Timeline | `segment.closed`, `segment.labels`, `section.updated` |
 | Fact-check | `claim.flagged`, `claim.duplicate`, `claim.repeat`, `claim.researching`, `claim.verdict`, `claim.dropped`, `claim.disputed`, `audit`, `s1.version`, `s1.memory` |
@@ -88,34 +88,39 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | GET | `/api/events` | SSE: the session's events so far, then live |
 | GET | `/api/state` | Full current state (or a recorded session's snapshot) |
 | POST | `/api/session/start` | `{ mode: "live", mic?, name? }` or `{ mode: "replay", dir \| sessionId, speed, name? }` |
-| POST | `/api/session/stop` | Stop reading input; in-flight work completes |
+| POST | `/api/session/stop` | Stop reading input; in-flight work completes. When the session ends, the engine serves it as an opened recording (see [Recordings](recordings.md)) |
+| POST | `/api/session/pause`, `/api/session/resume` | Live sessions only: while paused, incoming audio is replaced by silence, so nothing is heard, transcribed, or spent, and the WAVs and session times stay aligned; Stop still works |
 | GET | `/api/devices` | The helper's input devices |
 | POST | `/api/speakers/:id/rename`, `/api/speakers/merge` | Speaker edits (see [Speakers](speakers.md)) |
 | PUT | `/api/labels`, `/api/stories`; POST `/api/labels/relabel` | Timeline label set, tonight's stories, relabelling (see [Jev](jev.md)) |
 | POST | `/api/claims/:id/override`, `/api/s1/rollback` | Host dispute, System 1 rollback (see [System 1 and System 2](system1-system2.md)) |
 | GET | `/api/stats` | Current stats |
-| GET, PATCH, POST | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
+| GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
+| GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
 
-It also serves `web/index.html` at `/`, and `web/styles.css` and `web/dist/**` as static files, confined to `web/`.
+It also serves `web/index.html` at `/`, and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/`.
 
 ## Web front end — `web/`
 
 Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`) — no bundler, no framework, no chart library. It loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
 
-- **Top:** session controls (microphone picker, Start live, replay folder and speed, Stop), stream meters with last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), and a cost meter against the session cap.
-- **Timeline** (inline SVG): the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines, markers (disagreement, hot take, prediction, recommendation, clip-worthy, humour), section brackets, and a dashed "in progress" bar for the open segment. Faded labels are dimmed; clicking a segment or marker jumps to the transcript.
-- **Transcript** with segment dividers, live text, filters (markers, speaker, subject), and click-to-rename.
-- **Fact-check cards:** queued → researching → verdict, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; the most recently active card is on top.
-- **Side tabs:** Recordings, System 1 (active version, counters, last promotion or rejection, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log.
+The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
-The page is laid out to be legible when shared as a window in Riverside at 1280 × 720.
+- **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover; for an opened recording, labelled Cost: what that recording cost when it ran), and the controls: microphone picker, Start live, Pause / Resume (live sessions), Stop, a replay popover (folder and 1× / max speed), and a settings cog.
+- **Transcript and fact-checks (two columns)**, split by a divider you can drag (25–75 %, arrow keys too; double-click resets; the split is remembered in the browser):
+  - the transcript, caption style, with segment dividers, live text, filters (markers, speaker, subject), and click-to-rename; a speaker's name tag appears once per run of consecutive lines, and inferred speakers show as a muted "name *";
+  - the fact-check cards as lower-thirds: a solid verdict block (False, Supported, Misleading…, or Queued / Checking / Dropped), queued → researching → verdict steps, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; a tally of verdicts sits in the column header, and the most recently active card is on top.
+- **Timeline (bottom, full width):** HTML lanes positioned in percent of the session length, with an inline-SVG heat and hype chart: section brackets, the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines on 0–4, marker pins (disagreement, hot take, prediction, recommendation, clip-worthy, humour), a dashed "in progress" block for the open segment, hatched paused stretches, the axis, and a now line. Faded labels are dimmed; clicking a segment or marker jumps to the transcript. A dotted line follows the pointer with the exact time. Zoom with − / + / Fit or ⌘/Ctrl + scroll (a trackpad pinch), from the whole session down to about 30 s across; zoomed in, the strip scrolls sideways (the wheel scrolls through time), segment labels stay in view, axis ticks adapt to the zoom, and a live session stays pinned to the newest moment while scrolled to the end. Dragging the strip's top edge (or its arrow keys) makes the heat · hype chart taller or shorter; double-click resets it, and the height is remembered in the browser.
+- **Settings (the cog menu), each in a modal:** Recordings, System 1 (active version, counters, last promotion or rejection with its gate, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log.
+
+Renames, merges, disputes, and replay confirmations use an in-page dialog rather than the browser's `prompt()` and `confirm()`, so they read well on a shared screen. The page is laid out to be legible when shared as a window in Riverside at 1280 × 720.
 
 ## Budgets — `src/budget.ts`
 
 One ledger per session, plus the development total read from `sessions/**/*.jsonl` when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in three buckets (`transcription` — final and live, `jev`, `s2`), which drive the `cost` event.
 
 - **Session cap** (`budget.sessionCapUsd`, $5) — always enforced.
-- **Development cap** (`budget.devCapUsd`, $3) — the total of `cost_usd` over call rows in `sessions/**/*.jsonl`, enforced by replays (including `serve --replay`) and `smoke`, not by live sessions or `preflight`. `--allow-over-dev-cap` lifts it.
+- **Development cap** (`budget.devCapUsd`, $3) — the total of `cost_usd` over call rows in `sessions/**/*.jsonl` (including `sessions/deleted-spend.jsonl`, which keeps the spend of deleted recordings), enforced by replays (including `serve --replay`) and `smoke`, not by live sessions or `preflight`. `--allow-over-dev-cap` lifts it.
 - When a cap is reached, or OpenRouter returns a non-transient 402, `budget.exhausted` is emitted and further calls are refused.
 
 ## Configuration — `config/`

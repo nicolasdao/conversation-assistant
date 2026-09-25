@@ -62,6 +62,9 @@ export class Session {
   readonly factcheck: FactChecker;
   readonly startedAt = new Date();
   status: "running" | "ending" | "ended" = "running";
+  /** While paused, incoming audio is replaced by silence: nothing is heard, transcribed, or spent, and times stay aligned. */
+  paused = false;
+  private lastMs = 0;
   private readonly bus: EventBus;
   private readonly services: Services;
   private readonly vads = new Map<StreamName, StreamVad>();
@@ -185,7 +188,8 @@ export class Session {
   emit(type: EventType, data: Record<string, unknown>): void {
     const transient = type === "utterance.partial";
     const e = this.bus.emit(type, data, { transient });
-    if (!transient) this.store.append("events", e);
+    // Commands after the end (a speaker rename or merge) are still recorded, so a reopened recording shows them.
+    if (!transient) this.store.append("events", e, { afterClose: this.status === "ended" });
   }
 
   /** Runs the whole session; resolves at session.ended. */
@@ -213,8 +217,10 @@ export class Session {
     let reason = "end_of_input";
     try {
       let n = 0;
-      for await (const f of mergeSources(this.opts.sources, (s) => this.endStream(s))) {
+      for await (let f of mergeSources(this.opts.sources, (s) => this.endStream(s))) {
         if (this.stopRequested) { reason = "stopped"; break; }
+        this.lastMs = Math.max(this.lastMs, f.sessionMs);
+        if (this.paused) f = { ...f, samples: new Float32Array(f.samples.length) };
         this.store.writeAudio(f.stream, f.samples);
         const h = this.health.get(f.stream)!;
         h.lastFrameAt = Date.now();
@@ -339,6 +345,21 @@ export class Session {
     this.store.close();
   }
 
+  /** Pauses a running session: audio becomes silence until resume(). */
+  pause(): boolean {
+    if (this.status !== "running" || this.paused) return false;
+    this.paused = true;
+    this.emit("session.paused", { sessionId: this.id, atMs: this.lastMs });
+    return true;
+  }
+
+  resume(): boolean {
+    if (this.status !== "running" || !this.paused) return false;
+    this.paused = false;
+    this.emit("session.resumed", { sessionId: this.id, atMs: this.lastMs });
+    return true;
+  }
+
   /** Stops reading input; everything in flight still completes. */
   async stop(): Promise<void> {
     this.stopRequested = true;
@@ -350,6 +371,7 @@ export class Session {
   renameSpeaker(id: string, displayName: string) {
     const s = this.speakers.rename(id, displayName);
     this.emit("speaker.updated", { id: s.id, displayName: s.displayName });
+    this.saveSpeakersAfterEnd();
     return s;
   }
 
@@ -357,13 +379,19 @@ export class Session {
     const from = this.speakers.resolve(fromId);
     const s = this.speakers.merge(fromId, intoId);
     this.emit("speaker.merged", { fromId: from, intoId: s.id, displayName: s.displayName });
+    this.saveSpeakersAfterEnd();
     return s;
+  }
+
+  /** speakers.json is written at the end; an edit made after that rewrites it. */
+  private saveSpeakersAfterEnd() {
+    if (this.status === "ended") this.store.writeJson("speakers.json", this.speakers.list());
   }
 
   state() {
     return {
       session: {
-        id: this.id, mode: this.opts.mode, status: this.status, dir: this.store.dir, startedAt: this.startedAt.toISOString(),
+        id: this.id, mode: this.opts.mode, status: this.status, paused: this.paused, dir: this.store.dir, startedAt: this.startedAt.toISOString(),
         streams: this.opts.sources.map((s) => s.stream),
       },
       speakers: this.speakers.list(),

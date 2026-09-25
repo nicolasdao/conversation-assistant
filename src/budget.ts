@@ -4,7 +4,8 @@ import { join } from "node:path";
 export type Bucket = "transcription" | "jev" | "s2";
 
 /** Call rows whose cost_usd counts toward the dev total. Events and totals never do: they would count a cost twice. */
-const CALL_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription"]);
+// deleted_session: the spend of a recording deleted from the library, kept so deleting cannot lower the development total
+const CALL_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription", "deleted_session"]);
 
 export class BudgetExhaustedError extends Error {
   constructor(readonly cap: "session" | "dev" | "provider", message: string) {

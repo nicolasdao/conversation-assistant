@@ -28,7 +28,7 @@ Every session — live or replay — is kept as one folder of plain files. There
 | `speakers.json` | Final speaker list, written at session end |
 | `meta.json` | Library metadata: `name`, `notes` (only if set) |
 
-The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the call rows in all of these folders. Keys are redacted from every file and event.
+The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the call rows in all of these folders, plus `sessions/deleted-spend.jsonl`: deleting a recording first appends its total there (`kind: "deleted_session"`), so deleting cannot lower the development total. Keys are redacted from every file and event.
 
 ## The library — `src/store/library.ts`
 
@@ -44,10 +44,14 @@ The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the 
 | --- | --- | --- |
 | What happens | The recorded `events.jsonl` is loaded into the event bus (`EventBus.load`) and the page rebuilds the session from it | The session's WAVs run through the whole pipeline again as a new session |
 | API calls | None — free | All of them: transcription, Jev, System 2, and live text at speed 1 — about the original session's cost again (more than a `--speed max` replay, which skips live text) |
-| Editable | No: commands such as rename speaker return 409 | Yes, like any session |
+| Editable | Speakers only: rename and merge are saved into the recording (below); every other command returns 409 | Yes, like any session |
 | Result | Exactly what was seen at the time | A new session folder; answers can differ (Jev and GPT-6 Luna are not deterministic) |
 
-While a recording is open, `GET /api/state` returns an archived snapshot (`session.status: "archived"`), and the page replaces the stream meters with a "Recorded session" note. Starting a live session or a replay leaves the archived view.
+Renaming or merging a speaker on an open recording appends the `speaker.updated` or `speaker.merged` event to its `events.jsonl` (append-only, like every other event) and applies it to `speakers.json`, so the page updates at once, the library lists the new names, and reopening replays the edit. Search snippets show each line's speaker by their current name.
+
+While a recording is open, `GET /api/state` returns an archived snapshot (`session.status: "archived"`), and the page shows Archive in the header's ON AIR block, with no stream meters. Starting a live session or a replay leaves the archived view. A session that ends (Stop, or the end of a replay's input) becomes one too: the engine switches to serving it as an opened recording, and the page shows it as Archive.
+
+**Delete** removes a recording's folder for good, after an in-page confirmation (`DELETE /api/sessions/:id`). The running session cannot be deleted (409). Deleting the recording on screen opens the one listed below it (or above, if it was the last), or clears the view if none is left.
 
 ## API
 
@@ -56,9 +60,10 @@ While a recording is open, `GET /api/state` returns an archived snapshot (`sessi
 | GET | `/api/sessions?q=&all=1` | List recordings, newest first; with `q`, only matches, each with `matches` |
 | GET | `/api/sessions/:id` | One summary |
 | PATCH | `/api/sessions/:id` | `{ name?, notes? }` → updated summary |
+| DELETE | `/api/sessions/:id` | Deletes the recording's folder → `{ deleted }`; 409 for the running session |
 | POST | `/api/sessions/:id/open` | Reopen read-only → `{ sessionId, events }` (`events` is the number of events loaded); 409 while a session runs |
 | POST | `/api/session/start` | `{ mode: "replay", sessionId, speed }` replays a recording; `name` names the new session |
 
-The web page exposes this as the **Recordings** tab (search, Rename, Open, Replay). Its final look is still to be designed.
+The web page exposes this as **Recordings** in the settings menu (the cog, top right): a modal with search and match snippets. Click a recording to open it (the modal closes and the recording loads); click its name to rename it in place (Enter or leaving the field saves, Escape cancels); each row has a Replay button and a Delete button (with an "Are you sure?" confirmation).
 
 Related: [Transcription](transcription.md) for live-text cost, [Rehearsal kit](rehearsal.md) for using a recording as the on-air fallback.

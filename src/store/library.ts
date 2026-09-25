@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AppEvent } from "./events.ts";
 
@@ -38,6 +38,27 @@ function readJsonl(path: string): any[] {
   return out;
 }
 
+/** A recording's speakers from its events: current names, and merges (from → into). */
+export interface RecordedSpeakers { names: Map<string, string>; mergedInto: Map<string, string> }
+
+function foldSpeakers(events: AppEvent[]): RecordedSpeakers {
+  const names = new Map<string, string>();
+  const mergedInto = new Map<string, string>();
+  for (const e of events) {
+    const d = e.data as any;
+    if (e.type === "speaker.created" || e.type === "speaker.updated") names.set(d.id, d.displayName);
+    else if (e.type === "speaker.merged") mergedInto.set(d.fromId, d.intoId);
+  }
+  return { names, mergedInto };
+}
+
+/** Follows merges to the surviving speaker. */
+export function resolveRecorded(sp: RecordedSpeakers, id: string): string {
+  let cur = id;
+  for (let i = 0; sp.mergedInto.has(cur) && i < 50; i++) cur = sp.mergedInto.get(cur)!;
+  return cur;
+}
+
 function readJson(path: string): any | null {
   try {
     return JSON.parse(readFileSync(path, "utf8"));
@@ -50,7 +71,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /** The recordings library: every session folder, with names, search, and read-only reopening (no API calls). */
 export class SessionLibrary {
-  private readonly cache = new Map<string, { mtimeMs: number; summary: SessionSummary; utterances: AppEvent[] }>();
+  private readonly cache = new Map<string, { mtimeMs: number; summary: SessionSummary; utterances: AppEvent[]; recorded: RecordedSpeakers }>();
 
   constructor(readonly root = "sessions") {}
 
@@ -76,17 +97,14 @@ export class SessionLibrary {
     const session = readJson(join(dir, "session.json")) ?? {};
     const meta: SessionMeta = readJson(metaPath) ?? {};
     const events = readJsonl(eventsPath) as AppEvent[];
-    const names = new Map<string, string>();
-    const merged = new Set<string>();
+    const recorded = foldSpeakers(events);
     let segments = 0;
     let claims = 0;
     let ended = false;
     const utterances: AppEvent[] = [];
     for (const e of events) {
       const d = e.data as any;
-      if (e.type === "speaker.created" || e.type === "speaker.updated") names.set(d.id, d.displayName);
-      else if (e.type === "speaker.merged") merged.add(d.fromId);
-      else if (e.type === "utterance") utterances.push(e);
+      if (e.type === "utterance") utterances.push(e);
       else if (e.type === "segment.closed") segments++;
       else if (e.type === "claim.flagged") claims++;
       else if (e.type === "session.ended") ended = true;
@@ -94,7 +112,7 @@ export class SessionLibrary {
     const speakersFile = readJson(join(dir, "speakers.json"));
     const speakers = Array.isArray(speakersFile)
       ? speakersFile.filter((s: any) => !s.mergedInto).map((s: any) => String(s.displayName))
-      : [...names].filter(([id]) => !merged.has(id)).map(([, n]) => n);
+      : [...recorded.names].filter(([id]) => !recorded.mergedInto.has(id)).map(([, n]) => n);
     let durationMs = 0;
     for (const s of ["host", "remote"]) {
       const p = join(dir, `${s}.wav`);
@@ -110,7 +128,7 @@ export class SessionLibrary {
       startedAt: session.startedAt ?? null, durationMs: Math.round(durationMs), streams: session.streams ?? [],
       ended, utterances: utterances.length, speakers, segments, claims, costUsd, tool: TOOL_PREFIXES.some((p) => id.startsWith(p)),
     };
-    const entry = { mtimeMs, summary, utterances };
+    const entry = { mtimeMs, summary, utterances, recorded };
     this.cache.set(id, entry);
     return entry;
   }
@@ -125,7 +143,7 @@ export class SessionLibrary {
     const words = (opts.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
     const out: (SessionSummary & { matches?: SearchMatch[] })[] = [];
     for (const id of this.ids()) {
-      const { summary, utterances } = this.load(id);
+      const { summary, utterances, recorded } = this.load(id);
       if (summary.tool && !opts.includeTools) continue;
       if (words.length === 0) {
         out.push(summary);
@@ -140,7 +158,8 @@ export class SessionLibrary {
           const i = text.toLowerCase().indexOf(words[0]);
           const from = Math.max(0, i - 50);
           matches.push({
-            utteranceId: d.id, startMs: d.startMs, speaker: d.speakerName,
+            // the speaker's current name: renames and merges made after the line was said apply
+            utteranceId: d.id, startMs: d.startMs, speaker: recorded.names.get(resolveRecorded(recorded, d.speakerId)) ?? d.speakerName,
             snippet: `${from > 0 ? "…" : ""}${text.slice(from, i + 90)}${i + 90 < text.length ? "…" : ""}`,
           });
         }
@@ -178,6 +197,51 @@ export class SessionLibrary {
   /** The recorded event stream, for reopening a session exactly as it was, without calling any service. */
   events(id: string): AppEvent[] {
     return readJsonl(join(this.dirOf(id), "events.jsonl")) as AppEvent[];
+  }
+
+  /** The recording's speakers as they stand now, including renames and merges made after it was recorded. */
+  speakers(id: string): RecordedSpeakers {
+    this.dirOf(id);
+    return this.load(id).recorded;
+  }
+
+  /**
+   * Records a speaker rename or merge made on a reopened recording: the event is appended to events.jsonl (so reopening
+   * shows it) and applied to speakers.json (so the library lists the new names).
+   */
+  recordSpeakerEdit(id: string, e: AppEvent): void {
+    const dir = this.dirOf(id);
+    appendFileSync(join(dir, "events.jsonl"), JSON.stringify(e) + "\n");
+    const path = join(dir, "speakers.json");
+    const list = readJson(path);
+    if (Array.isArray(list)) {
+      const d = e.data as any;
+      const byId = new Map(list.map((s: any) => [s.id, s]));
+      if (e.type === "speaker.updated" && byId.has(d.id)) byId.get(d.id).displayName = d.displayName;
+      if (e.type === "speaker.merged" && byId.has(d.fromId) && byId.has(d.intoId)) {
+        const from = byId.get(d.fromId);
+        const into = byId.get(d.intoId);
+        from.mergedInto = d.intoId;
+        into.utterances = (into.utterances ?? 0) + (from.utterances ?? 0);
+      }
+      writeFileSync(path, JSON.stringify(list, null, 2) + "\n");
+    }
+    this.cache.delete(id);
+  }
+
+  /**
+   * Deletes a recording's folder for good. Its spend is first appended to deleted-spend.jsonl beside the folders, so the
+   * development budget (sumDevSpend) still counts it.
+   */
+  remove(id: string): void {
+    const dir = this.dirOf(id);
+    const summary = this.load(id).summary;
+    if (summary.costUsd > 0) {
+      appendFileSync(join(this.root, "deleted-spend.jsonl"),
+        JSON.stringify({ kind: "deleted_session", session_id: id, deleted_at: new Date().toISOString(), cost_usd: summary.costUsd }) + "\n");
+    }
+    rmSync(dir, { recursive: true, force: true });
+    this.cache.delete(id);
   }
 
   snapshot(id: string) {

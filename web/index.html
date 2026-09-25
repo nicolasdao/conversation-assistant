@@ -4,57 +4,168 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Podcast Assistant</title>
+  <link rel="preload" href="/fonts/BarlowCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/Barlow-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%234f86f7'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23e8263b'/><circle cx='8' cy='8' r='3.5' fill='%23fff'/></svg>">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span id="conn" class="conn" title="Event stream connection"></span>Podcast Assistant</div>
-    <div id="session-status"></div>
-    <div class="controls">
-      <select id="mic" aria-label="Microphone"><option value="builtin">Built-in microphone</option></select>
-      <button id="start-live" class="primary">Start live</button>
-      <span class="sep"></span>
-      <input id="replay-dir" value="fixtures/conversation" aria-label="Replay folder" size="18">
-      <select id="replay-speed" aria-label="Replay speed"><option value="1">1×</option><option value="max">max</option></select>
-      <button id="start-replay">Replay</button>
-      <button id="stop" class="danger" disabled>Stop</button>
+  <!-- Drawn glyphs for markers and controls: no emoji. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="g-disagreement" viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.2h4.1L6.3 15l6.2-8.4H8.4z" fill="currentColor"/></symbol>
+      <symbol id="g-humour" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 9.3c1.6 2.2 4.4 2.2 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="5.9" cy="6.2" r="1" fill="currentColor"/><circle cx="10.1" cy="6.2" r="1" fill="currentColor"/></symbol>
+      <symbol id="g-hot_take" viewBox="0 0 16 16"><path d="M8.2 1c.4 2.6 3.9 4.2 3.9 8.1a4.1 4.1 0 0 1-8.2 0c0-2 1.1-3.2 2-4.1.2 1.3.9 2.2 1.8 2.5C7.4 5.3 7.1 3.1 8.2 1z" fill="currentColor"/></symbol>
+      <symbol id="g-prediction" viewBox="0 0 16 16"><path d="M1.5 12.5 6 8l3 3 5.2-6.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 4.3h4.6v4.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="g-recommendation" viewBox="0 0 16 16"><path d="M8 1.3l2 4.4 4.7.4-3.6 3.1 1.1 4.7L8 11.4l-4.2 2.5 1.1-4.7L1.3 6.1 6 5.7z" fill="currentColor"/></symbol>
+      <symbol id="g-clip_worthy" viewBox="0 0 16 16"><circle cx="4" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.4 10.5 12.5 1.5M10.6 10.5 3.5 1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="g-flag" viewBox="0 0 16 16"><path d="M3.5 15V1.8h9l-2 3.3 2 3.3h-9" fill="currentColor"/></symbol>
+      <symbol id="g-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="3.6" stroke-dasharray="3.4 2.25"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></symbol>
+      <symbol id="g-replay" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.6 1.8v3.4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="g-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" fill="currentColor"/><rect x="9.5" y="2.5" width="3" height="11" fill="currentColor"/></symbol>
+      <symbol id="g-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></symbol>
+      <symbol id="g-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.8 6.5v4.5M9.2 6.5v4.5" stroke="currentColor" stroke-width="1.4"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- Header: the broadcast strap -->
+  <header id="top" class="top no-onair">
+    <div id="onair" class="onair" hidden><i></i><span id="onair-label">On air</span></div>
+    <div class="strap">
+      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Podcast Assistant</div>
+      <button id="session-name" class="name" title="Click to rename this session" disabled>No session</button>
+    </div>
+    <div class="clock"><span class="k">Elapsed</span><span id="clock" class="t">00:00</span></div>
+
+    <div class="top-right">
+      <div id="health" class="health"></div>
+      <div id="cost" class="cost" tabindex="0"></div>
+      <span class="vsep"></span>
+      <div class="controls">
+        <label class="sr" for="mic">Microphone</label>
+        <select id="mic" class="select"><option value="builtin">Built-in microphone</option></select>
+        <button id="start-live" class="btn primary">Start live</button>
+        <button id="pause" class="btn pause" hidden aria-pressed="false">Pause</button>
+        <button id="stop" class="btn stop" disabled>Stop</button>
+        <button id="replay-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Replay a folder"><svg class="g"><use href="#g-replay"/></svg></button>
+        <button id="cog-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Settings"><svg><use href="#g-cog"/></svg></button>
+
+        <div id="replay-pop" class="pop replay-pop" hidden>
+          <div class="pop-h">Replay a folder</div>
+          <label class="fieldlabel">Folder<input id="replay-dir" class="input" value="fixtures/conversation"></label>
+          <div class="fieldlabel">Speed
+            <div id="replay-speed" class="seg-ctl" role="group" aria-label="Replay speed">
+              <button data-speed="1" aria-pressed="true">1×</button><button data-speed="max" aria-pressed="false">Max</button>
+            </div>
+          </div>
+          <div class="row"><button id="start-replay" class="btn">Replay</button><p id="replay-note" class="note"></p></div>
+        </div>
+
+        <div id="cog-menu" class="pop menu" role="menu" hidden>
+          <button role="menuitem" data-open="dlg-recordings"><b>Recordings</b><span id="m-recordings"></span></button>
+          <button role="menuitem" data-open="dlg-s1"><b>System 1</b><span id="m-s1"></span></button>
+          <button role="menuitem" data-open="dlg-speakers"><b>Speakers</b><span id="m-speakers"></span></button>
+          <button role="menuitem" data-open="dlg-labels"><b>Labels</b><span id="m-labels"></span></button>
+          <button role="menuitem" data-open="dlg-stats"><b>Stats</b><span id="m-stats"></span></button>
+          <button role="menuitem" data-open="dlg-log"><b>Log</b><span id="m-log"></span></button>
+        </div>
+      </div>
     </div>
   </header>
-  <section class="statusbar">
-    <div id="health" class="health"></div>
-    <div id="cost" class="cost"></div>
-  </section>
-  <section class="timeline-wrap">
-    <svg id="timeline" role="img" aria-label="Timeline of the conversation"></svg>
-  </section>
-  <main class="columns">
-    <section class="col col-transcript">
-      <div id="filters" class="filters"></div>
-      <div id="transcript" class="transcript"></div>
+
+  <!-- Transcript and fact-checks -->
+  <div id="stale" class="stale" role="alert" hidden>
+    The engine code changed after the server started, so new features and fixes are not running yet. Restart <code>npm run serve</code>, then reload this page.
+  </div>
+
+  <main id="stage" class="stage">
+    <section class="col" aria-label="Transcript">
+      <div class="col-head">
+        <span class="col-title">Transcript</span>
+        <div id="filters" class="chips" role="group" aria-label="Filters"></div>
+      </div>
+      <div id="transcript" class="scroll captions"></div>
     </section>
-    <section class="col col-claims">
-      <h2>Fact-checks <span id="claims-count" class="count"></span></h2>
-      <div id="claims" class="claims"></div>
-    </section>
-    <section class="col col-panel">
-      <nav class="tabs">
-        <button data-tab="tab-recordings">Recordings</button>
-        <button data-tab="tab-s1" class="on">System 1</button>
-        <button data-tab="tab-speakers">Speakers</button>
-        <button data-tab="tab-labels">Labels</button>
-        <button data-tab="tab-stats">Stats</button>
-        <button data-tab="tab-log">Log</button>
-      </nav>
-      <div id="tab-recordings" class="tab" hidden><div id="recordings"></div></div>
-      <div id="tab-s1" class="tab"><div id="s1"></div></div>
-      <div id="tab-speakers" class="tab" hidden><div id="speakers"></div></div>
-      <div id="tab-labels" class="tab" hidden><div id="labels"></div></div>
-      <div id="tab-stats" class="tab" hidden><div id="stats"></div></div>
-      <div id="tab-log" class="tab" hidden><div id="errors"></div></div>
+    <div id="split" class="split" role="separator" aria-orientation="vertical" aria-label="Resize the transcript and fact-checks" tabindex="0"
+      title="Drag to resize · double-click to reset"><span></span></div>
+    <section class="col" aria-label="Fact-checks">
+      <div class="col-head">
+        <span class="col-title">Fact-check <span id="claims-count" class="n"></span></span>
+        <div id="tally" class="tally"></div>
+      </div>
+      <div id="claims" class="scroll cards"></div>
     </section>
   </main>
-  <div id="toasts" class="toasts"></div>
+
+  <!-- Timeline -->
+  <footer id="tl" class="tl" aria-label="Timeline">
+    <div id="tl-grip" class="tl-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" tabindex="0"
+      title="Drag to resize · double-click to reset"><span></span></div>
+    <div class="tl-head">
+      <span class="col-title">Timeline</span>
+      <div id="legend" class="legend"></div>
+      <div class="zoom" role="group" aria-label="Timeline zoom">
+        <button id="zoom-out" class="btn icon sm" title="Zoom out (⌘ or Ctrl + scroll)" aria-label="Zoom out">−</button>
+        <span id="zoom-level" class="zoom-level">Whole show</span>
+        <button id="zoom-in" class="btn icon sm" title="Zoom in (⌘ or Ctrl + scroll)" aria-label="Zoom in">+</button>
+        <button id="zoom-fit" class="btn sm" title="Show the whole session">Fit</button>
+      </div>
+    </div>
+    <div class="tl-body">
+      <div class="tl-labels" aria-hidden="true">
+        <span></span>
+        <span class="tl-lbl">Subject</span>
+        <span class="tl-lbl">Mode</span>
+        <span class="tl-lbl tl-lbl-chart">Heat · Hype<i class="scale top">4</i><i class="scale bottom">0</i></span>
+        <span class="tl-lbl">Markers</span>
+        <span></span>
+      </div>
+      <div id="tl-scroll" class="tl-scroll">
+        <div id="timeline" class="tl-track"></div>
+        <div id="tl-hover" class="tl-hover" hidden><span></span></div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Settings, opened from the cog menu -->
+  <dialog id="dlg-recordings" aria-labelledby="h-rec">
+    <div class="dlg-head"><h2 id="h-rec">Recordings</h2><span class="sub">Newest first</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="recordings" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-s1" aria-labelledby="h-s1">
+    <div class="dlg-head"><h2 id="h-s1">System 1</h2><span class="sub">Jev flags claims; System 2 grades and rewrites</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="s1" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-speakers" aria-labelledby="h-sp">
+    <div class="dlg-head"><h2 id="h-sp">Speakers</h2><span class="sub">Rename a voice, or merge two that are the same person</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="speakers" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-labels" aria-labelledby="h-lb">
+    <div class="dlg-head"><h2 id="h-lb">Labels</h2><span class="sub">Changes apply from the next segment</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="labels" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-stats" aria-labelledby="h-st">
+    <div class="dlg-head"><h2 id="h-st">Stats</h2><span class="sub">Updated every minute and at the end of the show</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="stats" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-log" aria-labelledby="h-lg">
+    <div class="dlg-head"><h2 id="h-lg">Log</h2><span class="sub">Last 30 errors</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="errors" class="dlg-body"></div>
+  </dialog>
+
+  <!-- In-page prompt and confirm: renames, merges, disputes -->
+  <dialog id="dlg-ask" class="ask" aria-labelledby="h-ask">
+    <form method="dialog">
+      <div class="dlg-head"><h2 id="h-ask"></h2><button type="button" class="x" data-cancel aria-label="Close">×</button></div>
+      <div class="dlg-body">
+        <p id="ask-message" class="ask-message"></p>
+        <input id="ask-input" class="input" autocomplete="off">
+        <div class="row end"><button type="button" class="btn" data-cancel>Cancel</button><button id="ask-ok" class="btn primary" value="ok">OK</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toasts" class="toasts" popover="manual" aria-live="polite"></div>
   <script type="module" src="/dist/main.js"></script>
 </body>
 </html>

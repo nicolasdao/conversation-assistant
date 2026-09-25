@@ -35,8 +35,9 @@ export class SessionStore {
 
   private readonly redact: (s: string) => string;
 
-  append(file: JsonlFile, row: unknown): void {
-    if (this.closed) return;
+  /** `afterClose` lets a host command made after the session ended (a speaker rename or merge) still reach the files. */
+  append(file: JsonlFile, row: unknown, opts: { afterClose?: boolean } = {}): void {
+    if (this.closed && !opts.afterClose) return;
     appendFileSync(join(this.dir, `${file}.jsonl`), this.redact(JSON.stringify(row)) + "\n");
   }
 

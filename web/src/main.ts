@@ -2,10 +2,10 @@
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
-  bindControls, jumpToSegment, loadDevices, renderClaims, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
-  renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
+  bindControls, bindSessionName, bindSplit, checkEngine, jumpToSegment, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
+  renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
 } from "./panels.js";
-import { renderTimeline } from "./timeline.js";
+import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
 import { applyEvent, emptyState, fromSnapshot, type Dirty, type State } from "./state.js";
 
 let st: State = emptyState();
@@ -27,9 +27,9 @@ function schedule() {
     const all = dirty.has("session");
     if (all || dirty.has("session")) {
       renderSession(st);
-      if (!$("#tab-recordings")?.hidden) void renderRecordings(st);
+      if (isOpen("dlg-recordings")) void renderRecordings(st);
     }
-    if (all || dirty.has("health")) renderHealth(st);
+    if (all || dirty.has("health")) { renderHealth(st); renderClock(nowMs()); }
     if (all || dirty.has("transcript") || dirty.has("speakers")) renderTranscript(st);
     if (all || dirty.has("timeline") || dirty.has("transcript")) drawTimeline();
     if (all || dirty.has("speakers") || dirty.has("stats")) { renderSpeakers(st); renderFilters(st, onFilter); }
@@ -39,6 +39,7 @@ function schedule() {
     if (all || dirty.has("cost")) renderCost(st);
     if (all || dirty.has("stats")) renderStats(st);
     if (all || dirty.has("errors")) renderErrors(st);
+    renderMenu(st);
     dirty.clear();
   });
 }
@@ -49,8 +50,16 @@ function markAll() {
 }
 
 function drawTimeline() {
-  const svg = $<SVGSVGElement>("#timeline");
-  if (svg) renderTimeline(svg, st, { matches: segmentMatches, onJump: jumpToSegment, nowMs: nowMs() });
+  const box = $("#timeline");
+  if (box) renderTimeline(box, st, { matches: segmentMatches, onJump: jumpToSegment, nowMs: nowMs() });
+}
+
+const isOpen = (id: string) => !!$<HTMLDialogElement>(`#${id}`)?.open;
+
+/** Renders a settings dialog's content just before it opens. */
+function onOpen(id: string) {
+  if (id === "dlg-recordings") void renderRecordings(st);
+  if (id === "dlg-labels") renderLabels(st);
 }
 
 function onFilter() {
@@ -85,7 +94,7 @@ function connect() {
     if (e.type === "s1.version") void api.state().then((snap) => { st.s1.versions = snap?.s1?.versions ?? st.s1.versions; dirty.add("s1"); schedule(); });
     schedule();
   };
-  for (const t of ["session.started", "session.ended", "health", "utterance", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
+  for (const t of ["session.started", "session.ended", "session.paused", "session.resumed", "health", "utterance", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
     "segment.closed", "segment.labels", "section.updated", "claim.flagged", "claim.duplicate", "claim.repeat", "claim.researching",
     "claim.verdict", "claim.dropped", "claim.disputed", "audit", "s1.version", "s1.memory", "cost", "budget.exhausted", "stats", "error"]) {
     es.addEventListener(t, (ev) => void handle(ev as MessageEvent));
@@ -98,19 +107,13 @@ function connect() {
   };
 }
 
-function tabs() {
-  document.querySelectorAll<HTMLButtonElement>(".tabs button").forEach((b) => {
-    b.addEventListener("click", () => {
-      document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
-      document.querySelectorAll<HTMLElement>(".tab").forEach((t) => { t.hidden = t.id !== b.dataset.tab; });
-      if (b.dataset.tab === "tab-labels") renderLabels(st);
-      if (b.dataset.tab === "tab-recordings") void renderRecordings(st);
-    });
-  });
-}
-
-bindControls();
-tabs();
+bindControls(onOpen, () => void reload());
+bindSessionName(() => st, () => { dirty.add("session"); schedule(); });
+bindSplit();
+void checkEngine();
+setInterval(() => void checkEngine(), 15_000);
+bindTimeline(() => { dirty.add("timeline"); schedule(); });
+renderLegend($("#legend"));
 void loadDevices();
 await reload();
 connect();

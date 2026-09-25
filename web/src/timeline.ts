@@ -1,122 +1,285 @@
-// The timeline as inline SVG: a subject lane (AI subjects as shades of one lane), a mode lane, heat and hype lines,
-// and markers. Low-confidence labels are faded. Clicking a segment or marker jumps to the transcript.
-import { clock, pretty, s } from "./dom.js";
+// The timeline as a results strip: section brackets, a subject lane (AI subjects as shades of one colour), a mode lane,
+// heat and hype lines (inline SVG), and marker pins. Low-confidence labels are faded. Clicking a segment or marker
+// jumps to the transcript. Positions are percentages of the session length inside a track that is `zoom` times the
+// visible width, so zooming only widens the track and the strip scrolls sideways. The strip can be made taller by
+// dragging its top edge, and a dotted line follows the pointer with the exact time.
+import { clock, glyph, h, pretty, replace, s } from "./dom.js";
 import type { Segment, State } from "./state.js";
 
 export const SUBJECT_COLORS: Record<string, string> = {
-  ai_models: "#4f86f7", ai_tools: "#82aefc", ai_industry: "#2d5fd0",
-  tech: "#2bb3a3", marketing: "#e0a33a", personal_life: "#d8638b", other_topics: "#9a7fd1", the_show: "#8a8f98",
+  ai_models: "#3f7df0", ai_tools: "#6fa0ff", ai_industry: "#2a58c9",
+  tech: "#1fa89a", marketing: "#d0892a", personal_life: "#d9588a", other_topics: "#8b6fd6", the_show: "#6f7a8c",
 };
 export const MODE_COLORS: Record<string, string> = {
-  news: "#4c9be8", analysis: "#a58be0", personal_story: "#e67aa0", explainer: "#48c1a8", banter: "#f0b14a", transition: "#7f8792", other: "#5d636b",
+  news: "#3e8ee0", analysis: "#9a7fe0", personal_story: "#d9679a", explainer: "#2fb39c", banter: "#d99a2b", transition: "#6a7d98", other: "#4e5b6c",
 };
-export const MARKERS: Record<string, { icon: string; label: string }> = {
-  disagreement: { icon: "⚡", label: "Disagreement" },
-  humour: { icon: "😄", label: "Humour" },
-  hot_take: { icon: "🔥", label: "Hot take" },
-  prediction: { icon: "🔮", label: "Prediction" },
-  recommendation: { icon: "👍", label: "Recommendation" },
-  clip_worthy: { icon: "✂️", label: "Clip-worthy" },
+/** Marker ids map to drawn glyphs (`#g-<id>` in index.html). */
+export const MARKERS: Record<string, { label: string; short: string }> = {
+  disagreement: { label: "Disagreement", short: "Disagree" },
+  hot_take: { label: "Hot take", short: "Hot take" },
+  prediction: { label: "Prediction", short: "Prediction" },
+  recommendation: { label: "Recommendation", short: "Recommend" },
+  clip_worthy: { label: "Clip-worthy", short: "Clip" },
+  humour: { label: "Humour", short: "Humour" },
 };
 
-const GUTTER = 84;
-const ROWS = { subject: [14, 30], mode: [50, 20], chart: [78, 64], markers: [150, 26], axis: 190 } as const;
+export function renderLegend(el: HTMLElement | null) {
+  replace(el,
+    h("span", {}, h("span", { class: "ln heat" }), "Heat"),
+    h("span", {}, h("span", { class: "ln hype" }), "Hype"),
+    Object.entries(MARKERS).map(([k, m]) => h("span", { class: "mk" }, glyph(k), m.short)));
+}
+
+const pct = (n: number) => `${Math.max(0, Math.min(100, n)).toFixed(4)}%`;
+
+// ---------- zoom, scroll, hover, resize ----------
+
+/** How many times the visible width the track is: 1 shows the whole session. */
+let zoom = 1;
+/** The session length the track was last drawn for. */
+let spanMs = 60_000;
+/** The closest zoom shows about 30 s across the strip. */
+const MIN_VISIBLE_MS = 30_000;
+const maxZoom = () => Math.max(1, spanMs / MIN_VISIBLE_MS);
+
+const scroller = () => document.getElementById("tl-scroll") as HTMLElement | null;
+const track = () => document.getElementById("timeline") as HTMLElement | null;
+
+/** Zooms to `z`, keeping the time under `anchorX` (px from the strip's left edge; default its centre) in place. */
+function setZoom(z: number, anchorX?: number) {
+  const sc = scroller();
+  const tr = track();
+  if (!sc || !tr) return;
+  const next = Math.min(maxZoom(), Math.max(1, z));
+  const ax = anchorX ?? sc.clientWidth / 2;
+  const at = (sc.scrollLeft + ax) / (sc.clientWidth * zoom);
+  zoom = next;
+  tr.style.width = `${zoom * 100}%`;
+  sc.scrollLeft = at * sc.clientWidth * zoom - ax;
+  showZoom();
+  redraw();
+}
+
+function showZoom() {
+  const label = document.getElementById("zoom-level");
+  if (label) label.textContent = zoom <= 1.001 ? "Whole show" : `${clock(spanMs / zoom)} view`;
+  const out = document.getElementById("zoom-out") as HTMLButtonElement | null;
+  const inn = document.getElementById("zoom-in") as HTMLButtonElement | null;
+  if (out) out.disabled = zoom <= 1.001;
+  if (inn) inn.disabled = zoom >= maxZoom() - 0.001;
+}
+
+let hoverX: number | null = null; // px from the strip's left edge while the pointer is over it
+
+function showHover() {
+  const sc = scroller();
+  const line = document.getElementById("tl-hover");
+  if (!sc || !line) return;
+  if (hoverX === null) { line.hidden = true; return; }
+  const x = sc.scrollLeft + hoverX;
+  const width = sc.clientWidth * zoom;
+  line.hidden = false;
+  line.style.left = `${x}px`;
+  line.classList.toggle("edge-left", hoverX < 30);
+  line.classList.toggle("edge-right", sc.clientWidth - hoverX < 30);
+  line.querySelector("span")!.textContent = clock((x / width) * spanMs);
+}
+
+const CHART_DEFAULT = 100;
+const CHART_MIN = 60;
+const STORE_KEY = "pa.timelineChartPx";
+
+function setChartHeight(px: number) {
+  const tl = document.getElementById("tl");
+  if (!tl) return;
+  const current = parseFloat(getComputedStyle(tl).getPropertyValue("--tl-chart")) || CHART_DEFAULT;
+  // keep at least ~160 px for the transcript and fact-checks
+  const max = Math.max(CHART_MIN, window.innerHeight - 60 - 160 - (tl.offsetHeight - current));
+  const next = Math.round(Math.min(max, Math.max(CHART_MIN, px)));
+  tl.style.setProperty("--tl-chart", `${next}px`);
+  document.getElementById("tl-grip")?.setAttribute("aria-valuenow", String(next));
+  try { localStorage.setItem(STORE_KEY, String(next)); } catch { /* storage may be unavailable */ }
+}
+
+let redraw: () => void = () => {};
+
+/** Wires the zoom buttons, ⌘/Ctrl + scroll zoom, sideways scrolling, the hover line, and the resize grip. */
+export function bindTimeline(onRedraw: () => void) {
+  redraw = onRedraw;
+  const sc = scroller();
+  const grip = document.getElementById("tl-grip");
+  document.getElementById("zoom-in")?.addEventListener("click", () => setZoom(zoom * 2));
+  document.getElementById("zoom-out")?.addEventListener("click", () => setZoom(zoom / 2));
+  document.getElementById("zoom-fit")?.addEventListener("click", () => setZoom(1));
+  showZoom();
+
+  sc?.addEventListener("wheel", (e) => {
+    const rect = sc.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) { // ⌘/Ctrl + scroll, or a trackpad pinch
+      e.preventDefault();
+      setZoom(zoom * Math.exp(-e.deltaY * 0.01), e.clientX - rect.left);
+    } else if (zoom > 1 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { // a plain wheel scrolls through time
+      e.preventDefault();
+      sc.scrollLeft += e.deltaY;
+    }
+  }, { passive: false });
+  sc?.addEventListener("pointermove", (e) => { hoverX = e.clientX - sc.getBoundingClientRect().left; showHover(); });
+  sc?.addEventListener("pointerleave", () => { hoverX = null; showHover(); });
+  sc?.addEventListener("scroll", showHover);
+
+  try {
+    const saved = Number(localStorage.getItem(STORE_KEY));
+    if (saved) setChartHeight(saved);
+  } catch { /* storage may be unavailable */ }
+  if (!grip) return;
+  grip.setAttribute("aria-valuemin", String(CHART_MIN));
+  grip.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    const tl = document.getElementById("tl")!;
+    const startY = e.clientY;
+    const start = parseFloat(getComputedStyle(tl).getPropertyValue("--tl-chart")) || CHART_DEFAULT;
+    grip.classList.add("dragging");
+    document.body.classList.add("resizing");
+    const move = (ev: PointerEvent) => setChartHeight(start + (startY - ev.clientY));
+    const up = () => {
+      grip.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+      grip.removeEventListener("pointercancel", up);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+    grip.addEventListener("pointercancel", up);
+  });
+  grip.addEventListener("dblclick", () => setChartHeight(CHART_DEFAULT));
+  grip.addEventListener("keydown", (e) => {
+    const tl = document.getElementById("tl")!;
+    const cur = parseFloat(getComputedStyle(tl).getPropertyValue("--tl-chart")) || CHART_DEFAULT;
+    if (e.key === "ArrowUp") { e.preventDefault(); setChartHeight(cur + 20); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setChartHeight(cur - 20); }
+  });
+}
+
+// ---------- drawing ----------
+
+const TICK_STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].map((s) => s * 1000);
 
 export function renderTimeline(
-  svg: SVGSVGElement, st: State, opts: { matches: (seg: Segment) => boolean; onJump: (segmentId: string) => void; nowMs: number },
+  box: HTMLElement, st: State, opts: { matches: (seg: Segment) => boolean; onJump: (segmentId: string) => void; nowMs: number },
 ) {
-  const width = Math.max(600, svg.clientWidth || svg.parentElement?.clientWidth || 900);
-  const height = ROWS.axis + 18;
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("height", String(height));
   const segs = [...st.segments.values()].sort((a, b) => a.startMs - b.startMs);
   const lastUtt = Math.max(0, ...[...st.utterances.values()].map((u) => u.endMs));
   const endMs = Math.max(60_000, opts.nowMs, lastUtt, ...segs.map((g) => g.endMs));
-  const plotW = width - GUTTER - 12;
-  const x = (ms: number) => GUTTER + (ms / endMs) * plotW;
-  const nodes: SVGElement[] = [];
+  const x = (ms: number) => (ms / endMs) * 100;
+  const sc = scroller();
+  // while live and scrolled to the newest moment, stay there as the session grows
+  const following = !!sc && zoom > 1 && sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 4;
+  spanMs = endMs;
+  if (zoom > maxZoom()) zoom = maxZoom();
+  box.style.width = `${zoom * 100}%`;
+  const trackPx = (sc?.clientWidth ?? 1000) * zoom;
 
-  // row labels
-  const rowLabel = (text: string, y: number) => s("text", { x: 8, y, class: "tl-rowlabel" }, text);
-  nodes.push(rowLabel("subject", ROWS.subject[0] + 20), rowLabel("mode", ROWS.mode[0] + 14), rowLabel("heat · hype", ROWS.chart[0] + 36), rowLabel("markers", ROWS.markers[0] + 18));
+  const sections = h("div", { class: "lane sections" });
+  const subject = h("div", { class: "lane subject" });
+  const mode = h("div", { class: "lane mode" });
+  const chart = h("div", { class: "lane chart" }, [25, 50, 75].map((t) => h("span", { class: "gridline", style: `top:${t}%` })));
+  const markers = h("div", { class: "lane markers" });
+  const axis = h("div", { class: "lane axis" });
 
-  // chart frame
-  const [cy, ch] = ROWS.chart;
-  nodes.push(s("rect", { x: GUTTER, y: cy, width: plotW, height: ch, class: "tl-chartbg" }));
-  for (let lvl = 1; lvl < 4; lvl++) nodes.push(s("line", { x1: GUTTER, x2: GUTTER + plotW, y1: cy + ch - (lvl / 4) * ch, y2: cy + ch - (lvl / 4) * ch, class: "tl-grid" }));
+  for (const sec of st.sections) {
+    sections.append(h("span", {
+      class: "sect", style: `left:${pct(x(sec.startMs))};width:${pct(x(sec.endMs) - x(sec.startMs))};background:${SUBJECT_COLORS[sec.subject] ?? "#6a7d98"}`,
+      title: `Section: ${pretty(sec.subject)}, ${clock(sec.startMs)}–${clock(sec.endMs)}`,
+    }));
+  }
 
-  const heat: string[] = [];
-  const hype: string[] = [];
+  // a 2 px gap between neighbouring segments, as in a results strip
+  const gap = (2 / trackPx) * 100;
+  const heat: [number, number][] = [];
+  const hype: [number, number][] = [];
   for (const g of segs) {
-    const x0 = x(g.startMs);
-    const w = Math.max(2, x(g.endMs) - x0 - 1);
+    const left = x(g.startMs);
+    const width = Math.max(0.3 / zoom, x(g.endMs) - left - gap);
+    const geo = `left:${pct(left)};width:${pct(width)}`;
     const dim = !opts.matches(g);
     const l = g.labels;
-    const jump = () => opts.onJump(g.id);
-    const group = s("g", { class: `tl-seg${dim ? " dim" : ""}`, onclick: jump });
     const subj = l?.choices.subject;
-    const mode = l?.choices.mode;
+    const md = l?.choices.mode;
+    const jump = () => opts.onJump(g.id);
+    const span = `${clock(g.startMs)}–${clock(g.endMs)}`;
     const tip = l && !l.unlabeled
-      ? `${clock(g.startMs)}–${clock(g.endMs)} · ${pretty(subj?.choice ?? "?")} (${Math.round((subj?.confidence ?? 0) * 100)}%) · ${pretty(mode?.choice ?? "?")}${l.story ? ` · story: ${l.story}` : ""}${l.mentions.length ? ` · mentions: ${l.mentions.join(", ")}` : ""}`
-      : `${clock(g.startMs)}–${clock(g.endMs)} · ${l?.unlabeled ? "unlabeled" : "labelling…"}`;
-    group.append(s("title", {}, tip));
-    group.append(s("rect", {
-      x: x0, y: ROWS.subject[0], width: w, height: ROWS.subject[1], rx: 3,
-      fill: subj ? SUBJECT_COLORS[subj.choice] ?? "#666" : "#2a2f37", "fill-opacity": subj?.faded ? 0.3 : 1,
-      class: l?.unlabeled ? "tl-unlabeled" : "",
-    }));
-    if (subj && w > 46) {
-      group.append(s("text", { x: x0 + 5, y: ROWS.subject[0] + 20, class: "tl-inlabel", "fill-opacity": subj.faded ? 0.5 : 1 }, pretty(subj.choice).slice(0, Math.floor(w / 7))));
-    }
-    group.append(s("rect", {
-      x: x0, y: ROWS.mode[0], width: w, height: ROWS.mode[1], rx: 3,
-      fill: mode ? MODE_COLORS[mode.choice] ?? "#666" : "#2a2f37", "fill-opacity": mode?.faded ? 0.3 : 0.9,
-    }));
-    if (mode && w > 46) group.append(s("text", { x: x0 + 5, y: ROWS.mode[0] + 14, class: "tl-inlabel small", "fill-opacity": mode.faded ? 0.5 : 1 }, pretty(mode.choice).slice(0, Math.floor(w / 6))));
-    nodes.push(group);
+      ? `${span} · ${pretty(subj?.choice ?? "?")} (${Math.round((subj?.confidence ?? 0) * 100)}%) · ${pretty(md?.choice ?? "?")}${l.story ? ` · story: ${l.story}` : ""}${l.mentions.length ? ` · mentions: ${l.mentions.join(", ")}` : ""}`
+      : `${span} · ${l?.unlabeled ? "unlabeled" : "labelling…"}`;
+    const state = `${dim ? " dim" : ""}${l?.unlabeled ? " unlabeled" : ""}`;
+    subject.append(h("button", {
+      class: `blk${subj?.faded ? " faded" : ""}${state}`, style: `${geo}${subj ? `;background:${SUBJECT_COLORS[subj.choice] ?? "#6a7d98"}` : ""}`,
+      title: `${tip} · click to jump`, onclick: jump,
+    }, h("span", { class: "blk-t" }, subj ? pretty(subj.choice) : l?.unlabeled ? "unlabeled" : "")));
+    mode.append(h("button", {
+      class: `blk${md?.faded ? " faded" : ""}${state}`, style: `${geo}${md ? `;background:${MODE_COLORS[md.choice] ?? "#4e5b6c"}` : ""}`,
+      title: `${span} · ${md ? `${pretty(md.choice)}${md.faded ? " (low confidence)" : ""}` : "no mode yet"}`, onclick: jump, tabindex: -1,
+    }, h("span", { class: "blk-t" }, md ? pretty(md.choice) : "")));
 
-    const mid = (x(g.startMs) + x(g.endMs)) / 2;
-    const yOf = (v: number) => cy + ch - (v / 4) * ch;
-    if (typeof l?.scores.heat === "number") heat.push(`${mid},${yOf(l.scores.heat)}`);
-    if (typeof l?.scores.hype === "number") hype.push(`${mid},${yOf(l.scores.hype)}`);
+    const mid = x((g.startMs + g.endMs) / 2);
+    if (typeof l?.scores.heat === "number") heat.push([mid, l.scores.heat]);
+    if (typeof l?.scores.hype === "number") hype.push([mid, l.scores.hype]);
 
     const marks = (l?.markers ?? []).filter((m) => MARKERS[m]);
     marks.forEach((m, i) => {
-      const mx = mid + (i - (marks.length - 1) / 2) * 20;
-      nodes.push(s("text", {
-        x: mx, y: ROWS.markers[0] + 19, class: `tl-marker${dim ? " dim" : ""}`, "text-anchor": "middle",
-        onclick: jump,
-      }, s("title", {}, `${MARKERS[m].label} · ${clock(g.startMs)} — click to jump`), MARKERS[m].icon));
+      const offset = (i - (marks.length - 1) / 2) * 28;
+      markers.append(h("button", {
+        class: `pin${dim ? " dim" : ""}`, style: `left:calc(${pct(mid)} + ${offset}px)`,
+        title: `${MARKERS[m].label} · ${clock(g.startMs)}: click to jump`, "aria-label": `${MARKERS[m].label} at ${clock(g.startMs)}`, onclick: jump,
+      }, glyph(m)));
     });
   }
+
   // the open segment: utterances not yet in a closed segment, shown as in progress
   const closed = new Set(segs.flatMap((g) => g.utteranceIds));
   const open = [...st.utterances.values()].filter((u) => !closed.has(u.id));
   if (open.length > 0) {
-    const x0 = x(Math.min(...open.map((u) => u.startMs)));
+    const start = Math.min(...open.map((u) => u.startMs));
     const end = Math.max(...open.map((u) => u.endMs), st.session?.status === "running" ? opts.nowMs : 0);
-    const w = Math.max(2, x(end) - x0);
-    nodes.push(s("rect", { x: x0, y: ROWS.subject[0], width: w, height: ROWS.subject[1], rx: 3, class: "tl-open" }, s("title", {}, "Segment in progress: labelled when it closes")));
-    nodes.push(s("rect", { x: x0, y: ROWS.mode[0], width: w, height: ROWS.mode[1], rx: 3, class: "tl-open" }));
-    if (w > 70) nodes.push(s("text", { x: x0 + 5, y: ROWS.subject[0] + 20, class: "tl-inlabel muted" }, "in progress…"));
-  }
-  if (heat.length) nodes.push(s("polyline", { points: heat.join(" "), class: "tl-heat" }));
-  if (hype.length) nodes.push(s("polyline", { points: hype.join(" "), class: "tl-hype" }));
-  for (const p of heat) { const [px, py] = p.split(","); nodes.push(s("circle", { cx: px, cy: py, r: 3, class: "tl-heat-dot" })); }
-  for (const p of hype) { const [px, py] = p.split(","); nodes.push(s("circle", { cx: px, cy: py, r: 3, class: "tl-hype-dot" })); }
-  nodes.push(s("text", { x: GUTTER + plotW - 4, y: cy + 12, class: "tl-legend", "text-anchor": "end" }, s("tspan", { class: "heat" }, "— heat "), s("tspan", { class: "hype" }, " — hype")));
-
-  // section brackets above the subject lane
-  for (const sec of st.sections) {
-    nodes.push(s("line", { x1: x(sec.startMs) + 1, x2: x(sec.endMs) - 1, y1: 8, y2: 8, class: "tl-section", stroke: SUBJECT_COLORS[sec.subject] ?? "#888" }));
+    const geo = `left:${pct(x(start))};width:${pct(Math.max(0.4 / zoom, x(end) - x(start)))}`;
+    const wide = ((end - start) / endMs) * trackPx > 90;
+    subject.append(h("span", { class: "blk open", style: geo, title: "Segment in progress: labelled when it closes" }, wide ? "In progress" : ""));
+    mode.append(h("span", { class: "blk open", style: geo }));
   }
 
-  // axis
-  const step = endMs > 40 * 60_000 ? 10 * 60_000 : endMs > 10 * 60_000 ? 5 * 60_000 : endMs > 3 * 60_000 ? 60_000 : 15_000;
+  // paused stretches, hatched across the lanes
+  for (const p of st.pauses) {
+    const end = p.endMs ?? opts.nowMs;
+    const geo = `left:${pct(x(p.startMs))};width:${pct(Math.max(0.2 / zoom, x(end) - x(p.startMs)))}`;
+    const tip = `Paused ${clock(p.startMs)}–${p.endMs === null ? "now" : clock(end)}: nothing was heard or transcribed`;
+    for (const lane of [subject, mode, chart]) lane.append(h("span", { class: "pause-band", style: geo, title: tip }));
+  }
+
+  // heat and hype on a 0–4 scale
+  const yOf = (v: number) => (1 - v / 4) * 100;
+  const line = (pts: [number, number][], cls: string) =>
+    pts.length ? s("polyline", { class: cls, points: pts.map(([px, v]) => `${px},${yOf(v)}`).join(" ") }) : null;
+  chart.append(s("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" }, line(heat, "heat"), line(hype, "hype")));
+  for (const [cls, pts] of [["heat", heat], ["hype", hype]] as const) {
+    for (const [px, v] of pts) chart.append(h("span", { class: `dot ${cls}`, style: `left:${pct(px)};top:${pct(yOf(v))}`, title: `${cls === "heat" ? "Heat" : "Hype"} ${v.toFixed(1)}` }));
+  }
+
+  // axis: ticks at least ~80 px apart at the current zoom, and the now line
+  const pxPerMs = trackPx / endMs;
+  const step = TICK_STEPS.find((t) => t * pxPerMs >= 80) ?? TICK_STEPS.at(-1)!;
   for (let t = 0; t <= endMs; t += step) {
-    nodes.push(s("line", { x1: x(t), x2: x(t), y1: ROWS.axis - 6, y2: ROWS.axis, class: "tl-tick" }));
-    nodes.push(s("text", { x: x(t), y: ROWS.axis + 13, class: "tl-axis", "text-anchor": "middle" }, clock(t)));
+    if (t > 0 && (endMs - t) * pxPerMs < 60) break; // leave room for the now tag
+    axis.append(h("span", { class: `tick${t === 0 ? " first" : ""}`, style: `left:${pct(x(t))}` }, clock(t)));
   }
-  if (opts.nowMs > 0) nodes.push(s("line", { x1: x(opts.nowMs), x2: x(opts.nowMs), y1: 4, y2: ROWS.axis, class: "tl-now" }));
-  svg.replaceChildren(...nodes);
+  if (opts.nowMs > 0) {
+    const nx = pct(x(opts.nowMs));
+    for (const lane of [subject, mode, chart, markers]) lane.append(h("span", { class: "nowline", style: `left:${nx}` }));
+    axis.append(h("span", { class: "nowtag", style: `left:calc(${nx} + 1px)` }, `${st.session?.status === "running" ? "Now" : "End"} ${clock(opts.nowMs)}`));
+  }
+
+  replace(box, sections, subject, mode, chart, markers, axis);
+  if (following && sc) sc.scrollLeft = sc.scrollWidth;
+  showZoom();
+  showHover();
 }

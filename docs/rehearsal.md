@@ -13,8 +13,8 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 ## The day before
 
 1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys, the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk.
-2. Record a fallback: run a live rehearsal session (below), stop it, and name it in the **Recordings** tab (for example "Fallback — Ep 12").
-3. Check that it works as a fallback: in the Recordings tab, **Open** shows it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
+2. Record a fallback: run a live rehearsal session (below), stop it, and name it in **Recordings** (the cog menu; for example "Fallback — Ep 12").
+3. Check that it works as a fallback: in Recordings, clicking it opens it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 
 ## Pre-show checklist
 
@@ -22,10 +22,10 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
 - [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $5), and a credit limit on the OpenRouter key.
-- [ ] **Tonight's stories** are typed in (Labels tab → Stories → Save stories).
-- [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use the Speakers tab). Merge duplicates there (see [Speakers](speakers.md)).
+- [ ] **Tonight's stories** are typed in (cog → Labels → Save stories).
+- [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
-- [ ] A **fallback session** was recorded the day before and is named in the Recordings tab.
+- [ ] A **fallback session** was recorded the day before and is named in Recordings.
 - [ ] Privacy: OpenRouter calls already send `provider: { data_collection: "deny" }` (`config/app.json`). Podcast audio still goes to OpenAI for transcription.
 
 ## Starting the show
