@@ -3,7 +3,7 @@ import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
   bindControls, jumpToSegment, loadDevices, renderClaims, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
-  renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
+  renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
 } from "./panels.js";
 import { renderTimeline } from "./timeline.js";
 import { applyEvent, emptyState, fromSnapshot, type Dirty, type State } from "./state.js";
@@ -25,7 +25,10 @@ function schedule() {
   frame = requestAnimationFrame(() => {
     frame = 0;
     const all = dirty.has("session");
-    if (all || dirty.has("session")) renderSession(st);
+    if (all || dirty.has("session")) {
+      renderSession(st);
+      if (!$("#tab-recordings")?.hidden) void renderRecordings(st);
+    }
     if (all || dirty.has("health")) renderHealth(st);
     if (all || dirty.has("transcript") || dirty.has("speakers")) renderTranscript(st);
     if (all || dirty.has("timeline") || dirty.has("transcript")) drawTimeline();
@@ -101,6 +104,7 @@ function tabs() {
       document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
       document.querySelectorAll<HTMLElement>(".tab").forEach((t) => { t.hidden = t.id !== b.dataset.tab; });
       if (b.dataset.tab === "tab-labels") renderLabels(st);
+      if (b.dataset.tab === "tab-recordings") void renderRecordings(st);
     });
   });
 }

@@ -36,7 +36,7 @@ export interface LivePartial { stream: Stream; itemId: string; text: string; utt
 export interface ErrorItem { component: string; message: string; at: string }
 
 export interface State {
-  session: { id: string; mode: string; status: string; dir?: string; startedAt?: string; streams?: Stream[] } | null;
+  session: { id: string; mode: string; status: string; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null } | null;
   speakers: Map<string, Speaker>;
   utterances: Map<string, Utterance>;
   /** Streaming text not yet replaced by its final utterance, by realtime item id. */
@@ -103,11 +103,11 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
   switch (type) {
     case "session.started":
       if (!s.session || s.session.id !== d.sessionId) return "reset";
-      s.session.status = "running";
+      if (s.session.status !== "archived") s.session.status = "running";
       dirty.add("session");
       break;
     case "session.ended":
-      if (s.session) s.session.status = "ended";
+      if (s.session && s.session.status !== "archived") s.session.status = "ended";
       dirty.add("session");
       break;
     case "health": {

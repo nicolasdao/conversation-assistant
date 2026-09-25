@@ -89,4 +89,15 @@ export class EventBus {
   reset(): void {
     this.events = [];
   }
+
+  /** Reopening a recorded session: its stored events become the history, and connected clients receive them. */
+  load(events: AppEvent[]): void {
+    this.events = [...events];
+    this.seq = events.reduce((m, e) => Math.max(m, e.seq ?? 0), 0);
+    for (const e of events) {
+      for (const s of this.subs) {
+        try { s(e); } catch { /* ignore */ }
+      }
+    }
+  }
 }

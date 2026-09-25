@@ -1,4 +1,4 @@
-import { api } from "./api.js";
+import { api, type SessionSummary } from "./api.js";
 import { $, clock, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
 import { resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
@@ -53,7 +53,8 @@ export function renderSession(st: State) {
   const s = st.session;
   const running = s?.status === "running" || s?.status === "ending";
   replace($("#session-status"), s
-    ? h("span", { class: `pill ${s.status}` }, `${s.mode} · ${s.status}`, h("span", { class: "muted" }, ` ${s.id}`))
+    ? h("span", { class: `pill ${s.status}` }, s.status === "archived" ? "recording" : `${s.mode} · ${s.status}`,
+      h("span", { class: "muted" }, ` ${s.name || s.id}`))
     : h("span", { class: "pill" }, "no session"));
   for (const id of ["#start-live", "#start-replay"]) $<HTMLButtonElement>(id)!.disabled = running;
   $<HTMLButtonElement>("#stop")!.disabled = !running;
@@ -62,6 +63,9 @@ export function renderSession(st: State) {
 // ---------- stream health ----------
 
 export function renderHealth(st: State) {
+  if (st.session?.status === "archived") {
+    return replace($("#health"), h("div", { class: "muted" }, "Recorded session: showing what was captured. Start live or replay to capture again."));
+  }
   const running = st.session?.status === "running";
   const streams: Stream[] = st.session?.streams ?? ["host", "remote"];
   replace($("#health"), (["host", "remote"] as Stream[]).map((stream) => {
@@ -410,4 +414,64 @@ export function renderStats(st: State) {
 export function renderErrors(st: State) {
   if (st.errors.length === 0) return replace($("#errors"), h("div", { class: "empty" }, "No errors."));
   replace($("#errors"), st.errors.slice(0, 8).map((e) => h("div", { class: "err small" }, h("span", { class: "mono" }, e.component), ` ${e.message}`)));
+}
+
+// ---------- recordings library ----------
+
+let libraryQuery = "";
+let libraryTimer: number | undefined;
+
+function when(iso: string | null, id: string): string {
+  if (!iso) return id;
+  return new Date(iso).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function recordingRow(st: State, r: SessionSummary, refresh: () => void): HTMLElement {
+  const current = st.session?.id === r.id;
+  const running = st.session?.status === "running" || st.session?.status === "ending";
+  return h("div", { class: `rec${current ? " current" : ""}` },
+    h("div", { class: "rec-head" },
+      h("strong", {}, r.name ?? when(r.startedAt, r.id)),
+      current ? h("span", { class: "badge repeat" }, st.session?.status === "archived" ? "viewing" : "current") : null,
+      !r.ended && !current ? h("span", { class: "badge disputed", title: "No session.ended: the recording stopped abruptly" }, "incomplete") : null),
+    h("div", { class: "muted small" },
+      [r.name ? when(r.startedAt, r.id) : null, clock(r.durationMs), r.mode, `${r.utterances} lines`, r.speakers.join(", ") || null,
+        r.claims ? `${r.claims} claims` : null, usd(r.costUsd)].filter(Boolean).join(" · ")),
+    (r.matches ?? []).map((m) => h("div", { class: "rec-match small" }, h("span", { class: "mono" }, clock(m.startMs)), ` ${m.speaker}: `, m.snippet)),
+    h("div", { class: "row" },
+      h("button", {
+        onclick: () => {
+          const name = prompt("Name this recording:", r.name ?? "");
+          if (name !== null) void run(async () => { await api.renameSession(r.id, name); refresh(); });
+        },
+      }, "Rename"),
+      h("button", { disabled: running, title: "Show it exactly as recorded; nothing is re-processed or spent", onclick: () => run(() => api.openSession(r.id)) }, "Open"),
+      h("button", {
+        disabled: running, title: "Run the audio through the pipeline again (costs money: transcription, Jev, System 2)",
+        onclick: () => { if (confirm(`Replay "${r.name ?? r.id}" through the pipeline at real-time speed? This calls the APIs again (about ${usd(r.costUsd || 0.02)}).`)) void run(() => api.replaySession(r.id, 1)); },
+      }, "Replay")));
+}
+
+export async function renderRecordings(st: State) {
+  const box = $("#recordings");
+  if (!box) return;
+  const refresh = () => void renderRecordings(st);
+  let search = box.querySelector<HTMLInputElement>("input.rec-search");
+  if (!search) {
+    search = h("input", { class: "rec-search", type: "search", placeholder: "Search names and transcripts…", value: libraryQuery });
+    search.addEventListener("input", () => {
+      libraryQuery = search!.value;
+      clearTimeout(libraryTimer);
+      libraryTimer = window.setTimeout(refresh, 250);
+    });
+    replace(box, search, h("div", { class: "rec-list" }));
+  }
+  const list = box.querySelector(".rec-list")!;
+  try {
+    const rows = await api.sessions(libraryQuery.trim());
+    replace(list, rows.length ? rows.map((r) => recordingRow(st, r, refresh))
+      : h("div", { class: "empty" }, libraryQuery ? "No recording matches." : "No recordings yet."));
+  } catch (e) {
+    replace(list, h("div", { class: "error-text small" }, e instanceof Error ? e.message : String(e)));
+  }
 }

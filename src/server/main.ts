@@ -8,6 +8,7 @@ import { Session, type SessionOptions } from "../pipeline/session.ts";
 import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
+import { SessionLibrary } from "../store/library.ts";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -16,8 +17,8 @@ export class ApiError extends Error {
 }
 
 export type StartRequest =
-  | { mode: "replay"; dir: string; speed?: Speed | "1" }
-  | { mode: "live"; mic?: string };
+  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string }
+  | { mode: "live"; mic?: string; name?: string };
 
 /** What the HTTP layer needs from the engine. The front end is a thin client of exactly this. */
 export interface EngineApi {
@@ -34,6 +35,10 @@ export interface EngineApi {
   override(claimId: string, note?: string): unknown;
   rollback(version: string): unknown;
   stats(): unknown;
+  listSessions(q?: string, includeTools?: boolean): unknown[];
+  getSession(id: string): unknown;
+  updateSession(id: string, patch: { name?: string; notes?: string }): unknown;
+  openSession(id: string): { sessionId: string; events: number };
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -70,10 +75,14 @@ export class Engine implements EngineApi {
   private session: Session | null = null;
   private capture: LiveCapture | null = null;
   private captureDetail: Record<string, unknown> | null = null;
+  /** A past session being viewed read-only, rebuilt from its events. */
+  private archived: string | null = null;
+  readonly library: SessionLibrary;
   private readonly config: Config;
 
   constructor(private readonly opts: EngineOptions = {}) {
     this.config = opts.config ?? loadConfig();
+    this.library = new SessionLibrary(opts.sessionsDir ?? "sessions");
   }
 
   get current(): Session | null {
@@ -81,12 +90,49 @@ export class Engine implements EngineApi {
   }
 
   private need(): Session {
+    if (this.archived) throw new ApiError(409, "viewing a recorded session: start or replay one to use this command");
     if (!this.session) throw new ApiError(409, "no session");
     return this.session;
   }
 
   state() {
-    return this.session ? this.session.state() : { session: null };
+    if (this.archived) return this.library.snapshot(this.archived);
+    if (!this.session) return { session: null };
+    const st = this.session.state();
+    let name: string | null = null;
+    try { name = this.library.get(this.session.id).name; } catch { /* not listed yet */ }
+    return { ...st, session: { ...st.session, name } };
+  }
+
+  private libraryCall<T>(fn: () => T): T {
+    try {
+      return fn();
+    } catch (e) {
+      const m = e instanceof Error ? e.message : String(e);
+      throw new ApiError(/unknown session|invalid session/.test(m) ? 404 : 400, m);
+    }
+  }
+
+  listSessions(q?: string, includeTools = false) {
+    return this.library.list({ q, includeTools });
+  }
+
+  getSession(id: string) {
+    return this.libraryCall(() => this.library.get(id));
+  }
+
+  updateSession(id: string, patch: { name?: string; notes?: string }) {
+    return this.libraryCall(() => this.library.update(id, patch ?? {}));
+  }
+
+  /** Shows a recorded session exactly as it was, from its events: no audio is processed and nothing is spent. */
+  openSession(id: string) {
+    if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is running: stop it first");
+    const events = this.libraryCall(() => this.library.events(id));
+    this.session = null;
+    this.archived = id;
+    this.bus.load(events);
+    return { sessionId: id, events: events.length };
   }
 
   async start(req: StartRequest): Promise<{ sessionId: string }> {
@@ -95,9 +141,10 @@ export class Engine implements EngineApi {
     let mode: "replay" | "live";
     let liveText = false;
     if (req?.mode === "replay") {
-      if (typeof req.dir !== "string" || !req.dir) throw new ApiError(400, "dir is required");
+      const dir = req.sessionId ? this.libraryCall(() => this.library.dirOf(req.sessionId!)) : req.dir;
+      if (typeof dir !== "string" || !dir) throw new ApiError(400, "dir or sessionId is required");
       const speed: Speed = req.speed === "max" ? "max" : 1;
-      sources = replaySources(req.dir, speed);
+      sources = replaySources(dir, speed);
       mode = "replay";
       liveText = speed === 1; // streaming text only makes sense at real-time pace
     } else if (req?.mode === "live") {
@@ -113,12 +160,14 @@ export class Engine implements EngineApi {
     } else {
       throw new ApiError(400, "mode must be replay or live");
     }
+    this.archived = null;
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
       allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, ...this.opts.session,
     });
     const s = this.session;
+    if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
     s.run().catch((e) => console.error("session failed:", e));
     return { sessionId: s.id };
   }
@@ -274,6 +323,14 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       if (m === "PUT" && path === "/api/stories") return send(res, 200, engine.putStories((await readJson(req)).headlines));
       mm = path.match(/^\/api\/claims\/([^/]+)\/override$/);
       if (m === "POST" && mm) return send(res, 200, engine.override(decodeURIComponent(mm[1]), (await readJson(req)).note));
+      if (m === "GET" && path === "/api/sessions") {
+        return send(res, 200, engine.listSessions(url.searchParams.get("q") ?? undefined, url.searchParams.get("all") === "1"));
+      }
+      mm = path.match(/^\/api\/sessions\/([^/]+)$/);
+      if (m === "GET" && mm) return send(res, 200, engine.getSession(decodeURIComponent(mm[1])));
+      if (m === "PATCH" && mm) return send(res, 200, engine.updateSession(decodeURIComponent(mm[1]), await readJson(req)));
+      mm = path.match(/^\/api\/sessions\/([^/]+)\/open$/);
+      if (m === "POST" && mm) return send(res, 200, engine.openSession(decodeURIComponent(mm[1])));
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));
       if (m === "GET" && serveStatic(webRoot, path, res)) return;
       return send(res, 404, { error: "not found" });

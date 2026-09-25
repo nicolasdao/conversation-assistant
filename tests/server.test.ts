@@ -33,6 +33,10 @@ class FakeEngine implements EngineApi {
   override(id: string, note?: string) { this.calls.push(["override", id, note]); return { id, disputed: true }; }
   rollback(version: string) { this.calls.push(["rollback", version]); return { active: version }; }
   stats() { return { roganIndex: 0.25 }; }
+  listSessions(q?: string, all?: boolean) { this.calls.push(["list", q, all]); return [{ id: "20260925-120000", name: "Pilot" }]; }
+  getSession(id: string) { if (id !== "20260925-120000") throw new ApiError(404, "unknown session"); return { id }; }
+  updateSession(id: string, patch: unknown) { this.calls.push(["update", id, patch]); return { id, ...(patch as object) }; }
+  openSession(id: string) { this.calls.push(["open", id]); return { sessionId: id, events: 12 }; }
 }
 
 let base = "";
@@ -85,9 +89,15 @@ describe("HTTP API", () => {
     expect((await call("POST", "/api/s1/rollback", { version: "s1@1" })).json).toEqual({ active: "s1@1" });
     expect((await call("GET", "/api/stats")).json).toEqual({ roganIndex: 0.25 });
     expect((await call("POST", "/api/session/stop")).json).toEqual({ sessionId: "s1" });
+    expect((await call("GET", "/api/sessions?q=jev%20cheap&all=1")).json).toEqual([{ id: "20260925-120000", name: "Pilot" }]);
+    expect((await call("GET", "/api/sessions/20260925-120000")).json).toEqual({ id: "20260925-120000" });
+    expect((await call("GET", "/api/sessions/nope")).status).toBe(404);
+    expect((await call("PATCH", "/api/sessions/20260925-120000", { name: "Episode 12" })).json).toEqual({ id: "20260925-120000", name: "Episode 12" });
+    expect((await call("POST", "/api/sessions/20260925-120000/open")).json).toEqual({ sessionId: "20260925-120000", events: 12 });
     expect((await call("POST", "/api/session/start", "{bad json")).status).toBe(400);
     expect((await call("GET", "/api/nope")).status).toBe(404);
-    expect(engine.calls.map((c) => c[0])).toEqual(["start", "merge", "labels", "relabel", "stories", "override", "rollback", "stop"]);
+    expect(engine.calls.map((c) => c[0])).toEqual(["start", "merge", "labels", "relabel", "stories", "override", "rollback", "stop", "list", "update", "open"]);
+    expect(engine.calls[8]).toEqual(["list", "jev cheap", true]);
     expect(engine.calls[0][1]).toEqual({ mode: "replay", dir: "fixtures/conversation", speed: 1 });
   });
 

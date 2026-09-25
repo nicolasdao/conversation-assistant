@@ -177,3 +177,9 @@ label input, label textarea { width: 100%; margin-top: 2px; }
 .utt.live .utt-text { font-style: italic; color: #b9c1cd; }
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.25; } }
+.pill.archived { border-color: var(--accent); color: #b9cdfb; }
+.rec-search { width: 100%; margin-bottom: 8px; }
+.rec { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: var(--panel); }
+.rec.current { border-color: var(--accent); }
+.rec-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rec-match { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--warn); color: #cfd5de; }

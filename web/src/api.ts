@@ -19,6 +19,12 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return json as T;
 }
 
+export interface SessionSummary {
+  id: string; name: string | null; notes: string | null; mode: string; startedAt: string | null; durationMs: number; ended: boolean;
+  utterances: number; speakers: string[]; segments: number; claims: number; costUsd: number;
+  matches?: { utteranceId: string; startMs: number; speaker: string; snippet: string }[];
+}
+
 export const api = {
   state: () => call<any>("GET", "/api/state"),
   stats: () => call<any>("GET", "/api/stats"),
@@ -32,5 +38,9 @@ export const api = {
   relabel: () => call<{ segments: number }>("POST", "/api/labels/relabel"),
   putStories: (headlines: string[]) => call<{ version: string }>("PUT", "/api/stories", { headlines }),
   override: (claimId: string, note?: string) => call("POST", `/api/claims/${encodeURIComponent(claimId)}/override`, note ? { note } : {}),
+  sessions: (q = "") => call<SessionSummary[]>("GET", `/api/sessions${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  renameSession: (id: string, name: string) => call<SessionSummary>("PATCH", `/api/sessions/${encodeURIComponent(id)}`, { name }),
+  openSession: (id: string) => call<{ sessionId: string; events: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/open`),
+  replaySession: (sessionId: string, speed: 1 | "max") => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed }),
   rollback: (version: string) => call<{ active: string }>("POST", "/api/s1/rollback", { version }),
 };
