@@ -181,6 +181,7 @@ export class LiveTranscriber {
   }
 
   private sendAudio(l: StreamLink, samples: Float32Array) {
+    if (this.disabled) return;
     const pcm = toPcm16(l.resampler.resample(samples));
     if (pcm.length === 0) return;
     this.send(l, JSON.stringify({ type: "input_audio_buffer.append", audio: pcm.toString("base64") }));
@@ -222,6 +223,13 @@ export class LiveTranscriber {
     l.awaitingCommit.push(utteranceId);
     l.sentSinceCommit = 0;
     this.bill(l);
+    // An open connection must not keep streaming past a spend cap: check the budget at every turn.
+    try {
+      this.deps.budget.assertCanSpend("transcription:live");
+    } catch {
+      this.disabled = true;
+      this.close();
+    }
   }
 
   private bill(l: StreamLink) {

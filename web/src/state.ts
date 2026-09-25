@@ -45,7 +45,7 @@ export interface State {
   sections: Section[];
   claims: Map<string, Claim>;
   health: Partial<Record<Stream, Health>>;
-  s1: { active: string; versions: S1Version[]; memorySize: number; last: S1Outcome | null; misses: number; audits: number };
+  s1: { active: string; versions: S1Version[]; memorySize: number; last: S1Outcome | null; misses: number; audits: number; auditsSeen: Set<string> };
   labels: { set: LabelSet | null; stories: string[]; version: string };
   cost: Cost;
   stats: any | null;
@@ -56,7 +56,7 @@ export interface State {
 export function emptyState(): State {
   return {
     session: null, speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
-    s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0 },
+    s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
     cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 5 },
     stats: null, errors: [], budgetExhausted: null,
@@ -92,7 +92,8 @@ export function fromSnapshot(snap: any): State {
   if (snap.labels) s.labels = snap.labels;
   if (snap.cost) s.cost = snap.cost;
   s.stats = snap.stats ?? null;
-  s.s1.misses = snap.stats?.factcheck?.misses ?? 0;
+  // Misses are counted from `audit` events, which the event stream replays on connect; seeding them from the
+  // snapshot as well would count every audit twice.
   return s;
 }
 
@@ -204,6 +205,8 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       break;
     }
     case "audit":
+      if (s.s1.auditsSeen.has(at)) break; // the same audit, replayed
+      s.s1.auditsSeen.add(at);
       s.s1.misses += (d.misses ?? []).length;
       s.s1.audits++;
       dirty.add("s1");

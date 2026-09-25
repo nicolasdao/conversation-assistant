@@ -120,6 +120,21 @@ describe("live transcription", () => {
     expect(rows.length).toBe(2);
   });
 
+  test("stops streaming once the session budget is exhausted", () => {
+    const { lt, sockets, budget } = setup();
+    lt.warm("host");
+    const ws = sockets[0];
+    ws.onopen?.({});
+    ws.server({ type: "session.updated" });
+    lt.feed("host", frame(), true);
+    budget.record("jev", 5); // another component spends the whole $5 session cap
+    lt.commit("host", "u_1");
+    const sent = ws.appends.length;
+    for (let i = 0; i < 20; i++) lt.feed("host", frame(), true);
+    expect(ws.appends.length).toBe(sent);
+    expect(sockets.length).toBe(1); // and it does not reconnect
+  });
+
   test("reconnects on the next speech after the server closes; errors surface", () => {
     const { lt, sockets, errors } = setup();
     lt.warm("host");
