@@ -12,9 +12,9 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 
 ## The day before
 
-1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys, the config, the OpenRouter credit, one live call per service (about $0.02), and 2 GB of free disk.
+1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys, the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk.
 2. Record a fallback: run a live rehearsal session (below), stop it, and name it in the **Recordings** tab (for example "Fallback — Ep 12").
-3. Check that it works as a fallback: in the Recordings tab, **Open** shows it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about twice its original cost, because live text streams again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
+3. Check that it works as a fallback: in the Recordings tab, **Open** shows it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 
 ## Pre-show checklist
 
@@ -34,7 +34,7 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 npm run serve        # builds the page, then serves http://127.0.0.1:4317
 ```
 
-Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream has been silent for more than 10 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
+Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream stays at or below −50 dBFS for more than 10 s, or no audio frame arrives for more than 3 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
 
 ## Planted lines to say on air
 

@@ -23,12 +23,16 @@
         "Design decisions",
         "License"
       ],
-      "line_count": 91,
+      "line_count": 97,
       "links_to": [
+        "docs/architecture.md",
         "docs/gotchas.md",
+        "docs/jev.md",
+        "docs/mission.md",
         "docs/recordings.md",
         "docs/rehearsal.md",
         "docs/speakers.md",
+        "docs/system1-system2.md",
         "docs/transcription.md"
       ],
       "over_size": false,
@@ -40,6 +44,59 @@
       "toc": {
         "linked": true,
         "present": true,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The end-to-end architecture — native capture, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.",
+      "has_frontmatter": true,
+      "headings": [
+        "Architecture",
+        "Capture — `native/capture/` and `src/audio/nativeSource.ts`",
+        "The session pipeline — `src/pipeline/session.ts`",
+        "Event bus and API — `src/store/events.ts`, `src/server/main.ts`",
+        "Web front end — `web/`",
+        "Budgets — `src/budget.ts`",
+        "Configuration — `config/`",
+        "Tests"
+      ],
+      "line_count": 137,
+      "links_to": [
+        "docs/gotchas.md",
+        "docs/jev.md",
+        "docs/mission.md",
+        "docs/recordings.md",
+        "docs/speakers.md",
+        "docs/system1-system2.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/architecture.md",
+      "source": [
+        "src/pipeline/session.ts",
+        "src/pipeline/stats.ts",
+        "src/server/main.ts",
+        "src/audio/**",
+        "src/budget.ts",
+        "src/config.ts",
+        "native/capture/**",
+        "web/**"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "architecture",
+        "pipeline",
+        "capture",
+        "api",
+        "events",
+        "web",
+        "budget"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
         "stale": false
       }
     },
@@ -77,6 +134,92 @@
         "openrouter",
         "jev",
         "sherpa-onnx"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.",
+      "has_frontmatter": true,
+      "headings": [
+        "Jev",
+        "The API",
+        "Question types",
+        "A real exchange from this project",
+        "How to read the answers",
+        "Limits and price",
+        "Where this project asks Jev",
+        "The boundary question (per utterance)",
+        "The timeline questions (per segment)",
+        "The client — `src/jev/client.ts`",
+        "Measured performance and cost"
+      ],
+      "line_count": 177,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/gotchas.md",
+        "docs/system1-system2.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/jev.md",
+      "source": [
+        "src/jev/client.ts",
+        "src/jev/types.ts",
+        "src/pipeline/segmenter.ts",
+        "src/pipeline/timeline.ts",
+        "src/factcheck/gate.ts",
+        "config/labels.default.json",
+        "config/factcheck.s1.default.json"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "jev",
+        "typesafe",
+        "openrouter",
+        "decisions-api",
+        "system-1",
+        "llm"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Why Podcast Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.",
+      "has_frontmatter": true,
+      "headings": [
+        "Mission",
+        "Why this exists",
+        "The thesis it demonstrates",
+        "Principles",
+        "Non-goals"
+      ],
+      "line_count": 49,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/jev.md",
+        "docs/recordings.md",
+        "docs/rehearsal.md",
+        "docs/system1-system2.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/mission.md",
+      "source": [],
+      "source_unresolved": [],
+      "tags": [
+        "mission",
+        "purpose",
+        "principles",
+        "non-goals"
       ],
       "toc": {
         "linked": false,
@@ -192,6 +335,58 @@
         "diarization",
         "embeddings",
         "calibration"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.",
+      "has_frontmatter": true,
+      "headings": [
+        "System 1 and System 2",
+        "System 1",
+        "The question set (`s1@1`)",
+        "The flag rule",
+        "Memory questions",
+        "Versions",
+        "System 2",
+        "The research queue — `src/factcheck/queue.ts`",
+        "Research",
+        "Grading and the host's override",
+        "Audits: finding misses",
+        "Rewrites",
+        "The replay gate — `src/factcheck/gate.ts`",
+        "Events and files",
+        "Measured so far"
+      ],
+      "line_count": 251,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/jev.md",
+        "docs/recordings.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/system1-system2.md",
+      "source": [
+        "src/factcheck/**",
+        "src/pipeline/segmenter.ts",
+        "config/factcheck.s1.default.json"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "system-1",
+        "system-2",
+        "fact-check",
+        "jev",
+        "gpt-6-luna",
+        "feedback-loop",
+        "architecture"
       ],
       "toc": {
         "linked": false,

@@ -14,10 +14,10 @@ Speech is transcribed twice, for two different readers:
 
 | Layer | Model | Produces | Read by | When it arrives |
 | --- | --- | --- | --- | --- |
-| Final | `gpt-transcribe` (file upload) | One transcript per VAD utterance | Jev (segmenter, fact-checker), speakers, timeline, session files | ~2.5 s after the speaker stops |
+| Final | `gpt-transcribe` (file upload) | One transcript per VAD utterance | Jev (segmenter, fact-checker), timeline, session files | ~2.5 s after the speaker stops |
 | Live | `gpt-live-transcribe` (realtime WebSocket) | Word-by-word display text | The web page only | ~1.2 s after the speaker starts |
 
-The live layer never feeds any judgment: Jev, the fact-checker, and the stored transcript use only the final layer. Turning the live layer off changes nothing but what the page shows while someone is still speaking.
+The live layer never feeds any judgment: Jev, the fact-checker, and the stored transcript use only the final layer. Turning the live layer off changes what the page shows while someone is still speaking, and removes its cost — which otherwise counts toward the same session cap as every other call.
 
 ## Utterances: what triggers a transcript
 
@@ -51,7 +51,7 @@ When it runs: live sessions and speed-1 replays (`Engine.start` sets `liveText`)
 
 ## Cost
 
-Live text is billed per audio minute actually sent, at `live.usdPerMinute` ($0.017), logged to `transcriptions.jsonl` as `kind: "live_transcription"` at each commit and at close, and counted in the budget's `transcription` bucket.
+Live text is billed per audio minute actually sent, at `live.usdPerMinute` ($0.017, from OpenAI's `gpt-live-transcribe` model page, checked 25 September 2026), logged to `transcriptions.jsonl` as `kind: "live_transcription"` at each commit, when a connection closes, and at session end, and counted in the budget's `transcription` bucket. The budget is checked when a connection opens and at every commit; once a cap is reached, live text stops and its connections close.
 
 Measured on the 78 s fixture at speed 1: 63 s of speech sent as 78 s of audio (pre-roll and hangover), costing $0.022 live against $0.0047 final. For a one-hour show with about 50 minutes of speech, expect roughly $1.00 live plus $0.23 final. Crosstalk costs double, because both streams send. See [Recordings](recordings.md) for how replays re-spend.
 
