@@ -50,7 +50,9 @@ describe("Jev client", () => {
     const headers = calls[0].headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer sk-or-test");
     expect(headers["X-OpenRouter-Title"]).toBe("Podcast Assistant");
-    expect(JSON.parse(calls[0].body as string)).toEqual({ model: "typesafe/jev-1.13", state: { text: "hello" }, questions: QUESTIONS });
+    expect(JSON.parse(calls[0].body as string)).toEqual({
+      model: "typesafe/jev-1.13", state: { text: "hello" }, questions: QUESTIONS, provider: { data_collection: "deny" },
+    });
     expect(rows[0]).toMatchObject({
       kind: "jev_call", purpose: "utterance", utterance_id: "u_1", ok: true, attempts: 1, id: "gen-dec-1",
       model_returned: "typesafe/jev-1.13-20260917", provider_returned: "TypeSafe", cost_usd: 0.00002,

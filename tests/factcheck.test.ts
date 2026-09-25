@@ -484,7 +484,7 @@ describe("S2 client", () => {
     const b = bodies[0];
     expect(b.model).toBe("openai/gpt-6-luna");
     expect(b.reasoning).toEqual({ effort: "medium" });
-    expect(b.provider).toEqual({ order: ["openai"], allow_fallbacks: false, require_parameters: true });
+    expect(b.provider).toEqual({ order: ["openai"], allow_fallbacks: false, require_parameters: true, data_collection: "deny" });
     expect(b.plugins).toEqual([{ id: "web", engine: "exa", max_results: 5 }]);
     expect(b.response_format.type).toBe("json_schema");
     expect(b.response_format.json_schema).toMatchObject({ name: "verdict", strict: true });

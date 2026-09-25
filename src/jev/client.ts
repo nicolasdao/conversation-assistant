@@ -216,7 +216,7 @@ export class JevClient {
         headers: {
           Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Podcast Assistant",
         },
-        body: JSON.stringify({ model: this.cfg.model, state, questions }),
+        body: JSON.stringify({ model: this.cfg.model, state, questions, ...(this.cfg.provider ? { provider: this.cfg.provider } : {}) }),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {
