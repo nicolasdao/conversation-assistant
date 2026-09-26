@@ -44,6 +44,10 @@
       <div class="controls">
         <label class="sr" for="mic">Microphone</label>
         <select id="mic" class="select"><option value="builtin">Built-in microphone</option></select>
+        <label class="sr" for="voices">People on the call</label>
+        <select id="voices" class="select voices" title="How many people you will hear on the call. Voices beyond this count go to the closest one instead of becoming new speakers.">
+          <option value="1">1 on call</option><option value="2" selected>2 on call</option><option value="3">3 on call</option><option value="4">4 on call</option><option value="0">Any</option>
+        </select>
         <button id="start-live" class="btn primary">Start live</button>
         <button id="pause" class="btn pause" hidden aria-pressed="false">Pause</button>
         <button id="stop" class="btn stop" disabled>Stop</button>
@@ -100,11 +104,9 @@
       <div id="pane-fc" class="pane" role="tabpanel"><div id="claims" class="scroll cards"></div></div>
       <div id="pane-think" class="pane scroll" role="tabpanel" hidden>
         <div id="think" class="think"></div>
-        <div id="think-log-h" class="feed-h"></div>
-        <div id="think-log" class="calls"></div>
       </div>
       <div id="pane-jev" class="pane" role="tabpanel" hidden>
-        <p class="feed-note">Every call to Jev, live: what it was shown, the typed questions it was asked, its answers, time, and cost. Click a call for the full request and response.</p>
+        <p class="feed-note">Every call to Jev, live. Each asks several typed questions about one moment of the conversation at once, and gets back typed answers. Click a call to see the exact HTTP request and response.</p>
         <div id="jev-log" class="scroll calls"></div>
       </div>
     </section>
@@ -116,6 +118,18 @@
       title="Drag to resize · double-click to reset"><span></span></div>
     <div class="tl-head">
       <span class="col-title">Timeline</span>
+      <div id="player" class="player" hidden>
+        <button id="play" class="btn icon sm play" aria-label="Play" title="Play the recording (space)"><svg class="g"><use href="#g-play"/></svg></button>
+        <label class="sr" for="play-speed">Playback speed</label>
+        <select id="play-speed" class="select sm" title="Playback speed: voices keep their pitch">
+          <option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option>
+        </select>
+        <label class="sr" for="play-boost">Volume boost</label>
+        <select id="play-boost" class="select sm" title="Volume boost, beyond your computer's volume">
+          <option value="1">Vol 100%</option><option value="1.5">Vol 150%</option><option value="2">Vol 200%</option><option value="3">Vol 300%</option>
+        </select>
+        <span id="play-time" class="play-time">0:00</span>
+      </div>
       <div id="legend" class="legend"></div>
       <div class="zoom" role="group" aria-label="Timeline zoom">
         <button id="zoom-out" class="btn icon sm" title="Zoom out (⌘ or Ctrl + scroll)" aria-label="Zoom out">−</button>
@@ -164,6 +178,12 @@
   <dialog id="dlg-log" aria-labelledby="h-lg">
     <div class="dlg-head"><h2 id="h-lg">Log</h2><span class="sub">Last 30 errors</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="errors" class="dlg-body"></div>
+  </dialog>
+
+  <!-- A speaker, from a click on their name in the transcript: rename or merge -->
+  <dialog id="dlg-speaker" class="speaker-dlg" aria-labelledby="h-speaker">
+    <div class="dlg-head"><h2 id="h-speaker"></h2><span id="speaker-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="speaker-body" class="dlg-body"></div>
   </dialog>
 
   <!-- In-page prompt and confirm: renames, merges, disputes -->

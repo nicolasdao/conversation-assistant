@@ -40,6 +40,12 @@ export function applyFixes(text: string, fixes: AppConfig["transcription"]["fixe
   return fixes.reduce((t, f) => t.replace(new RegExp(`\\b(?:${f.pattern})\\b`, "g"), f.replace), text);
 }
 
+/** A VAD sliver this short (54 ms was seen) has no words, and the API answers 400 "Audio file might be corrupted". */
+export const MIN_AUDIO_SECONDS = 0.25;
+
+/** Per-clip guidance for the final transcript: a prompt (with the conversation so far) and extra keywords. */
+export interface TranscriptionContext { prompt?: string; keywords?: string[] }
+
 export function isFiller(text: string): boolean {
   const t = text.trim();
   return t.length < 4 || FILLER.test(t);
@@ -65,25 +71,25 @@ export class Transcriber {
     else this.active--;
   }
 
-  buildForm(wav: Buffer, style = this.fieldStyle): FormData {
+  buildForm(wav: Buffer, style = this.fieldStyle, context: TranscriptionContext = {}): FormData {
     const form = new FormData();
     form.append("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "utterance.wav");
     form.append("model", this.cfg.model);
-    form.append("prompt", this.cfg.prompt);
+    form.append("prompt", context.prompt ?? this.cfg.prompt);
     const k = style === "brackets" ? "keywords[]" : "keywords";
     const l = style === "brackets" ? "languages[]" : "languages";
-    for (const kw of this.cfg.keywords) form.append(k, kw);
+    for (const kw of [...new Set([...this.cfg.keywords, ...(context.keywords ?? [])])]) form.append(k, kw);
     for (const lang of this.cfg.languages) form.append(l, lang);
     return form;
   }
 
-  private async send(wav: Buffer): Promise<string> {
+  private async send(wav: Buffer, context?: TranscriptionContext): Promise<string> {
     let res: Response;
     try {
       res = await this.deps.fetch(TRANSCRIBE_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${this.deps.apiKey}` }, // no Content-Type: fetch sets the multipart boundary
-        body: this.buildForm(wav),
+        body: this.buildForm(wav, this.fieldStyle, context),
         signal: AbortSignal.timeout(this.cfg.timeoutMs),
       });
     } catch (e) {
@@ -100,8 +106,13 @@ export class Transcriber {
     return e instanceof HttpFailure && e.status === 400 && this.fieldStyle === "brackets" && /keywords|languages/i.test(e.body);
   }
 
-  async transcribe(utteranceId: string, samples: Float32Array): Promise<TranscriptionResult> {
+  /**
+   * `context` makes a short clip less ambiguous: the conversation so far and the names in it. Clips shorter than
+   * MIN_AUDIO_SECONDS are not sent (the API rejects them as corrupted); they come back as empty text, which drops them.
+   */
+  async transcribe(utteranceId: string, samples: Float32Array, context?: TranscriptionContext): Promise<TranscriptionResult> {
     const audioSeconds = samples.length / SAMPLE_RATE;
+    if (audioSeconds < MIN_AUDIO_SECONDS) return { ok: true, text: "", filler: false };
     this.deps.budget.assertCanSpend("transcription");
     await this.acquire();
     const started = Date.now();
@@ -113,7 +124,7 @@ export class Transcriber {
       while (attempts < 2 || (styleRetried && attempts < 3)) {
         attempts++;
         try {
-          const raw = await this.send(wav);
+          const raw = await this.send(wav, context);
           const cost = (audioSeconds / 60) * USD_PER_AUDIO_MINUTE;
           this.deps.budget.record("transcription", cost);
           this.log(utteranceId, { ok: true, attempts, started, audioSeconds, cost });

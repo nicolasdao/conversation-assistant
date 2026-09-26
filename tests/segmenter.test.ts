@@ -72,7 +72,7 @@ describe("segmenter", () => {
       new_utterance: { speaker: "Nic", text: "line 3", tags: [] },
     });
     expect(JSON.stringify(st)).not.toMatch(/u_\d|spk_|\d{4}/);
-    expect(Object.keys(h.asked[0].questions)).toEqual(["boundary", "claim", "claim_type", "hedged", "worth"]);
+    expect(Object.keys(h.asked[0].questions)).toEqual(["boundary", "claim", "claim_type", "public", "hedged", "worth"]);
     expect(h.asked[0].meta).toMatchObject({ purpose: "utterance", utterance_id: "u_1", question_set_version: "s1@1" });
     expect(h.factAnswers).toEqual(["u_1", "u_2", "u_3"]);
     expect(h.seg.closeFinal()).toMatchObject({ final: true, forced: false });

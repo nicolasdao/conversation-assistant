@@ -1,4 +1,4 @@
-import { api, ApiError, type SessionSummary } from "./api.js";
+import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.js";
 import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
 import { resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
@@ -81,6 +81,9 @@ let replaySpeed: 1 | "max" = 1;
 
 let onViewGone: () => void = () => {};
 
+/** How many people are on the call, from the header picker (0 = any number). */
+const voicesOnCall = () => Number($<HTMLSelectElement>("#voices")?.value ?? 2);
+
 /**
  * Opens and closes the replay popover and the settings menu; `onOpen` renders a settings dialog before it shows, and
  * `viewGone` reloads the page's state after the recording on screen was deleted.
@@ -94,11 +97,14 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
     const paused = $("#pause")!.dataset.paused === "1";
     void run(() => (paused ? api.resume() : api.pause()), paused ? "Resumed" : "Paused: nothing is heard or transcribed until you resume");
   });
-  $("#start-live")?.addEventListener("click", () => run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined)));
+  $("#start-live")?.addEventListener("click", () => run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined, voicesOnCall())));
+  const voices = $<HTMLSelectElement>("#voices");
+  try { const saved = localStorage.getItem("pa.voices"); if (voices && saved !== null) voices.value = saved; } catch { /* storage may be unavailable */ }
+  voices?.addEventListener("change", () => { try { localStorage.setItem("pa.voices", voices.value); } catch { /* storage may be unavailable */ } });
   $("#start-replay")?.addEventListener("click", () => {
     const dir = $<HTMLInputElement>("#replay-dir")!.value.trim();
     closePops();
-    void run(() => api.startReplay(dir, replaySpeed));
+    void run(() => api.startReplay(dir, replaySpeed, voicesOnCall()));
   });
   $("#stop")?.addEventListener("click", () => run(() => api.stop(), "Stopping: in-flight work will finish"));
   document.querySelectorAll<HTMLButtonElement>("#replay-speed button").forEach((b) => b.addEventListener("click", () => {
@@ -326,14 +332,75 @@ export function renderFilters(st: State, onChange: () => void) {
 
 // ---------- transcript ----------
 
-async function promptRename(st: State, id: string) {
-  const current = speakerName(st, id);
-  const name = await ask(`Rename ${current}`, { input: true, value: current, ok: "Rename" });
-  if (name && name.trim() && name.trim() !== current) await run(() => api.rename(resolveSpeaker(st, id)?.id ?? id, name.trim()));
+/**
+ * The speaker panel a click on a name in the transcript opens: rename them, merge them into someone else, or merge
+ * someone else into them. Merges are made here without a second question; the button says exactly what will happen.
+ */
+function openSpeaker(st: State, clickedId: string) {
+  const dlg = $<HTMLDialogElement>("#dlg-speaker");
+  const sp = resolveSpeaker(st, clickedId);
+  if (!dlg || !sp) return;
+  const others = [...st.speakers.values()].filter((s) => !s.mergedInto && s.id !== sp.id);
+  const lines = [...st.utterances.values()].filter((u) => resolveSpeaker(st, u.speakerId)?.id === sp.id);
+  const talkMs = lines.reduce((n, u) => n + (u.endMs - u.startMs), 0);
+  const streams = [...new Set(lines.map((u) => (u.stream === "host" ? "your mic" : "the call")))].join(" and ") || "no lines yet";
+  const close = () => dlg.close();
+
+  const input = h("input", { class: "input", value: sp.displayName, "aria-label": "Name" });
+  const rename = () => {
+    const name = input.value.trim();
+    if (!name) return toast("Type a name first.");
+    if (name === sp.displayName) return close();
+    void run(async () => { await api.rename(sp.id, name); close(); }, `Renamed ${sp.displayName} to ${name}`);
+  };
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); rename(); } });
+
+  const option = (o: { id: string; displayName: string }) => h("option", { value: o.id }, o.displayName);
+  const intoSel = h("select", { class: "select", "aria-label": `Merge ${sp.displayName} into` }, h("option", { value: "" }, "Choose a speaker…"), others.map(option));
+  const fromSel = h("select", { class: "select", "aria-label": `Merge into ${sp.displayName}` }, h("option", { value: "" }, "Choose a speaker…"), others.map(option));
+  const nameOf = (id: string) => st.speakers.get(id)?.displayName ?? id;
+  const intoBtn = h("button", { class: "btn", disabled: true }, "Merge");
+  const fromBtn = h("button", { class: "btn", disabled: true }, "Merge");
+  intoSel.addEventListener("change", () => {
+    intoBtn.disabled = !intoSel.value;
+    replace(intoBtn, intoSel.value ? `Merge ${sp.displayName} into ${nameOf(intoSel.value)}` : "Merge");
+  });
+  fromSel.addEventListener("change", () => {
+    fromBtn.disabled = !fromSel.value;
+    replace(fromBtn, fromSel.value ? `Merge ${nameOf(fromSel.value)} into ${sp.displayName}` : "Merge");
+  });
+  intoBtn.addEventListener("click", () => {
+    const to = intoSel.value;
+    if (to) void run(async () => { await api.merge(sp.id, to); close(); }, `Merged ${sp.displayName} into ${nameOf(to)}`);
+  });
+  fromBtn.addEventListener("click", () => {
+    const from = fromSel.value;
+    if (from) void run(async () => { await api.merge(from, sp.id); close(); }, `Merged ${nameOf(from)} into ${sp.displayName}`);
+  });
+
+  replace($("#h-speaker"), sp.displayName);
+  replace($("#speaker-sub"), `${lines.length} line${lines.length === 1 ? "" : "s"} · ${clock(talkMs)} talking · on ${streams}`);
+  replace($("#speaker-body"),
+    h("label", { class: "fieldlabel" }, "Name", h("div", { class: "row" }, input, h("button", { class: "btn primary", onclick: rename }, "Rename"))),
+    others.length
+      ? [
+        h("div", { class: "fieldlabel" }, `${sp.displayName} is really…`, h("div", { class: "row" }, intoSel, intoBtn),
+          h("span", { class: "note" }, `${sp.displayName}'s lines move to them, and ${sp.displayName} disappears.`)),
+        h("div", { class: "fieldlabel" }, `…is really ${sp.displayName}`, h("div", { class: "row" }, fromSel, fromBtn),
+          h("span", { class: "note" }, `Their lines move to ${sp.displayName}, who keeps this name.`)),
+      ]
+      : h("p", { class: "note" }, "No other speaker to merge with."));
+  dlg.showModal();
+  input.select();
 }
+
+let onTimeClick: ((ms: number) => void) | null = null;
+/** What a click on a transcript timestamp does (recordings: seek playback there). */
+export function setTimeClick(fn: (ms: number) => void) { onTimeClick = fn; }
 
 export function renderTranscript(st: State) {
   const box = $("#transcript")!;
+  const recording = st.session?.status === "archived";
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   const bySeg = segmentOf(st);
   const labelFilter = filters.markers.size > 0 || !!filters.subject;
@@ -363,13 +430,16 @@ export function renderTranscript(st: State) {
     const name = speakerName(st, u.speakerId);
     // Consecutive lines by the same speaker read like captions: the name tag appears once.
     const who = u.speakerInferred
-      ? h("button", { class: "who-cont", title: "Speaker inferred from a short utterance. Click to rename", onclick: () => promptRename(st, u.speakerId) }, `${name} *`)
+      ? h("button", { class: "who-cont", title: "Speaker inferred from a short utterance. Click to rename or merge", onclick: () => openSpeaker(st, u.speakerId) }, `${name} *`)
       : sp?.id === lastSpeaker
         ? h("span", {})
-        : h("button", { class: `who-tab ${u.stream}`, title: "Click to rename", onclick: () => promptRename(st, u.speakerId) }, name);
+        : h("button", { class: `who-tab ${u.stream}`, title: "Click to rename or merge", onclick: () => openSpeaker(st, u.speakerId) }, name);
     lastSpeaker = u.speakerInferred ? undefined : sp?.id;
-    rows.push(h("div", { class: `utt${u.filler ? " filler" : ""}${flagged.has(u.id) ? " flagged" : ""}`, id: `utt-${u.id}`, "data-seg": seg?.id ?? "" },
-      h("span", { class: "time" }, clock(u.startMs)),
+    rows.push(h("div", { class: `utt${u.filler ? " filler" : ""}${flagged.has(u.id) ? " flagged" : ""}`, id: `utt-${u.id}`, "data-seg": seg?.id ?? "", "data-start": Math.round(u.startMs) },
+      // in a recording, a timestamp plays from that line
+      recording
+        ? h("button", { class: "time seek", title: "Play from here", onclick: () => onTimeClick?.(u.startMs) }, clock(u.startMs))
+        : h("span", { class: "time" }, clock(u.startMs)),
       who,
       h("span", { class: "text" }, u.text,
         u.tags.map((t) => h("span", { class: "tag-loud" }, t)),
@@ -471,11 +541,94 @@ export function renderClaims(st: State) {
 
 // ---------- speakers ----------
 
+/** The duplicate-speaker analysis of the session on screen: kept while the modal re-renders. */
+const suggest: {
+  sessionId: string | null; loading: boolean; error: string | null; voices: number | null;
+  result: { suggestions: MergeSuggestion[]; voices: { host: number; remote: number } } | null;
+} = { sessionId: null, loading: false, error: null, voices: null, result: null };
+
+async function findDuplicates(st: State) {
+  suggest.loading = true;
+  suggest.error = null;
+  renderSpeakers(st);
+  try {
+    suggest.result = await api.suggestMerges(suggest.voices ?? undefined);
+    suggest.voices = suggest.result.voices.remote;
+  } catch (e) {
+    suggest.error = e instanceof Error ? e.message : String(e);
+  }
+  suggest.loading = false;
+  renderSpeakers(st);
+}
+
+async function applyMerges(st: State, list: MergeSuggestion[]) {
+  let done = 0;
+  for (const m of list) {
+    try {
+      await api.merge(m.fromId, m.intoId);
+      done++;
+      if (suggest.result) suggest.result.suggestions = suggest.result.suggestions.filter((x) => x !== m);
+    } catch (e) {
+      toast(`Could not merge ${m.fromName} into ${m.intoName}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (done) toast(done === 1 ? `Merged ${list[0]!.fromName} into ${list[0]!.intoName}` : `Merged ${done} speakers`, "ok");
+  renderSpeakers(st);
+}
+
+const CONFIDENCE_WORD = { high: "High confidence", medium: "Medium confidence", low: "Low confidence" };
+
+/** "Find duplicate speakers": voiceprints compared within each stream, merges proposed with a score and a confidence. */
+function suggestionsPanel(st: State): HTMLElement {
+  if (suggest.sessionId !== (st.session?.id ?? null)) Object.assign(suggest, { sessionId: st.session?.id ?? null, result: null, error: null, voices: null });
+  const r = suggest.result;
+  const voices = h("select", { class: "select", id: "suggest-voices", "aria-label": "People on the call", disabled: suggest.loading },
+    [1, 2, 3, 4].map((n) => h("option", { value: n, selected: (suggest.voices ?? r?.voices.remote ?? 2) === n }, `${n} on the call`)),
+    h("option", { value: 0, selected: suggest.voices === 0 }, "Any number on the call"));
+  voices.addEventListener("change", () => { suggest.voices = Number(voices.value); voices.blur(); void findDuplicates(st); });
+  const list = r?.suggestions ?? [];
+  const sure = list.filter((m) => m.confidence !== "low");
+  return h("section", { class: "suggest" },
+    h("div", { class: "suggest-head" },
+      h("div", {}, h("h3", {}, "Duplicate speakers"),
+        h("p", { class: "note" }, "Compares every speaker's voice with the others heard on the same stream and proposes which are the same person, with a voice-match score. Nothing merges until you click.")),
+      h("div", { class: "row" }, h("span", { class: "note" }, "1 on your mic,"), voices,
+        h("button", { class: "btn primary", disabled: suggest.loading, onclick: () => void findDuplicates(st) }, suggest.loading ? "Analysing voices…" : r ? "Analyse again" : "Find duplicates"))),
+    suggest.loading ? h("p", { class: "note" }, "Listening to each speaker's lines. A two-hour recording takes about half a minute.") : null,
+    suggest.error ? h("p", { class: "error-text" }, suggest.error) : null,
+    r && !suggest.loading
+      ? list.length === 0
+        ? h("p", { class: "suggest-none" }, "No duplicates: every speaker sounds distinct, and each stream has no more voices than expected.")
+        : [
+          h("div", { class: "suggest-list" }, list.map((m) => h("div", { class: `sugg c-${m.confidence}` },
+            h("span", { class: "sugg-names" }, h("b", {}, m.fromName), h("span", { class: "arrow" }, "→"), h("b", {}, m.intoName)),
+            h("span", { class: "sugg-conf" }, CONFIDENCE_WORD[m.confidence]),
+            h("span", { class: "sugg-score" }, m.similarity === null ? "no voiceprint" : `voice match ${Math.round(m.similarity * 100)}%`),
+            h("span", { class: "sugg-why" }, `${m.stream === "host" ? "Your mic" : "The call"}: ${m.reason}.`),
+            h("button", { class: "btn sm", onclick: () => void applyMerges(st, [m]) }, "Merge")))),
+          h("div", { class: "row end" },
+            sure.length && sure.length < list.length
+              ? h("button", { class: "btn", onclick: async () => {
+                if ((await ask(`Merge ${sure.length} high and medium confidence suggestion${sure.length === 1 ? "" : "s"}?`, { ok: "Merge" })) !== null) void applyMerges(st, sure);
+              } }, `Merge ${sure.length} high & medium`)
+              : null,
+            h("button", { class: "btn primary", onclick: async () => {
+              const low = list.length - sure.length;
+              const ok = await ask(`Merge all ${list.length} suggestion${list.length === 1 ? "" : "s"}?`, {
+                message: low ? `${low} of them ${low === 1 ? "is" : "are"} low confidence: check the transcript afterwards.` : "Every one is high or medium confidence.", ok: "Merge all",
+              });
+              if (ok !== null) void applyMerges(st, list);
+            } }, `Merge all ${list.length}`)),
+        ]
+      : null);
+}
+
 export function renderSpeakers(st: State) {
   const box = $("#speakers");
   if (editing(box)) return;
   const active = [...st.speakers.values()].filter((s) => !s.mergedInto);
-  replace(box, active.length === 0 ? h("div", { class: "empty" }, "Speakers appear as they talk.") : h("div", {}, active.map((sp) => {
+  replace(box, active.length > 1 || suggest.result ? suggestionsPanel(st) : null,
+    active.length === 0 ? h("div", { class: "empty" }, "Speakers appear as they talk.") : h("div", {}, active.map((sp) => {
     const input = h("input", { class: "input", value: sp.displayName, "aria-label": `Rename ${sp.id}` });
     const into = h("select", { class: "select", "aria-label": "Merge into" }, h("option", { value: "" }, "Merge into…"),
       active.filter((o) => o.id !== sp.id).map((o) => h("option", { value: o.id }, o.displayName)));
@@ -636,7 +789,7 @@ export function renderLabels(st: State, force = false) {
 
 export function renderCost(st: State) {
   const c = st.cost;
-  const cap = c.sessionCapUsd || 5;
+  const cap = c.sessionCapUsd || 10;
   const pct = Math.min(100, (c.session / cap) * 100);
   const box = $("#cost")!;
   box.classList.toggle("exhausted", !!st.budgetExhausted);
@@ -736,7 +889,7 @@ function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undef
           const ok = await ask(`Replay “${label}”?`, {
             message: `This runs the audio through the pipeline again at real-time speed and calls the APIs again (about ${usd(r.costUsd || 0.02)}).`, ok: "Replay",
           });
-          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
+          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1, voicesOnCall()); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
         },
       }, glyph("replay"), "Replay"),
       h("button", {

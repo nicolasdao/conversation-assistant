@@ -23,7 +23,7 @@ export interface S1Version extends S1Set {
   errors?: string[];
 }
 
-export const S1_BASE_IDS = ["claim", "claim_type", "hedged", "worth"] as const;
+export const S1_BASE_IDS = ["claim", "claim_type", "public", "hedged", "worth"] as const;
 
 export const KNOWN_CRITERIA = {
   true: "new_utterance states the same factual claim again, in the same or different words.",
@@ -44,6 +44,7 @@ export interface FlagDecision {
   claimType: string | null;
   worth: number;
   hedged: number;
+  public: number;
   attention: boolean;
 }
 
@@ -53,18 +54,21 @@ export function flagDecision(answers: Record<string, JevAnswer>, v: Pick<S1Set, 
   const claimType = choice(answers, "claim_type")?.choice ?? null;
   const worth = score(answers, "worth") ?? 0;
   const hedged = noul(answers, "hedged") ?? 0;
+  // A set without the question (older versions) does not gate on it.
+  const pub = "public" in v.questions ? noul(answers, "public") ?? 0 : 1;
   const attention = Object.keys(v.questions).filter((k) => k.startsWith("attention_"))
     .some((k) => (noul(answers, k) ?? 0) >= t.attentionThreshold);
-  const flag = claim >= t.claimThreshold && claimType !== null && claimType !== "none" && worth >= t.worthMin;
+  const flag = claim >= t.claimThreshold && claimType !== null && claimType !== "none" && worth >= t.worthMin
+    && pub >= (t.publicThreshold ?? 0.5);
   const priority = worth + (hedged >= hedgedThreshold ? 0.5 : 0) + (attention ? 1 : 0);
-  return { flag, priority, claim, claimType, worth, hedged, attention };
+  return { flag, priority, claim, claimType, worth, hedged, public: pub, attention };
 }
 
 // ---------- rewrite validation (§4.8c) ----------
 
 const INSTRUCTIONS_MAX = 400;
 const THRESHOLD_RANGES: Record<string, [number, number]> = {
-  claimThreshold: [0.5, 0.9], attentionThreshold: [0.5, 0.9], worthMin: [1, 3],
+  claimThreshold: [0.5, 0.9], publicThreshold: [0.5, 0.9], attentionThreshold: [0.5, 0.9], worthMin: [1, 3],
 };
 
 type FieldName = "text" | "true_text" | "false_text" | "options" | "levels" | "number";
@@ -106,7 +110,7 @@ export function applyRewrite(active: S1Set, proposal: RewriteProposal): { ok: tr
         break;
       }
       case "set_criteria": {
-        if (c.target === "claim" || c.target === "hedged") {
+        if (c.target === "claim" || c.target === "public" || c.target === "hedged") {
           const e = onlyFields(c, ["true_text", "false_text"]);
           if (e) { fail(e); break; }
           if (!c.true_text!.trim() || !c.false_text!.trim()) { fail("criteria descriptions must not be empty"); break; }

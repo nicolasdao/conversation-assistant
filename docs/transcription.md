@@ -21,12 +21,14 @@ The live layer never feeds any judgment: Jev, the fact-checker, and the stored t
 
 ## Utterances: what triggers a transcript
 
-`src/audio/vad.ts` runs one Silero VAD per stream (`host`, `remote`). An utterance closes after `vad.minSilenceDuration` (0.5 s) of silence, or at `vad.maxSpeechDuration` (20 s) of continuous speech. `vad.minSpeechDuration` is 0.25 s: at the spec's original 0.4 s, a short first word followed by a micro-pause ("I", "Jev") was dropped from the utterance.
+`src/audio/vad.ts` runs one Silero VAD per stream (`host`, `remote`). An utterance closes after `vad.minSilenceDuration` (0.5 s) of silence, or at `vad.maxSpeechDuration` (30 s) of continuous speech. It was 20 s until a one-hour call showed long turns cut mid-sentence at exactly 20.0 s, the next piece starting mid-thought ("To another pond."). `vad.minSpeechDuration` is 0.25 s: at the spec's original 0.4 s, a short first word followed by a micro-pause ("I", "Jev") was dropped from the utterance.
 
 ## Final layer — `src/transcribe/openai.ts`
 
 `Transcriber.transcribe(utteranceId, samples)` uploads the utterance as a 16 kHz PCM16 WAV to `POST https://api.openai.com/v1/audio/transcriptions` with `model`, `prompt`, `keywords[]`, and `languages[]` from `config/app.json` → `transcription`.
 
+- **Context per clip.** The `prompt` sent with each clip is built by the session: the configured prompt, the names the host gave the speakers ("The speakers are Nic, Sam."), tonight's stories, and up to 600 characters of the last lines said ("The conversation so far: …"). The speakers' names are also added to `keywords`. Clips are short (2–3 s on average for a remote guest), so without the conversation around them words are misheard: "let's go back to the cinema 2P" for "to pee".
+- **Slivers are not sent.** A clip shorter than 0.25 s (`MIN_AUDIO_SECONDS`; the VAD emitted 54 ms ones) comes back as empty text, which drops it, with no request and no cost: the API rejected every such clip with 400 "Audio file might be corrupted or unsupported".
 - One retry on a network error, timeout, 429, or 5xx — except a 429 whose body says `insufficient_quota` / `credit_balance_exhausted`, which is not transient and fails at once.
 - If the API rejects the bracketed field names, it retries once with `keywords` / `languages` and keeps that style.
 - A trimmed text shorter than 4 characters, or matching `uh|um|mm|hmm|mm-hmm|yeah|yes|no|okay|ok|right|so`, is a **filler**: it joins the segment but skips Jev.

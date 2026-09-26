@@ -10,6 +10,9 @@ import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
 import { resolveRecorded, SessionLibrary } from "../store/library.ts";
+import { Embedder } from "../speakers/registry.ts";
+import { recordedVoiceprints, suggestMerges, type MergeSuggestion } from "../speakers/suggest.ts";
+import { serveMixedAudio } from "./audio.ts";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -18,8 +21,8 @@ export class ApiError extends Error {
 }
 
 export type StartRequest =
-  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string }
-  | { mode: "live"; mic?: string; name?: string };
+  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string; voices?: number }
+  | { mode: "live"; mic?: string; name?: string; voices?: number };
 
 /** What the HTTP layer needs from the engine. The front end is a thin client of exactly this. */
 export interface EngineApi {
@@ -41,7 +44,11 @@ export interface EngineApi {
   updateSession(id: string, patch: { name?: string; notes?: string }): unknown;
   openSession(id: string): { sessionId: string; events: number };
   deleteSession(id: string): { deleted: string };
+  closeView(): { closed: string | null };
   callLog(system: "s1" | "s2", limit?: number): unknown;
+  /** A recording's folder, for serving its audio (throws for an unknown id). */
+  sessionDir(id: string): string;
+  speakerSuggestions(remoteVoices?: number): Promise<unknown>;
   pause(): { paused: boolean };
   resume(): { paused: boolean };
 }
@@ -151,11 +158,51 @@ export class Engine implements EngineApi {
     return { deleted: id };
   }
 
+  private embedder: Embedder | null = null;
+
+  /**
+   * Which speakers of the session on screen are probably the same person: from the live voiceprints while a session
+   * runs, or from a recording's audio (about 25 s for two hours). `remoteVoices` is how many people were on the call;
+   * by default the number the session ran with.
+   */
+  async speakerSuggestions(remoteVoices?: number): Promise<{ suggestions: MergeSuggestion[]; voices: { host: number; remote: number } }> {
+    const cfgVoices = this.config.app.speakers.voicesPerStream;
+    if (this.session && !this.archived) {
+      const run = this.session.voices;
+      const voices = { host: run.host ?? cfgVoices.host, remote: remoteVoices ?? run.remote ?? cfgVoices.remote };
+      // talk time per speaker, from the session's stats
+      const talk = new Map(this.session.stats().speakers.map((s) => [s.speakerId, s.talkMs]));
+      const prints = this.session.speakers.voiceprints().map((p) => ({ ...p, talkMs: talk.get(p.id) ?? 0 }));
+      return { suggestions: suggestMerges(prints, voices), voices };
+    }
+    const id = this.archived;
+    if (!id) throw new ApiError(409, "no session");
+    const { dir, voices: ran } = this.libraryCall(() => this.library.voicesOf(id));
+    const voices = { host: ran?.host ?? cfgVoices.host, remote: remoteVoices ?? ran?.remote ?? cfgVoices.remote };
+    const sp = this.library.speakers(id);
+    this.embedder ??= new Embedder();
+    const prints = await recordedVoiceprints(dir, this.embedder, (x) => resolveRecorded(sp, x), sp.names);
+    return { suggestions: suggestMerges(prints, voices), voices };
+  }
+
+  sessionDir(id: string): string {
+    return this.libraryCall(() => this.library.dirOf(id));
+  }
+
   /** The session on screen's recent Jev or System 2 calls (none without a session). */
   callLog(system: "s1" | "s2", limit?: number) {
     const id = this.archived ?? this.session?.id;
     if (!id) return { rows: [], models: { s1: this.config.app.jev.model, s2: this.config.app.s2.model } };
     return this.libraryCall(() => this.library.calls(id, system, limit));
+  }
+
+  /** Leaves an opened recording's view, back to no session (the page's "/"). A live or replay session is not affected. */
+  closeView() {
+    const id = this.archived;
+    if (!id) return { closed: null };
+    this.archived = null;
+    this.bus.reset();
+    return { closed: id };
   }
 
   pause() {
@@ -202,7 +249,10 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, ...this.opts.session,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText,
+      // how many people are on the call (the remote stream); 0 means no limit
+      ...(Number.isInteger(req.voices) && req.voices! >= 0 ? { voices: { remote: req.voices } } : {}),
+      ...this.opts.session,
     });
     const s = this.session;
     if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
@@ -352,7 +402,8 @@ function sse(res: ServerResponse, e: AppEvent) {
 /** Serves web/index.html at /, and web/styles.css, web/dist/** and web/fonts/** as static files, confined to web/. */
 function serveStatic(webRoot: string, path: string, res: ServerResponse): boolean {
   let rel: string;
-  if (path === "/" || path === "/index.html") rel = "index.html";
+  // the page's own URLs (see docs/architecture.md): home, and an opened recording
+  if (path === "/" || path === "/index.html" || /^\/recordings\/[A-Za-z0-9][A-Za-z0-9_-]*\/?$/.test(path)) rel = "index.html";
   else if (path === "/styles.css") rel = "styles.css";
   else if (path.startsWith("/dist/") || path.startsWith("/fonts/")) rel = path.slice(1);
   else return false;
@@ -397,8 +448,13 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());
       if (m === "POST" && path === "/api/session/start") return send(res, 200, await engine.start(await readJson(req)));
       if (m === "POST" && path === "/api/session/stop") return send(res, 200, await engine.stop());
+      if (m === "POST" && path === "/api/sessions/close") return send(res, 200, engine.closeView());
       if (m === "POST" && path === "/api/session/pause") return send(res, 200, engine.pause());
       if (m === "POST" && path === "/api/session/resume") return send(res, 200, engine.resume());
+      if (m === "GET" && path === "/api/speakers/suggestions") {
+        const v = url.searchParams.get("voices");
+        return send(res, 200, await engine.speakerSuggestions(v === null || v === "" ? undefined : Math.max(0, Number(v) || 0)));
+      }
       if (m === "POST" && path === "/api/speakers/merge") {
         const b = await readJson(req);
         return send(res, 200, engine.mergeSpeakers(b.fromId, b.intoId));
@@ -417,6 +473,8 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       if (m === "GET" && mm) return send(res, 200, engine.getSession(decodeURIComponent(mm[1])));
       if (m === "PATCH" && mm) return send(res, 200, engine.updateSession(decodeURIComponent(mm[1]), await readJson(req)));
       if (m === "DELETE" && mm) return send(res, 200, engine.deleteSession(decodeURIComponent(mm[1])));
+      mm = path.match(/^\/api\/sessions\/([^/]+)\/audio$/);
+      if ((m === "GET" || m === "HEAD") && mm) return serveMixedAudio(engine.sessionDir(decodeURIComponent(mm[1])), req, res);
       mm = path.match(/^\/api\/sessions\/([^/]+)\/open$/);
       if (m === "POST" && mm) return send(res, 200, engine.openSession(decodeURIComponent(mm[1])));
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));

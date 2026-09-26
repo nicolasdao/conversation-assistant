@@ -17,20 +17,22 @@ export function researchSystemPrompt(today: string): string {
     "- unverifiable: no reliable source found.",
     "- not_a_claim: an opinion, joke, exaggeration, or too vague to check.",
     "",
+    "A claim about the speakers' own private lives (their family, friends, feelings, plans, or personal experiences) cannot be checked against public sources: use not_a_claim with false_alarm_reason private.",
+    "",
     "restated_claim is one precise sentence. correction is at most 25 words saying what is true. Cite only sources you used.",
   ].join("\n");
 }
 
 export const AUDIT_SYSTEM =
-  "You audit a live AI podcast's fact-checker. For each utterance, say whether it contains a specific factual claim that could be checked against public sources, and how much listeners would care whether it is accurate. Opinions, jokes, exaggerations, and vague statements are not checkable claims.";
+  "You audit a live AI podcast's fact-checker. For each utterance, say whether it contains a specific factual claim that could be checked against public sources, and how much listeners would care whether it is accurate. A checkable claim is about the public world: companies, products, AI models, public figures, prices, statistics, science, laws, or news. Opinions, jokes, exaggerations, and vague statements are not checkable claims, and neither is anything about the speakers' own private lives (their family, friends, feelings, plans, or personal experiences), however concrete.";
 
 export const REWRITE_SYSTEM =
-  "You improve the questions a fast classifier uses to flag checkable factual claims in a live AI podcast. You get the active questions and thresholds, false alarms (flagged but not checkable) with reasons, correctly flagged examples, and missed claims. Propose at most 3 changes that remove false alarms or catch misses without losing correct flags. Follow these question rules: one narrow judgment per question, concrete true and false descriptions for yes/no questions, never ask for counting or arithmetic.";
+  "You improve the questions a fast classifier uses to flag checkable factual claims in a live AI podcast. You get the active questions and thresholds, false alarms (flagged but not checkable) with reasons, correctly flagged examples, and missed claims. Propose at most 3 changes that remove false alarms or catch misses without losing correct flags. A checkable claim is always about the public world; the speakers' private lives never count, so never widen the questions to include them. Follow these question rules: one narrow judgment per question, concrete true and false descriptions for yes/no questions, never ask for counting or arithmetic.";
 
 // ---------- schemas: strict JSON schemas for the API, zod for validation ----------
 
 export const VERDICTS = ["supported", "contradicted", "misleading", "unverifiable", "not_a_claim"] as const;
-export const FALSE_ALARM_REASONS = ["none", "hyperbole", "joke", "opinion", "too_vague", "trivial", "not_factual"] as const;
+export const FALSE_ALARM_REASONS = ["none", "hyperbole", "joke", "opinion", "too_vague", "trivial", "not_factual", "private"] as const;
 export type VerdictKind = (typeof VERDICTS)[number];
 
 // Length and count limits stay out of the strict schema (strict mode has rejected maxLength / maxItems); code enforces them.

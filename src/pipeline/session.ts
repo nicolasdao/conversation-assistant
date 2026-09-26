@@ -5,8 +5,8 @@ import { mergeSources, type AudioSource, type StreamName } from "../audio/source
 import { LoudTagger, rmsDbfs } from "../audio/tags.ts";
 import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
-import { Embedder, SpeakerRegistry } from "../speakers/registry.ts";
-import { Transcriber, type TranscriptionResult } from "../transcribe/openai.ts";
+import { Embedder, SpeakerRegistry, type VoiceLimits } from "../speakers/registry.ts";
+import { Transcriber, type TranscriptionContext, type TranscriptionResult } from "../transcribe/openai.ts";
 import { LiveTranscriber, type LiveDeps } from "../transcribe/live.ts";
 import { JevClient, type JevCallMeta, type JevCallRow } from "../jev/client.ts";
 import type { JevResponse, QuestionSet } from "../jev/types.ts";
@@ -25,7 +25,7 @@ export type SessionMode = "replay" | "live";
 const TRANSIENT = new Set<EventType>(["utterance.partial", "call.started", "call"]);
 
 export interface Services {
-  transcribe(utteranceId: string, samples: Float32Array): Promise<TranscriptionResult>;
+  transcribe(utteranceId: string, samples: Float32Array, context?: TranscriptionContext): Promise<TranscriptionResult>;
   ask(state: unknown, questions: QuestionSet, meta: JevCallMeta): Promise<JevResponse>;
   s2: S2Api;
 }
@@ -51,6 +51,8 @@ export interface SessionOptions {
   liveText?: boolean;
   /** Test seam for the realtime WebSocket. */
   liveConnect?: LiveDeps["connect"];
+  /** Overrides `speakers.voicesPerStream`, e.g. how many people are on the call tonight. */
+  voices?: VoiceLimits;
 }
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
@@ -121,7 +123,7 @@ export class Session {
       for (const s of streams) this.live.warm(s);
     }
 
-    this.speakers = new SpeakerRegistry(cfg.app.speakers, opts.embedder ?? new Embedder());
+    this.speakers = new SpeakerRegistry(cfg.app.speakers, opts.embedder ?? new Embedder(), this.voices);
     for (const s of streams) {
       this.vads.set(s, new StreamVad(s, cfg.app.vad, this.ids));
       this.health.set(s, { lastFrameAt: 0, recent: [], utteranceTimes: [] });
@@ -171,6 +173,11 @@ export class Session {
     return this.store.id;
   }
 
+  /** How many voices each stream carries in this session. */
+  get voices(): VoiceLimits {
+    return { ...this.opts.config.app.speakers.voicesPerStream, ...(this.opts.voices ?? {}) };
+  }
+
   get mode(): SessionMode {
     return this.opts.mode;
   }
@@ -191,7 +198,7 @@ export class Session {
       onStart: (purpose) => this.emit("call.started", { system: "s2", purpose }),
     });
     return {
-      transcribe: (id, samples) => transcriber.transcribe(id, samples),
+      transcribe: (id, samples, context) => transcriber.transcribe(id, samples, context),
       ask: (s, q, m) => jev.ask(s, q, m),
       s2,
     };
@@ -215,7 +222,7 @@ export class Session {
     this.store.writeJson("session.json", {
       id: this.id, mode: this.opts.mode, startedAt: this.startedAt.toISOString(),
       streams: this.opts.sources.map((s) => s.stream),
-      config: cfg.app, labelSet: cfg.labels, labelSetVersion: this.timeline.version,
+      config: cfg.app, voices: this.voices, labelSet: cfg.labels, labelSetVersion: this.timeline.version,
       s1Version: this.factcheck.active.id, s1: cfg.s1,
     });
     this.emit("session.started", {
@@ -268,7 +275,7 @@ export class Session {
     });
     this.segmenter.emitted(u);
     this.live?.commit(u.stream, u.id);
-    const p = this.services.transcribe(u.id, u.samples)
+    const p = this.services.transcribe(u.id, u.samples, this.transcriptionContext())
       .catch((e): TranscriptionResult => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       .then((r) => {
         if (!r.ok) this.emit("error", { component: "transcription", message: r.error, utterance_id: u.id });
@@ -289,6 +296,30 @@ export class Session {
       });
     this.transcriptions.add(p);
     p.finally(() => this.transcriptions.delete(p));
+  }
+
+  /**
+   * Guidance for one clip's final transcript: the base prompt, the names the host gave the speakers, tonight's stories,
+   * and the last few lines said, so a 2-second clip is heard in context ("to pee", not "2P").
+   */
+  private transcriptionContext(): TranscriptionContext {
+    const cfg = this.opts.config.app.transcription;
+    const names = this.speakers.active().map((s) => s.displayName).filter((n) => !/^Speaker \d+$/.test(n));
+    const stories = this.timeline.storiesActive;
+    let recent = "";
+    for (const u of this.utterances.slice(-6).reverse()) {
+      if (!u.text) continue;
+      const line = `${this.speakers.displayName(u.speakerId)}: ${u.text}`;
+      if (recent.length + line.length > 600) break;
+      recent = recent ? `${line}\n${recent}` : line;
+    }
+    const prompt = [
+      cfg.prompt,
+      names.length ? `The speakers are ${names.join(", ")}.` : "",
+      stories.length ? `Topics tonight: ${stories.join("; ")}.` : "",
+      recent ? `The conversation so far:\n${recent}` : "",
+    ].filter(Boolean).join("\n");
+    return { prompt, keywords: names };
   }
 
   private onSegmentClosed(seg: Segment) {

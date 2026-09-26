@@ -6,6 +6,8 @@ import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { ApiError, createApiServer, engineStale, type EngineApi, type StartRequest } from "../src/server/main.ts";
 import { EventBus } from "../src/store/events.ts";
+import { wavHeader } from "../src/audio/wav.ts";
+import { limit, streamGain } from "../src/server/audio.ts";
 
 /** A fake pipeline: records every command and emits the events a real session would. */
 class FakeEngine implements EngineApi {
@@ -38,7 +40,11 @@ class FakeEngine implements EngineApi {
   updateSession(id: string, patch: unknown) { this.calls.push(["update", id, patch]); return { id, ...(patch as object) }; }
   openSession(id: string) { this.calls.push(["open", id]); return { sessionId: id, events: 12 }; }
   deleteSession(id: string) { this.calls.push(["delete", id]); return { deleted: id }; }
+  closeView() { this.calls.push(["close"]); return { closed: "20260925-120000" }; }
   pause() { this.calls.push(["pause"]); return { paused: true }; }
+  audioDir = "";
+  sessionDir(id: string) { if (id !== "20260925-120000") throw new ApiError(404, "unknown session"); return this.audioDir; }
+  async speakerSuggestions(v?: number) { this.calls.push(["suggest", v]); return { suggestions: [], voices: { host: 1, remote: v ?? 2 } }; }
   callLog(system: "s1" | "s2", limit?: number) { return { rows: [{ system, limit }], models: { s1: "typesafe/jev-1.13", s2: "openai/gpt-6-luna" } }; }
   resume() { this.calls.push(["resume"]); return { paused: false }; }
 }
@@ -79,7 +85,66 @@ function call(method: string, path: string, body?: unknown): Promise<{ status: n
   });
 }
 
+/** Raw bytes of a GET, with an optional Range header. */
+function bytes(path: string, range?: string): Promise<{ status: number; headers: Record<string, unknown>; body: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const req = request(base + path, { method: "GET", headers: range ? { range } : {} }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode!, headers: res.headers, body: Buffer.concat(chunks) }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 describe("HTTP API", () => {
+  test("a recording's audio: both streams mixed into one seekable WAV", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "audio-"));
+    const wav = (samples: number[]) => {
+      const pcm = Buffer.alloc(samples.length * 2);
+      samples.forEach((v, i) => pcm.writeInt16LE(v, i * 2));
+      return Buffer.concat([wavHeader(pcm.length, 16000), pcm]);
+    };
+    writeFileSync(join(dir, "host.wav"), wav([1000, -2000, 30000]));
+    writeFileSync(join(dir, "remote.wav"), wav([500, 500, 10000, 7])); // one sample longer
+    engine.audioDir = dir;
+    const all = await bytes("/api/sessions/20260925-120000/audio");
+    expect(all.status).toBe(200);
+    expect(all.headers["content-type"]).toBe("audio/wav");
+    expect(all.headers["accept-ranges"]).toBe("bytes");
+    expect(all.body.length).toBe(44 + 8);
+    expect(all.body.subarray(0, 4).toString()).toBe("RIFF");
+    expect(all.body.readUInt32LE(40)).toBe(8);
+    const samples = [0, 1, 2, 3].map((i) => all.body.readInt16LE(44 + i * 2));
+    // summed, the longer stream padded; too short to measure a level, so no gain; the loud sum bent under full scale
+    expect([samples[0], samples[1], samples[3]]).toEqual([1500, -1500, 7]);
+    expect(samples[2]).toBeGreaterThan(30000);
+    expect(samples[2]).toBeLessThan(32767);
+    // seeking: a range, including one that starts and ends mid-sample
+    const part = await bytes("/api/sessions/20260925-120000/audio", "bytes=46-49");
+    expect(part.status).toBe(206);
+    expect(part.headers["content-range"]).toBe("bytes 46-49/52");
+    expect([part.body.readInt16LE(0), part.body.readInt16LE(2)]).toEqual([samples[1], samples[2]]);
+    const odd = await bytes("/api/sessions/20260925-120000/audio", "bytes=45-46");
+    expect(odd.body).toEqual(all.body.subarray(45, 47));
+    expect((await bytes("/api/sessions/20260925-120000/audio", "bytes=99-")).status).toBe(416);
+    expect((await bytes("/api/sessions/nope/audio")).status).toBe(404);
+  });
+
+  test("quiet speech is boosted to a common level, within a limit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gain-"));
+    // 6 s of "speech" at −30 dBFS (a sine), like a quiet recording
+    const quiet = Array.from({ length: 16000 * 6 }, (_, i) => Math.round(Math.sin(i / 8) * 32768 * 10 ** (-30 / 20) * Math.SQRT2));
+    const pcm = Buffer.alloc(quiet.length * 2);
+    quiet.forEach((v, i) => pcm.writeInt16LE(v, i * 2));
+    writeFileSync(join(dir, "q.wav"), Buffer.concat([wavHeader(pcm.length, 16000), pcm]));
+    expect(20 * Math.log10(streamGain(join(dir, "q.wav")))).toBeCloseTo(18, 0); // −30 → −12 dBFS
+    expect(limit(0.8)).toBe(0.8); // ordinary speech passes untouched
+    expect(limit(2)).toBeLessThan(1);
+    expect(limit(-2)).toBeGreaterThan(-1);
+  });
+
   test("every route", async () => {
     expect((await call("GET", "/api/state")).json).toMatchObject({ session: { id: "s1" } });
     expect((await call("POST", "/api/session/start", { mode: "replay", dir: "fixtures/conversation", speed: 1 })).json).toEqual({ sessionId: "s1" });
@@ -114,6 +179,13 @@ describe("HTTP API", () => {
     expect(engine.calls.slice(-3)).toEqual([["pause"], ["resume"], ["delete", "20260925-120000"]]);
   });
 
+  test("merge suggestions for the session on screen", async () => {
+    expect((await call("GET", "/api/speakers/suggestions?voices=1")).json).toEqual({ suggestions: [], voices: { host: 1, remote: 1 } });
+    expect(engine.calls.at(-1)).toEqual(["suggest", 1]);
+    await call("GET", "/api/speakers/suggestions");
+    expect(engine.calls.at(-1)).toEqual(["suggest", undefined]);
+  });
+
   test("the call log of System 1 or System 2", async () => {
     expect((await call("GET", "/api/calls?system=s2&limit=50")).json.rows).toEqual([{ system: "s2", limit: 50 }]);
     expect((await call("GET", "/api/calls")).json).toMatchObject({ rows: [{ system: "s1" }], models: { s1: "typesafe/jev-1.13" } });
@@ -137,6 +209,10 @@ describe("HTTP API", () => {
     expect((await call("GET", "/fonts/face.woff2")).type).toBe("font/woff2");
     expect((await call("GET", "/fonts/../../secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/../../secret.txt")).status).toBe(404);
+    // the page's own URLs serve the page; anything else is not found
+    expect((await call("GET", "/recordings/20260925-202620")).type).toContain("text/html");
+    expect((await call("GET", "/recordings/../secret.txt")).status).toBe(404);
+    expect((await call("POST", "/api/sessions/close")).json).toEqual({ closed: "20260925-120000" });
     expect((await call("GET", "/dist/%2e%2e/%2e%2e/secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/..%2F..%2Fsecret.txt")).status).toBe(404);
   });

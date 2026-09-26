@@ -103,6 +103,39 @@ function setChartHeight(px: number) {
 
 let redraw: () => void = () => {};
 
+// ---------- playback: the playhead and click-to-seek (recordings only) ----------
+
+let playhead: number | null = null;
+let onSeek: ((ms: number) => void) | null = null;
+
+/** Where playback is, in session ms (null hides the playhead). While playing, keeps the playhead in view when zoomed. */
+export function setPlayhead(ms: number | null, follow = false) {
+  playhead = ms;
+  const tr = track();
+  if (!tr) return;
+  let line = document.getElementById("playhead");
+  if (ms === null) { line?.remove(); return; }
+  if (!line) {
+    line = h("div", { id: "playhead", class: "playhead" }, h("span", {}));
+    tr.append(line);
+  }
+  const x = Math.max(0, Math.min(100, (ms / spanMs) * 100));
+  line.style.left = `${x}%`;
+  line.querySelector("span")!.textContent = clock(ms);
+  line.classList.toggle("edge", x > 92);
+  const sc = scroller();
+  if (follow && sc && zoom > 1) {
+    const px = (x / 100) * sc.clientWidth * zoom;
+    if (px < sc.scrollLeft || px > sc.scrollLeft + sc.clientWidth - 40) sc.scrollLeft = px - sc.clientWidth * 0.3;
+  }
+}
+
+/** Lets a click on the timeline (outside segments and markers) move playback there. */
+export function setSeekHandler(fn: ((ms: number) => void) | null) {
+  onSeek = fn;
+  scroller()?.classList.toggle("seekable", !!fn);
+}
+
 /** Wires the zoom buttons, ⌘/Ctrl + scroll zoom, sideways scrolling, the hover line, and the resize grip. */
 export function bindTimeline(onRedraw: () => void) {
   redraw = onRedraw;
@@ -124,6 +157,11 @@ export function bindTimeline(onRedraw: () => void) {
     }
   }, { passive: false });
   sc?.addEventListener("pointermove", (e) => { hoverX = e.clientX - sc.getBoundingClientRect().left; showHover(); });
+  sc?.addEventListener("click", (e) => {
+    if (!onSeek || (e.target as Element).closest(".blk, .pin")) return;
+    const x = sc.scrollLeft + e.clientX - sc.getBoundingClientRect().left;
+    onSeek(Math.max(0, (x / (sc.clientWidth * zoom)) * spanMs));
+  });
   sc?.addEventListener("pointerleave", () => { hoverX = null; showHover(); });
   sc?.addEventListener("scroll", showHover);
 
@@ -207,7 +245,8 @@ export function renderTimeline(
     const l = g.labels;
     const subj = l?.choices.subject;
     const md = l?.choices.mode;
-    const jump = () => opts.onJump(g.id);
+    // jump the transcript there; in a recording, playback moves there too
+    const jump = () => { opts.onJump(g.id); onSeek?.(g.startMs); };
     const span = `${clock(g.startMs)}–${clock(g.endMs)}`;
     const tip = l && !l.unlabeled
       ? `${span} · ${pretty(subj?.choice ?? "?")} (${Math.round((subj?.confidence ?? 0) * 100)}%) · ${pretty(md?.choice ?? "?")}${l.story ? ` · story: ${l.story}` : ""}${l.mentions.length ? ` · mentions: ${l.mentions.join(", ")}` : ""}`
@@ -279,6 +318,7 @@ export function renderTimeline(
   }
 
   replace(box, sections, subject, mode, chart, markers, axis);
+  if (playhead !== null) setPlayhead(playhead);
   if (following && sc) sc.scrollLeft = sc.scrollWidth;
   showZoom();
   showHover();

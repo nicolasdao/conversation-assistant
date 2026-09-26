@@ -21,7 +21,7 @@ Everything to check before going on air with Podcast Assistant, the lines to pla
 - [ ] Everyone wears headphones, and the host wears **earbuds**. The app assumes it: there is no echo handling, so speakers would put the call on the host's microphone as well.
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
-- [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $5), and a credit limit on the OpenRouter key.
+- [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10), and a credit limit on the OpenRouter key.
 - [ ] **Tonight's stories** are typed in (cog → Labels → Save stories).
 - [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).

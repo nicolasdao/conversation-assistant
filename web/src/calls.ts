@@ -1,7 +1,13 @@
-// The thinking tabs beside the fact-checks: a live log of every Jev (System 1) call, and "Fast · slow thinking", a
-// diagram of System 1 and System 2 that lights up while each one is working, with each system's own call feed.
+// The thinking tabs beside the fact-checks, written for an audience watching the demo:
+//   - "Fast · slow thinking": System 1 (Jev) and System 2 side by side, a funnel from every line heard to the few
+//     verdicts, and one row per claim showing the handoff: Jev flagged it fast and cheap, System 2 researched it.
+//   - "Jev log": every call to Jev in plain words (what it was asked, what it answered, what the app did next), with
+//     the exact HTTP request and response a click away.
 import { $, clock, h, pretty, replace } from "./dom.js";
-import type { CallRow, State, SystemId } from "./state.js";
+import type { CallRow, Claim, State, SystemId } from "./state.js";
+
+const JEV_URL = "https://openrouter.ai/api/alpha/decisions";
+const S2_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /** Dollars at the precision a single call needs: $0.000036, $0.0077, $1.24. */
 export function money(n: number): string {
@@ -12,6 +18,7 @@ export function money(n: number): string {
 }
 
 const seconds = (ms: number) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 /** Session time of a call, from its wall-clock timestamp. */
 function when(st: State, row: CallRow): string {
@@ -23,163 +30,183 @@ function when(st: State, row: CallRow): string {
 /** Rows the reader expanded, by key, so a live re-render keeps them open. */
 const expanded = new Set<string>();
 const keyOf = (r: CallRow) => `${r.kind}|${r.at}|${r.id ?? ""}|${r.purpose}`;
-
-function json(value: unknown): HTMLElement {
-  return h("pre", { class: "json" }, JSON.stringify(value, null, 2));
-}
-
-// ---------- System 1: Jev ----------
-
-/** One answer as a compact chip: noul as a %, choice as its label and confidence, score as level / max. */
-function answerChip(id: string, a: any): HTMLElement {
-  if (!a) return h("span", { class: "ans" }, id, h("b", {}, "–"));
-  if (a.type === "noul") {
-    const p = Math.round(a.noul * 100);
-    return h("span", { class: `ans noul${a.noul >= 0.5 ? " yes" : ""}`, title: `${id}: probability of yes ${p}%` },
-      id, h("i", { class: "meter" }, h("i", { style: `width:${p}%` })), h("b", {}, `${p}%`));
-  }
-  if (a.type === "choice") {
-    const conf = Math.round((a.confidence ?? a.probabilities?.[a.choice] ?? 0) * 100);
-    return h("span", { class: "ans choice", title: `${id}: ${a.choice}, confidence ${conf}%` }, id, h("b", {}, `${pretty(a.choice)} · ${conf}%`));
-  }
-  if (a.type === "score") {
-    const max = Math.max(1, Object.keys(a.probabilities ?? a.legend ?? {}).length - 1);
-    return h("span", { class: "ans score", title: `${id}: level ${a.score.toFixed(2)} of 0–${max}` }, id, h("b", {}, `${a.score.toFixed(1)} / ${max}`));
-  }
-  return h("span", { class: "ans" }, id, h("b", {}, JSON.stringify(a)));
-}
-
-/** A one-line summary of what Jev was shown. */
-function stateSummary(state: any): string {
-  if (state?.new_utterance) return `${state.new_utterance.speaker}: “${state.new_utterance.text}”`;
-  if (Array.isArray(state?.segment)) {
-    const first = state.segment[0];
-    return `Segment of ${state.segment.length} line${state.segment.length === 1 ? "" : "s"}${first ? `, from ${first.speaker}: “${first.text}”` : ""}`;
-  }
-  return typeof state === "string" ? state : JSON.stringify(state ?? "").slice(0, 160);
-}
-
-function lines(title: string, rows: any[]): HTMLElement | null {
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  return h("div", { class: "ctx" }, h("div", { class: "ctx-h" }, `${title} · ${rows.length} line${rows.length === 1 ? "" : "s"}`),
-    rows.map((l) => h("div", { class: "ctx-l" }, h("b", {}, `${l.speaker}: `), l.text)));
-}
-
-/** The request, readable: the new line and its context, then each question with its wording when known. */
-function jevRequest(st: State, r: CallRow): HTMLElement {
-  const s = r.state;
-  const known = { ...st.calls.questions, ...(r.questions ?? {}) };
-  return h("div", { class: "req" },
-    s?.new_utterance ? h("div", { class: "ctx now" }, h("div", { class: "ctx-h" }, "New utterance"),
-      h("div", { class: "ctx-l" }, h("b", {}, `${s.new_utterance.speaker}: `), s.new_utterance.text,
-        (s.new_utterance.tags ?? []).map((t: string) => h("span", { class: "tag-loud" }, t)))) : null,
-    lines("Current segment", s?.current_segment),
-    lines("Segment", s?.segment),
-    lines("Previous segment", s?.previous_segment),
-    !s?.new_utterance && !Array.isArray(s?.segment) ? json(s) : null,
-    h("div", { class: "qs" }, (r.question_ids ?? []).map((id) =>
-      h("div", { class: "q-line" }, h("code", {}, id), known[id] ? h("span", { class: "q-type" }, known[id]!.type) : null,
-        h("span", { class: "q-text" }, known[id]?.instructions ?? (id.startsWith("known_") ? "Memory question: is this a claim already checked?" : ""))))));
-}
-
-/** The response, detailed: each answer with its probabilities. */
-function jevResponse(r: CallRow): HTMLElement {
-  if (!r.answers) return h("p", { class: "error-text" }, r.error ?? "No answers.");
-  return h("div", { class: "resp" }, Object.entries(r.answers).map(([id, a]: [string, any]) => {
-    const probs = a?.probabilities ? Object.entries<number>(a.probabilities).sort((x, y) => y[1] - x[1]).filter(([, p]) => p > 0) : [];
-    return h("div", { class: "resp-row" }, answerChip(id, a),
-      probs.length ? h("span", { class: "probs" }, probs.slice(0, 4).map(([k, p]) =>
-        h("span", {}, `${a.legend?.[k] ? `${k} ${a.legend[k]}` : pretty(k)} ${Math.round(p * 100)}%`))) : null);
-  }));
-}
-
-function jevCall(st: State, r: CallRow): HTMLElement {
-  const key = keyOf(r);
-  const open = expanded.has(key);
-  const u = r.usage;
-  return h("article", { class: `call s1${r.ok ? "" : " failed"}${open ? " open" : ""}` },
-    h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key) },
-      h("span", { class: "t" }, when(st, r)),
-      h("span", { class: "purpose" }, pretty(r.purpose)),
-      h("span", { class: "subject" }, stateSummary(r.state)),
-      h("span", { class: "lat" }, seconds(r.latency_ms)),
-      h("span", { class: "cost" }, money(r.cost_usd))),
-    r.ok ? h("div", { class: "ans-row" }, Object.entries(r.answers ?? {}).map(([id, a]) => answerChip(id, a)))
-      : h("p", { class: "error-text" }, r.error ?? "The call failed."),
-    open ? h("div", { class: "call-detail" },
-      h("h4", {}, "Request"), jevRequest(st, r),
-      h("h4", {}, "Response"), jevResponse(r),
-      h("div", { class: "call-meta" },
-        [r.model_returned, u ? `${u.input_tokens} tokens in · ${u.output_tokens} out` : null, `${r.attempts} attempt${r.attempts === 1 ? "" : "s"}`,
-          r.question_set_version, r.request_hash ? `request ${r.request_hash}` : null].filter(Boolean).join(" · ")),
-      h("details", {}, h("summary", {}, "Raw JSON"), json({ state: r.state, question_ids: r.question_ids, answers: r.answers, usage: r.usage }))) : null);
-}
-
-// ---------- System 2 ----------
-
-function parsed(text: string | undefined): any {
-  if (!text) return null;
-  try { return JSON.parse(text); } catch { return text; }
-}
-
-function s2Call(st: State, r: CallRow): HTMLElement {
-  const key = keyOf(r);
-  const open = expanded.has(key);
-  const u = r.usage;
-  const reply = parsed(r.response);
-  const claim = r.claim_id ? st.claims.get(r.claim_id) : undefined;
-  const subject = r.purpose === "research" ? (claim ? `“${claim.text}”` : r.claim_id ?? "")
-    : r.purpose === "audit" ? "Looking for claims System 1 missed" : r.purpose === "rewrite" ? "Rewriting System 1's questions" : "";
-  const verdict = reply && typeof reply === "object" && reply.verdict ? String(reply.verdict) : null;
-  return h("article", { class: `call s2${r.ok ? "" : " failed"}${open ? " open" : ""}` },
-    h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key) },
-      h("span", { class: "t" }, when(st, r)),
-      h("span", { class: "purpose" }, pretty(r.purpose)),
-      h("span", { class: "subject" }, subject),
-      h("span", { class: "lat" }, seconds(r.latency_ms)),
-      h("span", { class: "cost" }, money(r.cost_usd))),
-    h("div", { class: "ans-row" },
-      verdict ? h("span", { class: `ans verdict v-${verdict}` }, "verdict", h("b", {}, verdict === "contradicted" ? "false" : pretty(verdict))) : null,
-      u ? h("span", { class: "ans" }, "tokens", h("b", {}, `${u.prompt_tokens} in · ${u.completion_tokens} out${u.reasoning_tokens ? ` (${u.reasoning_tokens} reasoning)` : ""}`)) : null,
-      r.web_engine ? h("span", { class: "ans" }, "web search", h("b", {}, r.web_engine)) : null,
-      !r.ok ? h("span", { class: "error-text" }, r.error ?? "The call failed.") : null),
-    open ? h("div", { class: "call-detail" },
-      h("h4", {}, "Request"),
-      r.request ? [
-        h("details", {}, h("summary", {}, `System prompt · ${r.request.system.length.toLocaleString()} characters`), h("pre", { class: "json" }, r.request.system)),
-        h("pre", { class: "json" }, r.request.user)]
-        : h("p", { class: "note" }, "This call was recorded before prompts were saved with each call."),
-      h("h4", {}, "Response"),
-      reply === null ? h("p", { class: "note" }, r.ok ? "No reply text recorded." : r.error ?? "The call failed.") : typeof reply === "string" ? h("pre", { class: "json" }, reply) : json(reply),
-      h("div", { class: "call-meta" }, [r.model_returned, `${r.attempts} attempt${r.attempts === 1 ? "" : "s"}`, r.id].filter(Boolean).join(" · "))) : null);
-}
-
-// ---------- feeds ----------
-
 let rerender: () => void = () => {};
 function toggle(key: string) {
   if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
   rerender();
 }
 
-/** Newest first, capped; keeps the reader's place when new calls arrive above it. */
-function feed(box: HTMLElement | null, st: State, system: SystemId) {
-  if (!box) return;
-  const rows = (system === "s1" ? st.calls.s1 : st.calls.s2).slice(-200).reverse();
-  const scroller = box.classList.contains("scroll") ? box : box.closest<HTMLElement>(".scroll") ?? box;
-  const before = scroller.scrollHeight;
-  const top = scroller.scrollTop;
-  replace(box, rows.length
-    ? rows.map((r) => (system === "s1" ? jevCall(st, r) : s2Call(st, r)))
-    : h("div", { class: "empty" }, system === "s1"
-      ? "Every Jev call appears here as it happens: what it was shown, what it was asked, and what it answered."
-      : "System 2 is called only when System 1 flags a claim, for a periodic audit, or to rewrite System 1."));
-  if (top > 0 && scroller === box) box.scrollTop = top + (box.scrollHeight - before);
+/** What each kind of Jev call is for, in words the audience knows. */
+const PURPOSE: Record<string, { label: string; about: string }> = {
+  utterance: { label: "Line check", about: "Every line said is checked: is it a new topic, and is it a public fact worth fact-checking?" },
+  segment: { label: "Topic labels", about: "Each closed stretch of conversation is labelled for the timeline: subject, mode, heat, hype, and moments." },
+  gate: { label: "Rewrite test", about: "System 2 proposed new questions; Jev re-answers earlier lines with them to test the rewrite before it is used." },
+  relabel: { label: "Relabel", about: "A closed stretch is labelled again with the host's edited questions." },
+  research: { label: "Research", about: "System 2 searches the web and writes a verdict with sources." },
+  audit: { label: "Audit", about: "System 2 looks over lines System 1 did not flag, for claims it missed." },
+  rewrite: { label: "Rewrite", about: "System 2 rewrites System 1's questions to fix false alarms and misses." },
+};
+const purposeOf = (p: string) => PURPOSE[p] ?? { label: pretty(p), about: "" };
+
+/** Plain-language names for the questions the audience sees most. */
+const QUESTION: Record<string, string> = {
+  boundary: "New topic?", claim: "Checkable claim?", public: "About the public world?", claim_type: "Kind of claim",
+  hedged: "Speaker unsure?", worth: "Worth checking?", subject: "Subject", mode: "Mode", heat: "Heat", hype: "Hype",
+  disagreement: "Disagreement?", humour: "Humour?", hot_take: "Hot take?", prediction: "Prediction?", recommendation: "Recommendation?",
+  clip_worthy: "Clip-worthy?",
+};
+const questionName = (id: string) => QUESTION[id] ?? (id.startsWith("known_") ? `Repeat of claim ${id.slice(6)}?` : `${pretty(id)}?`);
+
+/** One answer as words: "No (2% yes)", "event (39%)", "0.6 of 4". */
+function answerText(a: any): string {
+  if (!a) return "–";
+  if (a.type === "noul") return a.noul >= 0.5 ? `Yes (${pct(a.noul)})` : `No (${pct(a.noul)} yes)`;
+  if (a.type === "choice") return `${pretty(a.choice)} (${pct(a.confidence ?? a.probabilities?.[a.choice] ?? 0)} sure)`;
+  if (a.type === "score") {
+    const max = Math.max(1, Object.keys(a.probabilities ?? a.legend ?? {}).length - 1);
+    return `${a.score.toFixed(1)} of ${max}`;
+  }
+  return JSON.stringify(a);
 }
 
-// ---------- the Fast · slow thinking diagram ----------
+function answer(id: string, a: any, strong = false): HTMLElement {
+  const yes = a?.type === "noul" && a.noul >= 0.5;
+  return h("span", { class: `qa${yes ? " yes" : ""}${strong ? " key" : ""}` }, h("span", { class: "qa-q" }, questionName(id)), h("b", {}, answerText(a)));
+}
 
-let selected: SystemId = "s1";
+/** The claim a line produced, if any. */
+function claimFor(st: State, utteranceId: string | undefined): Claim | undefined {
+  if (!utteranceId) return undefined;
+  for (const c of st.claims.values()) if (c.utteranceId === utteranceId) return c;
+  return undefined;
+}
+
+const VERDICT_WORD: Record<string, string> = {
+  supported: "Supported", contradicted: "False", misleading: "Misleading", unverifiable: "Unverifiable", not_a_claim: "Not a claim",
+};
+
+/** Memory questions ("is this a repeat of claim c_7?"), one per claim already flagged, folded into one line. */
+function memory(r: CallRow): HTMLElement | null {
+  const known = Object.entries(r.answers ?? {}).filter(([id]) => id.startsWith("known_")) as [string, any][];
+  if (known.length === 0) return null;
+  const hits = known.filter(([, a]) => a?.noul >= 0.6);
+  return h("p", { class: "note" }, `Plus ${known.length} memory question${known.length === 1 ? "" : "s"}, one per claim already flagged ("is this a repeat of it?"): `,
+    hits.length ? h("b", {}, `a repeat of ${hits.map(([id]) => id.slice(6)).join(", ")}`) : "no repeat found.");
+}
+
+/** What the app did with a line check, in words: the part that makes the call meaningful. */
+function outcome(st: State, r: CallRow): HTMLElement | null {
+  if (r.purpose !== "utterance") return null;
+  if (!r.ok) return h("span", { class: "next bad" }, "→ No answer in time: this line is not fact-checked");
+  const c = claimFor(st, r.utterance_id);
+  if (c) {
+    const v = c.verdict ? ` · verdict: ${VERDICT_WORD[c.verdict.verdict] ?? c.verdict.verdict}` : c.status === "dropped" ? " · dropped" : " · researching";
+    return h("span", { class: "next go" }, `→ Flagged: sent to System 2${v}`);
+  }
+  const known = Object.entries(r.answers ?? {}).find(([id, a]: [string, any]) => id.startsWith("known_") && a?.noul >= 0.6);
+  if (known) return h("span", { class: "next" }, `→ Already checked: a repeat of claim ${known[0].slice(6)}`);
+  return h("span", { class: "next" }, "→ Not flagged: nothing sent to System 2");
+}
+
+/** What Jev was shown, as one line. */
+function shown(r: CallRow): string {
+  const s = r.state;
+  if (s?.new_utterance) return `${s.new_utterance.speaker}: “${s.new_utterance.text}”`;
+  if (Array.isArray(s?.segment)) {
+    const first = s.segment[0];
+    return `${s.segment.length} line${s.segment.length === 1 ? "" : "s"} of conversation${first ? `, from ${first.speaker}: “${first.text}”` : ""}`;
+  }
+  return "";
+}
+
+/** The answers worth showing collapsed: the decisive ones for a line check, the labels for a topic. */
+function keyAnswers(r: CallRow): [string, any][] {
+  const a = Object.entries(r.answers ?? {});
+  if (r.purpose === "utterance" || r.purpose === "gate") {
+    const order = ["claim", "public", "worth", "boundary"];
+    return order.filter((id) => r.answers?.[id]).map((id) => [id, r.answers![id]]);
+  }
+  return a.filter(([id]) => ["subject", "mode", "heat", "hype"].includes(id))
+    .concat(a.filter(([, v]: [string, any]) => v?.type === "noul" && v.noul >= 0.5));
+}
+
+/** An HTTP exchange, as the app sent and received it. */
+function http(method: string, url: string, request: unknown, status: string, response: unknown, note?: string): HTMLElement {
+  return h("div", { class: "http" },
+    h("div", { class: "http-line" }, h("b", {}, method), " ", url),
+    h("pre", { class: "json" }, typeof request === "string" ? request : JSON.stringify(request, null, 2)),
+    h("div", { class: "http-line resp" }, h("b", {}, status)),
+    h("pre", { class: "json" }, typeof response === "string" ? response : JSON.stringify(response, null, 2)),
+    note ? h("p", { class: "note" }, note) : null);
+}
+
+function jevRow(st: State, r: CallRow): HTMLElement {
+  const key = keyOf(r);
+  const open = expanded.has(key);
+  const p = purposeOf(r.purpose);
+  const questions = r.questions
+    ? Object.fromEntries(Object.entries(r.questions))
+    : Object.fromEntries((r.question_ids ?? []).map((id) => [id, st.calls.questions[id] ?? "(wording not recorded for this call)"]));
+  return h("article", { class: `call s1${r.ok ? "" : " failed"}${open ? " open" : ""}` },
+    h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key), title: p.about },
+      h("span", { class: "t" }, when(st, r)),
+      h("span", { class: "purpose" }, p.label),
+      h("span", { class: "subject" }, shown(r)),
+      h("span", { class: "lat" }, seconds(r.latency_ms)),
+      h("span", { class: "cost" }, money(r.cost_usd))),
+    h("div", { class: "qa-row" }, r.ok ? keyAnswers(r).map(([id, a]) => answer(id, a, true)) : h("span", { class: "error-text" }, r.error ?? "The call failed.")),
+    outcome(st, r),
+    open ? h("div", { class: "call-detail" },
+      h("p", { class: "note" }, p.about),
+      h("h4", {}, `Every answer · ${Object.keys(r.answers ?? {}).length} questions asked at once`),
+      h("div", { class: "qa-row all" }, Object.entries(r.answers ?? {}).filter(([id]) => !id.startsWith("known_")).map(([id, a]) => answer(id, a))),
+      memory(r),
+      h("h4", {}, "The HTTP request and response"),
+      http("POST", JEV_URL, { model: r.model_returned ?? "typesafe/jev-1.13", state: r.state, questions },
+        r.ok ? `200 OK · ${seconds(r.latency_ms)} · ${money(r.cost_usd)}` : `Failed · ${r.error ?? ""}`,
+        r.ok ? { answers: r.answers, usage: r.usage } : { error: r.error },
+        r.questions ? undefined : "The question wording is shown in full only for calls made while this page was open.")) : null);
+}
+
+function s2Row(st: State, r: CallRow): HTMLElement {
+  const key = keyOf(r);
+  const open = expanded.has(key);
+  const p = purposeOf(r.purpose);
+  let reply: any = null;
+  try { reply = r.response ? JSON.parse(r.response) : null; } catch { reply = r.response ?? null; }
+  const claim = r.claim_id ? st.claims.get(r.claim_id) : undefined;
+  const verdict = reply && typeof reply === "object" && reply.verdict ? VERDICT_WORD[reply.verdict] ?? reply.verdict : null;
+  const u = r.usage;
+  return h("article", { class: `call s2${r.ok ? "" : " failed"}${open ? " open" : ""}` },
+    h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key), title: p.about },
+      h("span", { class: "t" }, when(st, r)),
+      h("span", { class: "purpose" }, p.label),
+      h("span", { class: "subject" }, claim ? `“${claim.text}”` : p.about),
+      h("span", { class: "lat" }, seconds(r.latency_ms)),
+      h("span", { class: "cost" }, money(r.cost_usd))),
+    verdict ? h("span", { class: "next go" }, `→ Verdict: ${verdict}`) : null,
+    open ? h("div", { class: "call-detail" },
+      h("p", { class: "note" }, `${p.about}${u ? ` It read ${u.prompt_tokens.toLocaleString()} tokens and wrote ${u.completion_tokens.toLocaleString()}${u.reasoning_tokens ? `, ${u.reasoning_tokens.toLocaleString()} of them reasoning` : ""}.` : ""}`),
+      h("h4", {}, "The HTTP request and response"),
+      r.request
+        ? http("POST", S2_URL,
+          { model: r.model_returned ?? "", messages: [{ role: "system", content: `(${r.request.system.length.toLocaleString()} characters, below)` }, { role: "user", content: r.request.user }], ...(r.web_engine ? { plugins: [{ id: "web", engine: r.web_engine }] } : {}) },
+          r.ok ? `200 OK · ${seconds(r.latency_ms)} · ${money(r.cost_usd)}` : `Failed · ${r.error ?? ""}`, reply ?? r.error ?? "")
+        : h("p", { class: "note" }, "This call was recorded before prompts were saved with each call."),
+      r.request ? h("details", {}, h("summary", {}, "System prompt"), h("pre", { class: "json" }, r.request.system)) : null) : null);
+}
+
+/** Newest first, capped; keeps the reader's place when new calls arrive above it. */
+function feed(box: HTMLElement | null, st: State, rows: CallRow[], render: (st: State, r: CallRow) => HTMLElement, empty: string) {
+  if (!box) return;
+  const list = rows.slice(-200).reverse();
+  const before = box.scrollHeight;
+  const top = box.scrollTop;
+  replace(box, list.length ? list.map((r) => render(st, r)) : h("div", { class: "empty" }, empty));
+  if (top > 0 && box.classList.contains("scroll")) box.scrollTop = top + (box.scrollHeight - before);
+}
+
+// ---------- the Fast · slow thinking tab ----------
 
 function totals(rows: CallRow[]) {
   const ok = rows.filter((r) => r.ok);
@@ -187,41 +214,73 @@ function totals(rows: CallRow[]) {
   return { n: rows.length, cost, avgCost: ok.length ? cost / ok.length : 0, avgMs: ok.length ? ok.reduce((n, r) => n + r.latency_ms, 0) / ok.length : 0 };
 }
 
+const modelName = (model: string) => (model.split("/").pop() ?? "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/^Gpt (\d+)/, "GPT-$1");
+
 function node(st: State, sys: SystemId): HTMLElement {
   const t = totals(sys === "s1" ? st.calls.s1 : st.calls.s2);
   const busy = st.calls.active[sys] > 0;
   const model = st.calls.models[sys] ?? (sys === "s1" ? st.calls.s1.at(-1)?.model_returned : st.calls.s2.at(-1)?.model_returned) ?? "";
-  // "openai/gpt-6-luna" reads as "GPT-6 Luna"
-  const name = sys === "s1" ? "Jev"
-    : (model.split("/").pop() ?? "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).replace(/^Gpt (\d+)/, "GPT-$1");
-  return h("button", {
-    class: `sys ${sys}${busy ? " busy" : ""}${selected === sys ? " on" : ""}`, "aria-pressed": String(selected === sys),
-    title: `Show System ${sys === "s1" ? 1 : 2}'s calls`, onclick: () => { selected = sys; rerender(); },
-  },
+  return h("div", { class: `sys ${sys}${busy ? " busy" : ""}` },
     h("span", { class: "sys-k" }, sys === "s1" ? "System 1 · fast" : "System 2 · slow"),
-    h("span", { class: "sys-name" }, name || (sys === "s1" ? "Jev" : "System 2")),
+    h("span", { class: "sys-name" }, sys === "s1" ? "Jev" : modelName(model) || "System 2"),
     h("span", { class: "sys-model" }, model),
+    h("span", { class: "sys-role" }, sys === "s1" ? "Judges every line in under a second" : "Researches only what System 1 flags"),
     h("span", { class: "sys-state" }, h("i", {}), busy ? "Thinking" : "Idle"),
     h("span", { class: "sys-stats" },
       h("span", {}, h("b", {}, String(t.n)), "calls"),
-      h("span", {}, h("b", {}, money(t.cost)), "spent"),
-      h("span", {}, h("b", {}, t.n ? seconds(t.avgMs) : "–"), "avg time"),
-      h("span", {}, h("b", {}, t.n ? money(t.avgCost) : "–"), "per call")));
+      h("span", {}, h("b", {}, t.n ? seconds(t.avgMs) : "–"), "each, on average"),
+      h("span", {}, h("b", {}, t.n ? money(t.avgCost) : "–"), "per call"),
+      h("span", {}, h("b", {}, money(t.cost)), "in total")));
 }
 
-function diagram(st: State): HTMLElement {
+/** From every line heard to the few verdicts: where each system does its work. */
+function funnel(st: State): HTMLElement {
+  const lines = st.utterances.size;
+  const judged = st.calls.s1.filter((r) => r.purpose === "utterance").length;
+  const claims = [...st.claims.values()];
+  const research = st.calls.s2.filter((r) => r.purpose === "research");
+  const verdicts = claims.filter((c) => c.verdict);
+  const counts = (k: string) => verdicts.filter((c) => c.verdict!.verdict === k).length;
+  const real = [["False", counts("contradicted")], ["Misleading", counts("misleading")], ["Supported", counts("supported")]].filter(([, n]) => n) as [string, number][];
+  const s1 = totals(st.calls.s1.filter((r) => r.purpose === "utterance"));
+  const s2 = totals(research);
+  const step = (sys: string, n: number | string, label: string, sub: string) =>
+    h("div", { class: `step ${sys}` }, h("b", {}, String(n)), h("span", { class: "label" }, label), h("span", { class: "sub" }, sub));
+  return h("div", { class: "funnel" },
+    step("", lines, "lines heard", "transcribed"),
+    step("s1", judged, "checked by Jev", judged ? `${money(s1.cost)} · ${seconds(s1.avgMs)} each` : "System 1"),
+    step("s1", claims.length, "flagged", "public facts worth checking"),
+    step("s2", research.length, "researched", research.length ? `${money(s2.cost)} · ${seconds(s2.avgMs)} each` : "System 2"),
+    step("s2", verdicts.length, "verdicts", real.length ? real.map(([k, n]) => `${n} ${k.toLowerCase()}`).join(" · ") : "none yet"));
+}
+
+/** One claim's journey: Jev flagged it, System 2 researched it, the verdict. */
+function handoff(st: State, c: Claim): HTMLElement {
+  const jev = [...st.calls.s1].reverse().find((r) => r.purpose === "utterance" && r.utterance_id === c.utteranceId);
+  const s2 = [...st.calls.s2].reverse().find((r) => r.purpose === "research" && r.claim_id === c.id);
+  const key = `handoff|${c.id}`;
+  const open = expanded.has(key);
+  const v = c.verdict ? VERDICT_WORD[c.verdict.verdict] ?? c.verdict.verdict : c.status === "dropped" ? "Dropped" : c.status === "researching" ? "Researching…" : "Queued";
+  return h("article", { class: `handoff${open ? " open" : ""}` },
+    h("button", { class: "handoff-head", "aria-expanded": String(open), onclick: () => toggle(key) },
+      h("span", { class: "claim" }, `“${c.text}”`),
+      h("span", { class: "hops" },
+        h("span", { class: "hop s1" }, "Jev", h("small", {}, jev ? `${seconds(jev.latency_ms)} · ${money(jev.cost_usd)}` : "flagged")),
+        h("span", { class: "arrow" }, "→"),
+        h("span", { class: "hop s2" }, modelName(st.calls.models.s2 ?? "") || "System 2", h("small", {}, s2 ? `${seconds(s2.latency_ms)} · ${money(s2.cost_usd)}` : c.status === "dropped" ? "not researched" : "…")),
+        h("span", { class: "arrow" }, "→"),
+        h("span", { class: `hop verdict v-${c.verdict?.verdict ?? c.status}` }, v))),
+    open ? h("div", { class: "call-detail" },
+      jev ? [h("h4", {}, "System 1 · Jev flagged it"), jevRow(st, jev)] : null,
+      s2 ? [h("h4", {}, "System 2 · researched it"), s2Row(st, s2)] : null) : null);
+}
+
+function thinking(st: State): HTMLElement {
   const a = totals(st.calls.s1);
   const b = totals(st.calls.s2);
-  const busy2 = st.calls.active.s2 > 0;
-  // what System 2 would have cost had it made System 1's judgments, at its own average price and speed
   const times = Math.round((a.n * b.avgCost) / Math.max(a.cost, 1e-9));
-  const value = a.n && b.n && b.avgCost > 0
-    ? h("div", { class: "value" },
-      h("div", { class: "value-n" }, h("b", {}, `${times.toLocaleString()}×`), h("span", {}, "cheaper with System 1")),
-      h("p", {}, "System 1 made ", h("b", {}, `${a.n} judgment${a.n === 1 ? "" : "s"}`), " for ", h("b", {}, money(a.cost)), ". At System 2's average of ",
-        h("b", {}, `${money(b.avgCost)} and ${seconds(b.avgMs)}`), " a call, the same work would have cost about ", h("b", {}, money(a.n * b.avgCost)),
-        ` and taken ${clock(a.n * b.avgMs)} of model time.`))
-    : h("p", { class: "value muted" }, "System 1 (Jev) judges every utterance in well under a second for a fraction of a cent. System 2 is called only when System 1 finds something worth checking, and it improves System 1 by rewriting its questions.");
+  const busy2 = st.calls.active.s2 > 0;
+  const claims = [...st.claims.values()].sort((x, y) => (y.activity ?? "").localeCompare(x.activity ?? ""));
   return h("div", { class: "think-diagram" },
     h("div", { class: "sys-row" },
       node(st, "s1"),
@@ -229,17 +288,27 @@ function diagram(st: State): HTMLElement {
         h("span", { class: "link fwd" }, h("span", {}, "flags claims"), h("i", {})),
         h("span", { class: "link back" }, h("i", {}), h("span", {}, "rewrites its questions"))),
       node(st, "s2")),
-    value);
+    a.n && b.n && b.avgCost > 0
+      ? h("div", { class: "value" },
+        h("div", { class: "value-n" }, h("b", {}, `${times.toLocaleString()}×`), h("span", {}, "cheaper with System 1")),
+        h("p", {}, "Jev made ", h("b", {}, `${a.n} judgments`), " for ", h("b", {}, money(a.cost)), ". Asking System 2 for each would have cost about ",
+          h("b", {}, money(a.n * b.avgCost)), ` and taken ${clock(a.n * b.avgMs)} of model time.`))
+      : null,
+    h("div", { class: "feed-h" }, "From every line to a verdict"),
+    funnel(st),
+    h("div", { class: "feed-h" }, `Claims handed from System 1 to System 2${claims.length ? ` · ${claims.length}` : ""}`),
+    claims.length
+      ? h("div", { class: "handoffs" }, claims.slice(0, 60).map((c) => handoff(st, c)))
+      : h("p", { class: "empty" }, "When Jev flags a public fact worth checking, it appears here with its trip to System 2 and back."));
 }
 
 /** Renders whichever thinking tab is showing. */
 export function renderThinking(st: State) {
   rerender = () => renderThinking(st);
-  if (!$("#pane-jev")?.hidden) feed($("#jev-log"), st, "s1");
-  if (!$("#pane-think")?.hidden) {
-    replace($("#think"), diagram(st));
-    replace($("#think-log-h"), selected === "s1" ? "System 1 calls · Jev" : "System 2 calls");
-    feed($("#think-log"), st, selected);
+  if (!$("#pane-jev")?.hidden) {
+    feed($("#jev-log"), st, st.calls.s1, jevRow,
+      "Every call to Jev appears here as it happens: what it was asked, what it answered, and what the app did next.");
   }
+  if (!$("#pane-think")?.hidden) replace($("#think"), thinking(st));
   replace($("#jev-count"), st.calls.s1.length ? String(st.calls.s1.length) : "");
 }

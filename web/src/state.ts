@@ -84,8 +84,8 @@ const emptyCalls = (): Calls => ({
   s1: [], s2: [], active: { s1: 0, s2: 0 }, lastStart: { s1: 0, s2: 0 }, models: { s1: null, s2: null }, questions: {}, keys: new Set(),
 });
 
-/** Keeps at most this many System 1 calls in the page: about 20 minutes of a show. */
-const MAX_S1_CALLS = 1000;
+/** Keeps at most this many System 1 calls in the page: about an hour and a half of a show. */
+const MAX_S1_CALLS = 3000;
 
 /** Adds a call once (history and the live stream can overlap), newest last. */
 export function addCall(s: State, row: CallRow) {
@@ -103,7 +103,7 @@ export function emptyState(): State {
     session: null, pauses: [], speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
-    cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 5 },
+    cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 10 },
     stats: null, errors: [], budgetExhausted: null, calls: emptyCalls(),
   };
 }

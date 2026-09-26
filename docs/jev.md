@@ -97,7 +97,7 @@ Calibration reported by OpenRouter (Banking77): 96.3% accuracy on the 58% of inp
 
 | Purpose | When | State | Questions | Settings |
 | --- | --- | --- | --- | --- |
-| `utterance` | Every non-filler utterance, in time order (`src/pipeline/segmenter.ts`) | `{ current_segment, new_utterance }` | `boundary` + the active System 1 set (`claim`, `claim_type`, `hedged`, `worth`, 0–3 `attention_*`) + memory questions (0–40 `known_*`) → 5 to 48 questions | Live: 3 s timeout, 2 attempts |
+| `utterance` | Every non-filler utterance, in time order (`src/pipeline/segmenter.ts`) | `{ current_segment, new_utterance }` | `boundary` + the active System 1 set (`claim`, `claim_type`, `public`, `hedged`, `worth`, 0–3 `attention_*`) + memory questions (0–40 `known_*`) → 6 to 49 questions | Live: 3 s timeout, 2 attempts |
 | `segment` | Each closed segment (`src/pipeline/timeline.ts`) | `{ previous_segment, segment }` | The timeline label set: 10 questions, plus `story` when stories are set | Live: 5 s timeout, 2 attempts; up to 4 in parallel |
 | `relabel` | `POST /api/labels/relabel` | Same as `segment` | The current label set | Background: 30 s timeout, 5 attempts |
 | `gate` | Replay gate for a System 1 rewrite (`src/factcheck/gate.ts`) | The logged `utterance` states of graded flags and audit misses (up to 300) | The candidate System 1 set only (no `boundary`, no memory) | Background |

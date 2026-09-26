@@ -55,6 +55,7 @@ flowchart LR
 | --- | --- | --- |
 | `claim` | noul | It states a specific factual claim that could be checked against public sources, such as a number, price, date, ranking, quote, attribution, release, or product capability. **True:** at least one concrete, checkable statement of fact. **False:** an opinion, joke, question, feeling, exaggeration, vague statement, or no factual content. |
 | `claim_type` | choice | What kind of factual claim does it make? `number_or_price`, `date_or_release`, `quote_or_attribution`, `capability_or_benchmark`, `event`, `prediction`, `none` |
+| `public` | noul | Its factual claim is about the public world, such as companies, products, AI models, public figures, prices, statistics, science, laws, or news, so a web search could confirm or refute it. **True:** a claim about something outside the speakers' private lives that public sources could confirm or refute. **False:** about the speakers themselves or people they know (their family, friends, feelings, plans, or personal experiences), or no factual claim. |
 | `hedged` | noul | The speaker signals uncertainty about a fact, such as "I think", "if I remember correctly", "something like", or "don't quote me". |
 | `worth` | score | How much would listeners care whether its factual claim is accurate? 0 No factual claim, or trivial · 1 A minor detail · 2 Relevant to the discussion · 3 Central to the speaker's argument · 4 Surprising or high-stakes if wrong |
 
@@ -62,11 +63,13 @@ These ride in the **same** Jev request as the segmenter's `boundary` question, s
 
 ### The flag rule
 
-Using the active version's thresholds (`s1@1`: `claimThreshold` 0.7, `worthMin` 1.5, `attentionThreshold` 0.7), an utterance is **flagged** when all three hold:
+Using the active version's thresholds (`s1@1`: `claimThreshold` 0.7, `publicThreshold` 0.6, `worthMin` 1.5, `attentionThreshold` 0.7), an utterance is **flagged** when all four hold:
 
 ```text
-claim ≥ claimThreshold   AND   claim_type ≠ none   AND   worth ≥ worthMin
+claim ≥ claimThreshold   AND   claim_type ≠ none   AND   public ≥ publicThreshold   AND   worth ≥ worthMin
 ```
+
+(A System 1 version without a `public` question, from before it existed, does not gate on it.)
 
 Its research priority is:
 
@@ -75,6 +78,8 @@ priority = worth
          + 0.5  if hedged ≥ factcheck.hedgedThreshold (0.6)
          + 1    if any attention_* ≥ attentionThreshold
 ```
+
+**Why `public` exists.** In a one-hour personal call between two people, System 1 flagged 45 lines, almost all first-person accounts of private events (an argument, an accident): `claim` asks for a fact "checked against public sources", but nothing made the *subject* public, so a concrete personal event scored as an `event` claim. 20 came back `unverifiable` yet were graded good flags, the audit counted personal statements as misses, and three promoted rewrites widened System 1 further ("personal, first-person factual clauses count"). Re-asking Jev only the `public` question on the flagged lines: all 45 personal flags scored ≤ 0.43 (most 0.02) and would not be flagged, while all 13 public claims flagged in earlier AI-podcast sessions ("Jev is 445 times cheaper than GPT", the planted Suez and JFK conspiracies, a Reuters/Ipsos poll) scored 0.85–0.97. The measurement cost $0.0016.
 
 `worthMin` is 1.5, not the original 2: "Jev can never hallucinate" scored `worth` 1.94–2.01 across runs, so at 2 it was flagged only some of the time. Fillers and failed transcriptions never reach System 1; an utterance whose Jev request fails is not fact-checked.
 
@@ -154,6 +159,8 @@ grade = false_alarm   if verdict = not_a_claim  OR  false_alarm_reason ≠ none
         good_flag     otherwise
 ```
 
+`false_alarm_reason` is one of `none`, `hyperbole`, `joke`, `opinion`, `too_vague`, `trivial`, `not_factual`, or `private`: the research prompt says that a claim about the speakers' own private lives cannot be checked against public sources and must come back `not_a_claim` with reason `private`, so such a flag grades as a false alarm and teaches System 1 instead of passing as a good flag.
+
 A grade counts toward the System 1 version that was active **when the claim was flagged**. The host can dispute any verdict (`POST /api/claims/:id/override`, the "Host disputes" button): the claim is marked disputed (`claim.disputed`), and its grade leaves the evidence — it no longer counts toward rewrites or the gate.
 
 ### Audits: finding misses
@@ -163,7 +170,9 @@ A flag that should not have happened shows up as a false alarm; a claim that was
 - **When:** every `auditIntervalMs` (5 minutes) of **session time** (the audio clock, so a fast replay audits like a live show), if at least `auditMinUtterances` (10) unflagged, non-filler utterances have accumulated since the last audit. Utterances linked as repeats are not in the pool.
 - **What:** a random sample of up to `auditSample` (10) of them, as `{ utterance_id, speaker, text }`, sent without web search at `effort: low`, with the system message:
 
-  > You audit a live AI podcast's fact-checker. For each utterance, say whether it contains a specific factual claim that could be checked against public sources, and how much listeners would care whether it is accurate. Opinions, jokes, exaggerations, and vague statements are not checkable claims.
+  > You audit a live AI podcast's fact-checker. For each utterance, say whether it contains a specific factual claim that could be checked against public sources, and how much listeners would care whether it is accurate. A checkable claim is about the public world: companies, products, AI models, public figures, prices, statistics, science, laws, or news. Opinions, jokes, exaggerations, and vague statements are not checkable claims, and neither is anything about the speakers' own private lives (their family, friends, feelings, plans, or personal experiences), however concrete.
+
+  The rewrite prompt carries the same rule ("the speakers' private lives never count, so never widen the questions to include them"), and a rewrite may tune `publicThreshold` only within 0.5–0.9, never remove it.
 
 - **Schema:** `{ items: [{ utterance_id, has_checkable_claim: boolean, worth: "low" | "medium" | "high" }] }`.
 - **A miss** is an item with `has_checkable_claim` true and `worth` not `low`. Results go to `audits.jsonl` and an `audit` event.

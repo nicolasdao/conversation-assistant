@@ -3,7 +3,7 @@ import sherpa from "sherpa-onnx-node";
 
 export const SAMPLE_RATE = 16_000;
 
-function header(dataBytes: number, sampleRate: number): Buffer {
+export function wavHeader(dataBytes: number, sampleRate: number): Buffer {
   const h = Buffer.alloc(44);
   h.write("RIFF", 0, "ascii");
   h.writeUInt32LE(36 + dataBytes, 4);
@@ -33,7 +33,7 @@ export function toPcm16(samples: Float32Array): Buffer {
 /** An in-memory PCM16 mono WAV, for uploads. */
 export function encodeWav(samples: Float32Array, sampleRate = SAMPLE_RATE): Buffer {
   const pcm = toPcm16(samples);
-  return Buffer.concat([header(pcm.length, sampleRate), pcm]);
+  return Buffer.concat([wavHeader(pcm.length, sampleRate), pcm]);
 }
 
 /** Reads any WAV sherpa can read, resampled to 16 kHz mono Float32. */
@@ -50,7 +50,7 @@ export class WavWriter {
 
   constructor(readonly path: string, private readonly sampleRate = SAMPLE_RATE) {
     this.fd = openSync(path, "w");
-    writeSync(this.fd, header(0, sampleRate));
+    writeSync(this.fd, wavHeader(0, sampleRate));
   }
 
   write(samples: Float32Array): void {
@@ -66,7 +66,7 @@ export class WavWriter {
 
   close(): void {
     if (this.fd === null) return;
-    writeSync(this.fd, header(this.dataBytes, this.sampleRate), 0, 44, 0);
+    writeSync(this.fd, wavHeader(this.dataBytes, this.sampleRate), 0, 44, 0);
     closeSync(this.fd);
     this.fd = null;
   }

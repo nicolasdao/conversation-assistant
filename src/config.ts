@@ -14,7 +14,11 @@ export const AppConfigSchema = z.object({
   vad: z.object({
     threshold: probability, minSpeechDuration: positive, minSilenceDuration: positive, maxSpeechDuration: positive,
   }).strict(),
-  speakers: z.object({ threshold: probability, minEmbedSeconds: positive, maxEmbeddingsPerSpeaker: int }).strict(),
+  speakers: z.object({
+    threshold: probability, minEmbedSeconds: positive, maxEmbeddingsPerSpeaker: int,
+    /** The most voices each stream carries (0 = no limit); a session can override the remote count. */
+    voicesPerStream: z.object({ host: z.number().int().min(0), remote: z.number().int().min(0) }).strict(),
+  }).strict(),
   transcription: z.object({
     model: z.string().min(1),
     languages: z.array(z.string().min(1)),
@@ -87,6 +91,8 @@ export const CLAIM_TYPE_KEYS = [
 
 export const S1ThresholdsSchema = z.object({
   claimThreshold: z.number().min(0.5).max(0.9),
+  /** The `public` answer a flag needs: the claim is about the public world, not the speakers' private lives. */
+  publicThreshold: z.number().min(0.5).max(0.9),
   worthMin: z.number().min(1).max(3),
   attentionThreshold: z.number().min(0.5).max(0.9),
 }).strict();
@@ -102,10 +108,11 @@ export const S1QuestionsSchema = z.object({
     },
     { message: `claim_type must have exactly the keys ${CLAIM_TYPE_KEYS.join(", ")}` },
   ),
+  public: NoulQuestion,
   hedged: NoulQuestion,
   worth: ScoreQuestion.refine((q) => q.criteria.length === 5, "worth must have exactly 5 levels"),
 }).catchall(NoulQuestion).superRefine((q, ctx) => {
-  const extra = Object.keys(q).filter((k) => !["claim", "claim_type", "hedged", "worth"].includes(k));
+  const extra = Object.keys(q).filter((k) => !["claim", "claim_type", "public", "hedged", "worth"].includes(k));
   for (const k of extra) {
     if (!/^attention_\d+$/.test(k)) ctx.addIssue({ code: "custom", message: `unexpected System 1 question ${k}` });
   }

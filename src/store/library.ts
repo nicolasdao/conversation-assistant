@@ -229,6 +229,12 @@ export class SessionLibrary {
     this.cache.delete(id);
   }
 
+  /** A recording's folder and the voice limits it ran with (`voices` in session.json; absent before they existed). */
+  voicesOf(id: string): { dir: string; voices: Partial<Record<"host" | "remote", number>> | null } {
+    const dir = this.dirOf(id);
+    return { dir, voices: readJson(join(dir, "session.json"))?.voices ?? null };
+  }
+
   /**
    * The most recent Jev (System 1) or System 2 calls of a session, oldest first, with the models its config named.
    * Works for the running session too: its folder is in the library from the start.

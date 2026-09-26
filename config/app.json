@@ -1,11 +1,11 @@
 {
   "server": { "port": 4317 },
-  "budget": { "sessionCapUsd": 5, "devCapUsd": 3 },
-  "vad": { "threshold": 0.5, "minSpeechDuration": 0.25, "minSilenceDuration": 0.5, "maxSpeechDuration": 20 },
-  "speakers": { "threshold": 0.65, "minEmbedSeconds": 1.5, "maxEmbeddingsPerSpeaker": 20 },
+  "budget": { "sessionCapUsd": 10, "devCapUsd": 3 },
+  "vad": { "threshold": 0.5, "minSpeechDuration": 0.25, "minSilenceDuration": 0.5, "maxSpeechDuration": 30 },
+  "speakers": { "threshold": 0.65, "minEmbedSeconds": 1.5, "maxEmbeddingsPerSpeaker": 20, "voicesPerStream": { "host": 1, "remote": 2 } },
   "transcription": {
     "model": "gpt-transcribe", "languages": ["en"], "concurrency": 4, "timeoutMs": 20000,
-    "prompt": "Three friends co-host an English-language podcast about AI news, tech and marketing.",
+    "prompt": "A live, casual English-language conversation recorded for a podcast. It often covers AI, tech and marketing.",
     "keywords": ["Jev", "TypeSafe", "OpenRouter", "Riverside", "GPT-6 Luna", "GPT-6 Sol", "OpenAI", "Anthropic",
                  "Claude", "DeepSeek", "Gemini", "Hugging Face", "Nvidia", "System 1", "System 2", "Kahneman"],
     "fixes": [],

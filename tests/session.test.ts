@@ -50,6 +50,7 @@ function fakeFetch(script: ReturnType<typeof loadScript>) {
       for (const [id, q] of Object.entries<any>(body.questions)) {
         if (id === "boundary") answers[id] = { type: "noul", noul: line?.expected.topicChange ? 0.9 : 0.1 };
         else if (id === "claim") answers[id] = { type: "noul", noul: line?.expected.claim ? 0.95 : 0.05 };
+        else if (id === "public") answers[id] = { type: "noul", noul: line?.expected.claim ? 0.9 : 0.1 };
         else if (id === "claim_type") answers[id] = { type: "choice", choice: line?.expected.claim ? "number_or_price" : "none", confidence: 0.9, probabilities: {} };
         else if (id === "worth") answers[id] = { type: "score", score: line?.expected.claim ? 3.2 : 0.2, confidence: 0.9, probabilities: {} };
         else if (id.startsWith("known_")) answers[id] = { type: "noul", noul: line?.expected.repeatOf && id === "known_c_1" ? 0.95 : 0.02 };

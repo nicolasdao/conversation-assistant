@@ -25,17 +25,25 @@ export interface SessionSummary {
   matches?: { utteranceId: string; startMs: number; speaker: string; snippet: string }[];
 }
 
+export interface MergeSuggestion {
+  fromId: string; fromName: string; fromTalkMs: number; intoId: string; intoName: string; intoTalkMs: number; stream: "host" | "remote";
+  similarity: number | null; confidence: "high" | "medium" | "low"; reason: string;
+}
+
 export const api = {
   state: () => call<any>("GET", "/api/state"),
+  closeView: () => call<{ closed: string | null }>("POST", "/api/sessions/close"),
   calls: (system: "s1" | "s2", limit = 300) =>
     call<{ rows: unknown[]; models: { s1: string | null; s2: string | null } }>("GET", `/api/calls?system=${system}&limit=${limit}`),
   engine: () => call<{ startedAt: string; stale: boolean }>("GET", "/api/engine"),
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),
-  startReplay: (dir: string, speed: 1 | "max") => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed }),
-  startLive: (mic?: string) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}) }),
+  startReplay: (dir: string, speed: 1 | "max", voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices }),
+  startLive: (mic?: string, voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices }),
   stop: () => call<{ sessionId: string }>("POST", "/api/session/stop"),
   rename: (id: string, displayName: string) => call("POST", `/api/speakers/${encodeURIComponent(id)}/rename`, { displayName }),
+  suggestMerges: (voices?: number) => call<{ suggestions: MergeSuggestion[]; voices: { host: number; remote: number } }>(
+    "GET", `/api/speakers/suggestions${voices === undefined ? "" : `?voices=${voices}`}`),
   merge: (fromId: string, intoId: string) => call("POST", "/api/speakers/merge", { fromId, intoId }),
   putLabels: (set: unknown) => call<{ version: string }>("PUT", "/api/labels", set),
   relabel: () => call<{ segments: number }>("POST", "/api/labels/relabel"),
@@ -44,7 +52,7 @@ export const api = {
   sessions: (q = "") => call<SessionSummary[]>("GET", `/api/sessions${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   renameSession: (id: string, name: string) => call<SessionSummary>("PATCH", `/api/sessions/${encodeURIComponent(id)}`, { name }),
   openSession: (id: string) => call<{ sessionId: string; events: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/open`),
-  replaySession: (sessionId: string, speed: 1 | "max") => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed }),
+  replaySession: (sessionId: string, speed: 1 | "max", voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed, voices }),
   pause: () => call<{ paused: boolean }>("POST", "/api/session/pause"),
   resume: () => call<{ paused: boolean }>("POST", "/api/session/resume"),
   deleteSession: (id: string) => call<{ deleted: string }>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),

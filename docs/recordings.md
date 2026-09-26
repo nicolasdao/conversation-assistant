@@ -1,11 +1,12 @@
 ---
-description: Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, and replays past sessions.
-tags: [sessions, storage, library, replay, api]
+description: Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, and deletes past sessions.
+tags: [sessions, storage, library, replay, playback, api]
 source:
   - src/store/sessionStore.ts
   - src/store/library.ts
   - src/store/events.ts
   - src/server/main.ts
+  - src/server/audio.ts
 ---
 
 # Recordings
@@ -51,6 +52,8 @@ Renaming or merging a speaker on an open recording appends the `speaker.updated`
 
 While a recording is open, `GET /api/state` returns an archived snapshot (`session.status: "archived"`), and the page shows Archive in the header's ON AIR block, with no stream meters. Starting a live session or a replay leaves the archived view. A session that ends (Stop, or the end of a replay's input) becomes one too: the engine switches to serving it as an opened recording, and the page shows it as Archive.
 
+**Playback.** An open recording can be listened to: `GET /api/sessions/:id/audio` mixes `host.wav` and `remote.wav` on the fly into one 16 kHz mono WAV (the shorter stream padded). Each stream is raised to a common speech level first: its loud speech (the 95th percentile of 100 ms blocks, sampled every 2 s, cached per file) is brought to −12 dBFS (on laptop speakers, −14 was slightly too quiet and −10 sounded saturated), with at most +20 dB of gain, because recorded speech sat around −24 to −28 dBFS, well under a typical podcast; this also balances the host's mic against the call. The sum then goes through a soft limiter (linear up to 0.85 of full scale, bent smoothly towards it above, so only the loudest peaks are touched) instead of clipping. The page adds a volume boost on top (100–300 %, a Web Audio gain node), with HTTP Range support so the page can seek, and without loading the files (`src/server/audio.ts`). Both files share the session clock (sample index ÷ 16 = session ms), so the audio's time is the timeline's time. The page plays it in an `<audio>` element at 1×–4× with `preservesPitch`, so sped-up voices keep their pitch (see [Architecture](architecture.md)). Playback exists only for recordings, never on air.
+
 **Delete** removes a recording's folder for good, after an in-page confirmation (`DELETE /api/sessions/:id`). The running session cannot be deleted (409). Deleting the recording on screen opens the one listed below it (or above, if it was the last), or clears the view if none is left.
 
 ## API
@@ -60,6 +63,8 @@ While a recording is open, `GET /api/state` returns an archived snapshot (`sessi
 | GET | `/api/sessions?q=&all=1` | List recordings, newest first; with `q`, only matches, each with `matches` |
 | GET | `/api/sessions/:id` | One summary |
 | PATCH | `/api/sessions/:id` | `{ name?, notes? }` → updated summary |
+| GET | `/api/sessions/:id/audio` | The recording's two streams mixed into one WAV, with Range support (`206` / `416`) |
+| POST | `/api/sessions/close` | Leaves the opened recording's view; the page's `/` |
 | DELETE | `/api/sessions/:id` | Deletes the recording's folder → `{ deleted }`; 409 for the running session |
 | POST | `/api/sessions/:id/open` | Reopen read-only → `{ sessionId, events }` (`events` is the number of events loaded); 409 while a session runs |
 | POST | `/api/session/start` | `{ mode: "replay", sessionId, speed }` replays a recording; `name` names the new session |

@@ -61,7 +61,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 137,
+      "line_count": 160,
       "links_to": [
         "docs/gotchas.md",
         "docs/jev.md",
@@ -113,7 +113,7 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 45,
+      "line_count": 47,
       "links_to": [],
       "over_size": false,
       "parse_error": null,
@@ -229,7 +229,7 @@
     },
     {
       "dangling": false,
-      "description": "Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, and replays past sessions.",
+      "description": "Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, and deletes past sessions.",
       "has_frontmatter": true,
       "headings": [
         "Recordings",
@@ -238,8 +238,9 @@
         "Open vs Replay",
         "API"
       ],
-      "line_count": 64,
+      "line_count": 74,
       "links_to": [
+        "docs/architecture.md",
         "docs/rehearsal.md",
         "docs/transcription.md"
       ],
@@ -250,7 +251,8 @@
         "src/store/sessionStore.ts",
         "src/store/library.ts",
         "src/store/events.ts",
-        "src/server/main.ts"
+        "src/server/main.ts",
+        "src/server/audio.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -258,6 +260,7 @@
         "storage",
         "library",
         "replay",
+        "playback",
         "api"
       ],
       "toc": {
@@ -307,15 +310,17 @@
     },
     {
       "dangling": false,
-      "description": "How each utterance gets a speaker from local voice embeddings, why the threshold is 0.65, how short utterances are handled, and how to rename, merge, and calibrate.",
+      "description": "How each utterance gets a speaker from local voice embeddings, voices tied to a stream with a per-stream limit, the 0.65 threshold, merge suggestions with confidence, and how to rename, merge, and calibrate.",
       "has_frontmatter": true,
       "headings": [
         "Speakers",
         "Assignment rules",
+        "Voices belong to a stream, and each stream has a limit",
         "Threshold",
+        "Merge suggestions — `src/speakers/suggest.ts`",
         "Rename and merge"
       ],
-      "line_count": 50,
+      "line_count": 72,
       "links_to": [
         "docs/gotchas.md",
         "docs/recordings.md",
@@ -327,14 +332,16 @@
       "path": "docs/speakers.md",
       "source": [
         "src/speakers/registry.ts",
-        "src/cli/calibrateSpeakers.ts"
+        "src/cli/calibrateSpeakers.ts",
+        "src/speakers/suggest.ts"
       ],
       "source_unresolved": [],
       "tags": [
         "speakers",
         "diarization",
         "embeddings",
-        "calibration"
+        "calibration",
+        "merge-suggestions"
       ],
       "toc": {
         "linked": false,
@@ -363,7 +370,7 @@
         "Events and files",
         "Measured so far"
       ],
-      "line_count": 251,
+      "line_count": 260,
       "links_to": [
         "docs/architecture.md",
         "docs/jev.md",
@@ -406,7 +413,7 @@
         "Cost",
         "Configuration (`config/app.json` → `transcription`)"
       ],
-      "line_count": 72,
+      "line_count": 74,
       "links_to": [
         "docs/gotchas.md",
         "docs/recordings.md",

@@ -24,6 +24,22 @@ const json = (status: number, body: unknown) => () => new Response(JSON.stringif
 const oneSecond = new Float32Array(16000).fill(0.1);
 
 describe("transcription", () => {
+  test("a clip carries the conversation so far and the speakers' names; a sliver is never sent", async () => {
+    const { f, calls } = fakeFetch([json(200, { text: "to pee" })]);
+    const rows: TranscriptionRow[] = [];
+    const t = new Transcriber(cfg.transcription, { fetch: f, apiKey: "k", budget: budget(), log: (r) => rows.push(r) });
+    const prompt = `${cfg.transcription.prompt}\nThe speakers are Nic, Sam.\nThe conversation so far:\nNic: let's go back to the cinema`;
+    await t.transcribe("u_2", oneSecond, { prompt, keywords: ["Nic", "Sam", "Jev"] });
+    const form = calls[0].init.body as FormData;
+    expect(form.get("prompt")).toBe(prompt);
+    expect(form.getAll("keywords[]")).toEqual([...cfg.transcription.keywords, "Nic", "Sam"]); // no duplicate "Jev"
+    // 54 ms of audio: dropped as empty text, with no request, no cost, and no failure
+    expect(await t.transcribe("u_3", new Float32Array(864))).toEqual({ ok: true, text: "", filler: false });
+    expect(calls.length).toBe(1);
+    expect(rows.length).toBe(1);
+  });
+
+
   test("sends the multipart fields and records estimated cost", async () => {
     const { f, calls } = fakeFetch([json(200, { text: "Jev is cheap.", languages: ["en"] })]);
     const rows: TranscriptionRow[] = [];

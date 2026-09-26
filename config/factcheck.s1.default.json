@@ -22,6 +22,14 @@
         "none": "No checkable factual claim."
       }
     },
+    "public": {
+      "type": "noul",
+      "instructions": "Judge only new_utterance. Its factual claim is about the public world, such as companies, products, AI models, public figures, prices, statistics, science, laws, or news, so a web search could confirm or refute it.",
+      "criteria": {
+        "true": "A claim about something outside the speakers' private lives that public sources could confirm or refute.",
+        "false": "About the speakers themselves or people they know: their family, friends, feelings, plans, or personal experiences; or no factual claim."
+      }
+    },
     "hedged": {
       "type": "noul",
       "instructions": "Judge only new_utterance. The speaker signals uncertainty about a fact, such as 'I think', 'if I remember correctly', 'something like', or 'don't quote me'."
@@ -29,9 +37,19 @@
     "worth": {
       "type": "score",
       "instructions": "Judge only new_utterance. How much would listeners care whether its factual claim is accurate?",
-      "criteria": ["No factual claim, or trivial", "A minor detail", "Relevant to the discussion",
-                   "Central to the speaker's argument", "Surprising or high-stakes if wrong"]
+      "criteria": [
+        "No factual claim, or trivial",
+        "A minor detail",
+        "Relevant to the discussion",
+        "Central to the speaker's argument",
+        "Surprising or high-stakes if wrong"
+      ]
     }
   },
-  "thresholds": { "claimThreshold": 0.7, "worthMin": 1.5, "attentionThreshold": 0.7 }
+  "thresholds": {
+    "claimThreshold": 0.7,
+    "publicThreshold": 0.6,
+    "worthMin": 1.5,
+    "attentionThreshold": 0.7
+  }
 }

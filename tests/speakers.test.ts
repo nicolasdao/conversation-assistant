@@ -97,4 +97,26 @@ describe("speaker registry", () => {
     expect(reg.assignEmbedding("remote", null).speakerId).toBe("spk_1");
     expect(() => reg.merge("spk_1", "spk_1")).toThrow();
   });
+
+  test("a voice belongs to its stream, and a stream with all its voices reuses the closest one", () => {
+    const dim = embedder.dim;
+    const a = new Float32Array(dim).map((_, i) => (i % 2 ? 1 : 0));
+    const b = new Float32Array(dim).map((_, i) => (i % 2 ? 0 : 1));
+    const c = new Float32Array(dim).map((_, i) => (i % 4 < 2 ? 1 : -1));
+    const bish = b.map((x, i) => (i % 3 === 0 ? x * 0.3 + 0.2 : x)); // the same voice, drifted by a codec
+    const reg = new SpeakerRegistry(cfg.app.speakers, embedder, { host: 1, remote: 1 });
+    expect(reg.assignEmbedding("host", a).speakerId).toBe("spk_1");
+    // the same voiceprint on the other stream is a different person: the host's mic never hears the call
+    expect(reg.assignEmbedding("remote", a).created?.id).toBe("spk_2");
+    // the call carries one voice: an unfamiliar line goes to it rather than becoming Speaker 3
+    expect(reg.assignEmbedding("remote", c)).toEqual({ speakerId: "spk_2", inferred: false });
+    expect(reg.assignEmbedding("remote", bish).speakerId).toBe("spk_2");
+    // and so does the host's mic, with its one voice
+    expect(reg.assignEmbedding("host", c).speakerId).toBe("spk_1");
+    expect(reg.active().length).toBe(2);
+    // without a limit, the same unfamiliar voice would have been a new speaker
+    const open = new SpeakerRegistry(cfg.app.speakers, embedder, {});
+    open.assignEmbedding("remote", a);
+    expect(open.assignEmbedding("remote", c).created?.id).toBe("spk_2");
+  });
 });

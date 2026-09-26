@@ -52,9 +52,9 @@ macOS asks once for **Microphone** and once for **System Audio Recording**; both
 
 ## Using it
 
-`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in). The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/`; **Recordings** lists, names, searches, reopens, and replays them.
+`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in). The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/` (both audio streams included); **Recordings** lists, names, searches, opens, and deletes them, and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a refresh or a bookmark lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
 
-Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($5) in `config/app.json`. OpenRouter calls send `provider: { data_collection: "deny" }`.
+Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($10) in `config/app.json`. OpenRouter calls send `provider: { data_collection: "deny" }`.
 
 ## Documentation
 
@@ -63,9 +63,9 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.
 - [Jev](docs/jev.md) — What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.
 - [Mission](docs/mission.md) — Why Podcast Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
-- [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, and replays past sessions.
+- [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, and deletes past sessions.
 - [Rehearsal kit](docs/rehearsal.md) — The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.
-- [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, why the threshold is 0.65, how short utterances are handled, and how to rename, merge, and calibrate.
+- [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, voices tied to a stream with a per-stream limit, the 0.65 threshold, merge suggestions with confidence, and how to rename, merge, and calibrate.
 - [System 1 and System 2](docs/system1-system2.md) — The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.
 - [Transcription](docs/transcription.md) — How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.
 <!-- END doc-index -->

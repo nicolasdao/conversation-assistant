@@ -2,11 +2,13 @@
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
-  bindControls, bindSessionName, bindSplit, checkEngine, jumpToSegment, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
+  bindControls, bindSessionName, bindSplit, checkEngine, jumpToSegment, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
   renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
 import { renderThinking } from "./calls.js";
+import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
+import { panelName, PANELS, readRoute, setRoute, tabName, TABS, type Route } from "./router.js";
 import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
 
 let st: State = emptyState();
@@ -28,10 +30,12 @@ function schedule() {
     const all = dirty.has("session");
     if (all || dirty.has("session")) {
       renderSession(st);
+      syncPlayer(st);
+      followState();
       if (isOpen("dlg-recordings")) void renderRecordings(st);
     }
     if (all || dirty.has("health")) { renderHealth(st); renderClock(nowMs()); }
-    if (all || dirty.has("transcript") || dirty.has("speakers")) renderTranscript(st);
+    if (all || dirty.has("transcript") || dirty.has("speakers")) { renderTranscript(st); refreshFollow(); }
     if (all || dirty.has("timeline") || dirty.has("transcript")) drawTimeline();
     if (all || dirty.has("speakers") || dirty.has("stats")) { renderSpeakers(st); renderFilters(st, onFilter); }
     if (all || dirty.has("claims")) renderClaims(st);
@@ -58,8 +62,9 @@ function drawTimeline() {
 
 const isOpen = (id: string) => !!$<HTMLDialogElement>(`#${id}`)?.open;
 
-/** Renders a settings dialog's content just before it opens. */
+/** Renders a settings dialog's content just before it opens, and puts it in the URL. */
 function onOpen(id: string) {
+  setRoute({ panel: panelName(id) });
   if (id === "dlg-recordings") void renderRecordings(st);
   if (id === "dlg-labels") renderLabels(st);
 }
@@ -84,7 +89,7 @@ async function reload() {
 async function loadCalls(target: State) {
   if (!target.session) return;
   try {
-    const [s1, s2] = await Promise.all([api.calls("s1", 1000), api.calls("s2", 200)]);
+    const [s1, s2] = await Promise.all([api.calls("s1", 3000), api.calls("s2", 200)]);
     if (target !== st) return; // a newer session took over meanwhile
     const rows = [...(s1.rows as CallRow[]), ...(s2.rows as CallRow[])].sort((a, b) => a.at.localeCompare(b.at));
     for (const r of rows) addCall(st, r);
@@ -95,10 +100,14 @@ async function loadCalls(target: State) {
   } catch { /* an older server has no /api/calls */ }
 }
 
+let showPane: (paneId: string) => void = () => {};
+
 /** Right column tabs: Fact-check, Fast · slow thinking, Jev log. */
 function bindTabs() {
   const tabs = [...document.querySelectorAll<HTMLButtonElement>(".tabs .tab")];
+  showPane = (paneId) => { const t = tabs.find((x) => x.dataset.pane === paneId); if (t) show(t); };
   const show = (tab: HTMLButtonElement) => {
+    setRoute({ tab: tabName(tab.dataset.pane!) });
     for (const t of tabs) {
       t.setAttribute("aria-selected", String(t === tab));
       $(`#${t.dataset.pane}`)!.hidden = t !== tab;
@@ -109,10 +118,65 @@ function bindTabs() {
     schedule();
   };
   for (const t of tabs) t.addEventListener("click", () => show(t));
+  // the URL's tab wins over the one remembered in the browser
+  const fromUrl = readRoute().tab;
+  let saved: HTMLButtonElement | undefined;
+  try { saved = tabs.find((t) => t.dataset.pane === (fromUrl ? TABS[fromUrl] : localStorage.getItem("pa.rightTab"))); } catch { /* storage may be unavailable */ }
+  if (saved) show(saved);
+}
+
+// ---------- the URL (see router.ts) ----------
+
+/** False until the URL opened the page has been applied, and while Back or Forward is being applied. */
+let routeReady = false;
+
+/** The URL follows what is on screen: a recording opened or left (history entries), or a session ending as one. */
+function followState() {
+  if (!routeReady) return;
+  const recording = st.session?.status === "archived" ? st.session.id : null;
+  if (readRoute().recording !== recording) setRoute({ recording }, true);
+}
+
+/** Makes the screen match a URL: on load, or after Back and Forward. */
+async function applyRoute(r: Route, why: "load" | "history") {
+  routeReady = false;
   try {
-    const saved = tabs.find((t) => t.dataset.pane === localStorage.getItem("pa.rightTab"));
-    if (saved) show(saved);
-  } catch { /* storage may be unavailable */ }
+    const cur = st.session;
+    const onAir = !!cur && (cur.status === "running" || cur.status === "ending");
+    if (r.recording && cur?.id !== r.recording) {
+      if (onAir) {
+        toast("A session is on air, so it is shown instead of the recording.");
+        setRoute({ recording: null });
+      } else {
+        try {
+          await api.openSession(r.recording);
+          await reload();
+        } catch (e) {
+          toast(`Recording ${r.recording} could not be opened: ${e instanceof Error ? e.message : String(e)}`);
+          setRoute({ recording: null });
+        }
+      }
+    } else if (!r.recording && cur?.status === "archived") {
+      // Back to "/" leaves the recording; loading "/" while one is shown makes the URL say so instead
+      if (why === "history") { await api.closeView(); await reload(); }
+      else setRoute({ recording: cur.id });
+    }
+    if (r.tab) showPane(TABS[r.tab]!);
+    else if (why === "history") showPane("pane-fc");
+    for (const [name, id] of Object.entries(PANELS)) {
+      const d = $<HTMLDialogElement>(`#${id}`);
+      if (!d) continue;
+      if (name === r.panel && !d.open) { onOpen(id); d.showModal(); }
+      else if (name !== r.panel && d.open) d.close();
+    }
+    if (r.recording && r.t !== null && st.session?.status === "archived") {
+      syncPlayer(st); // make sure the audio exists before seeking
+      seek(r.t);
+    }
+  } finally {
+    routeReady = true;
+    followState();
+  }
 }
 
 function connect() {
@@ -148,6 +212,12 @@ function connect() {
 bindControls(onOpen, () => void reload());
 bindSessionName(() => st, () => { dirty.add("session"); schedule(); });
 bindSplit();
+bindPlayer();
+setTimeClick(seek);
+setPositionListener((ms) => { if (st.session?.status === "archived") setRoute({ t: ms }); });
+// a settings window closing takes `?panel=` out of the URL
+for (const id of Object.values(PANELS)) $<HTMLDialogElement>(`#${id}`)?.addEventListener("close", () => { if (readRoute().panel === panelName(id)) setRoute({ panel: null }); });
+window.addEventListener("popstate", () => void applyRoute(readRoute(), "history"));
 bindTabs();
 void checkEngine();
 setInterval(() => void checkEngine(), 15_000);
@@ -155,6 +225,7 @@ bindTimeline(() => { dirty.add("timeline"); schedule(); });
 renderLegend($("#legend"));
 void loadDevices();
 await reload();
+await applyRoute(readRoute(), "load");
 connect();
 window.addEventListener("resize", () => { dirty.add("timeline"); schedule(); });
 setInterval(() => {

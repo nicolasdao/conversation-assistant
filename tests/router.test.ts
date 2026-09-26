@@ -1,0 +1,25 @@
+import { describe, expect, test } from "vitest";
+import { buildUrl, parseTime, readRoute } from "../web/src/router.ts";
+
+const at = (url: string) => { const u = new URL(url, "http://x"); return readRoute({ pathname: u.pathname, search: u.search }); };
+
+describe("the page's URLs", () => {
+  test("a recording, its playback position, tab, and settings window", () => {
+    expect(at("/recordings/20260925-202620?t=58:27&tab=thinking&panel=speakers")).toEqual(
+      { recording: "20260925-202620", t: (58 * 60 + 27) * 1000, tab: "thinking", panel: "speakers" });
+    expect(at("/")).toEqual({ recording: null, t: null, tab: null, panel: null });
+    // a position means nothing without a recording; unknown tabs and windows are ignored
+    expect(at("/?t=1:00&tab=nope&panel=nope")).toEqual({ recording: null, t: null, tab: null, panel: null });
+    expect(at("/recordings/../etc")).toMatchObject({ recording: null });
+  });
+
+  test("round trip, with readable times", () => {
+    expect(buildUrl({ recording: "20260925-202620", t: 5_261_000, tab: "jev-log", panel: null })).toBe("/recordings/20260925-202620?t=1:27:41&tab=jev-log");
+    expect(buildUrl({ recording: null, t: 90_000, tab: "fact-check", panel: "recordings" })).toBe("/?panel=recordings");
+    expect(parseTime("83")).toBe(83_000);
+    expect(parseTime("1:02:03")).toBe(3_723_000);
+    expect(parseTime("x")).toBeNull();
+    const url = "/recordings/abc?t=12:34&tab=thinking&panel=log";
+    expect(buildUrl(at(url))).toBe(url);
+  });
+});

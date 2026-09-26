@@ -13,10 +13,11 @@ const clone = <T>(v: T): T => structuredClone(v);
 
 // ---------- helpers ----------
 
-function ans(o: { claim?: number; type?: string; worth?: number; hedged?: number; [k: string]: number | string | undefined }): Record<string, JevAnswer> {
+function ans(o: { claim?: number; type?: string; worth?: number; hedged?: number; public?: number; [k: string]: number | string | undefined }): Record<string, JevAnswer> {
   const a: Record<string, JevAnswer> = {
     claim: { type: "noul", noul: o.claim ?? 0 },
     claim_type: { type: "choice", choice: o.type ?? "none", confidence: 1, probabilities: {} },
+    public: { type: "noul", noul: o.public ?? 0.9 },
     worth: { type: "score", score: o.worth ?? 0, confidence: 1, probabilities: {} },
     hedged: { type: "noul", noul: o.hedged ?? 0 },
   };
@@ -87,6 +88,17 @@ describe("System 1: flag rule, priority, memory", () => {
     expect(flagDecision(ans({ ...FLAG, worth: 1.5 }), v, 0.6).flag).toBe(true);
   });
 
+  test("a concrete claim about the speakers' private lives is not flagged", () => {
+    const v = cfg.s1;
+    expect(flagDecision(ans({ ...FLAG, type: "event", public: 0.1 }), v, 0.6).flag).toBe(false);
+    expect(flagDecision(ans({ ...FLAG, public: 0.59 }), v, 0.6).flag).toBe(false);
+    expect(flagDecision(ans({ ...FLAG, public: 0.6 }), v, 0.6)).toMatchObject({ flag: true, public: 0.6 });
+    // a set from before the question existed does not gate on it
+    const old = clone(cfg.s1) as any;
+    delete old.questions.public;
+    expect(flagDecision(ans({ ...FLAG, public: 0 }), old, 0.6).flag).toBe(true);
+  });
+
   test("priority adds hedging and attention", () => {
     const v = clone(cfg.s1) as any;
     v.questions.attention_1 = { type: "noul", instructions: "about AI pricing" };
@@ -119,7 +131,7 @@ describe("System 1: flag rule, priority, memory", () => {
     h.say("claim two", ans(FLAG));
     h.say("claim three", ans(FLAG));
     const q = h.fc.questions();
-    expect(Object.keys(q.questions)).toEqual(["claim", "claim_type", "hedged", "worth", "known_c_2", "known_c_3"]);
+    expect(Object.keys(q.questions)).toEqual(["claim", "claim_type", "public", "hedged", "worth", "known_c_2", "known_c_3"]);
     expect(q.questions.known_c_3).toEqual({
       type: "noul",
       instructions: 'Judge only new_utterance. It restates or relies on this already-checked claim: "claim three"',
@@ -399,7 +411,7 @@ describe("feedback loop: audits, rewrites, gate", () => {
     };
     const promote = await runGate(cfg.s1, items, { ask, hedgedThreshold: 0.6 });
     expect(promote).toMatchObject({ G: 2, F: 1, M: 0, G2: 2, F2: 0, promote: true });
-    expect(Object.keys(seen[0])).toEqual(["claim", "claim_type", "hedged", "worth"]);
+    expect(Object.keys(seen[0])).toEqual(["claim", "claim_type", "public", "hedged", "worth"]);
     const reject = await runGate(cfg.s1, items, { ask: async (s, q, m) => ({ ...(await ask(s, q, m)), answers: ans(FLAG) }), hedgedThreshold: 0.6 });
     expect(reject).toMatchObject({ G2: 2, F2: 1, promote: false });
   });
