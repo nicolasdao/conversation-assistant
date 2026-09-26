@@ -1,11 +1,12 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-export type Bucket = "transcription" | "jev" | "s2";
+/** `chat` has its own cap per recording (chat.capUsd), so the session cap counts only the pipeline's buckets. */
+export type Bucket = "transcription" | "jev" | "s2" | "chat";
 
 /** Call rows whose cost_usd counts toward the dev total. Events and totals never do: they would count a cost twice. */
 // deleted_session: the spend of a recording deleted from the library, kept so deleting cannot lower the development total
-const CALL_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription", "deleted_session"]);
+const CALL_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription", "chat_call", "deleted_session"]);
 
 export class BudgetExhaustedError extends Error {
   constructor(readonly cap: "session" | "dev" | "provider", message: string) {
@@ -13,7 +14,7 @@ export class BudgetExhaustedError extends Error {
   }
 }
 
-export interface CostTotals { transcription: number; jev: number; s2: number; session: number; dev: number }
+export interface CostTotals { transcription: number; jev: number; s2: number; chat: number; session: number; dev: number }
 
 export interface BudgetOptions {
   sessionCapUsd: number;
@@ -28,21 +29,23 @@ export interface BudgetOptions {
 
 /** The one spending ledger for the whole process (§4.6). Every external call: assertCanSpend before, record after. */
 export class Budget {
-  private readonly spent: Record<Bucket, number> = { transcription: 0, jev: 0, s2: 0 };
+  private readonly spent: Record<Bucket, number> = { transcription: 0, jev: 0, s2: 0, chat: 0 };
   private exhausted: BudgetExhaustedError | null = null;
 
   constructor(private readonly opts: BudgetOptions) {}
 
   totals(): CostTotals {
-    const session = this.spent.transcription + this.spent.jev + this.spent.s2;
+    const session = this.spent.transcription + this.spent.jev + this.spent.s2 + this.spent.chat;
     return { ...this.spent, session, dev: this.opts.devSpentUsd + session };
   }
 
   assertCanSpend(purpose: string): void {
     if (this.exhausted) throw this.exhausted;
     const t = this.totals();
-    if (t.session >= this.opts.sessionCapUsd) {
-      this.exhaust("session", purpose, `session spend $${t.session.toFixed(4)} reached the cap of $${this.opts.sessionCapUsd}`);
+    // chat spend shows in the session's total but never stops the pipeline: it has its own cap
+    const pipeline = t.session - t.chat;
+    if (pipeline >= this.opts.sessionCapUsd) {
+      this.exhaust("session", purpose, `session spend $${pipeline.toFixed(4)} reached the cap of $${this.opts.sessionCapUsd}`);
     }
     if (this.opts.enforceDevCap && t.dev >= this.opts.devCapUsd) {
       this.exhaust("dev", purpose, `development spend $${t.dev.toFixed(4)} reached the cap of $${this.opts.devCapUsd}`);

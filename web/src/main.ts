@@ -7,6 +7,8 @@ import {
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
 import { renderThinking } from "./calls.js";
+import { bindChat, chatOpened, openChat, renderChat } from "./chat.js";
+import { bindBespoke } from "./ui.js";
 import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
 import { panelName, PANELS, readRoute, setRoute, tabName, TABS, type Route } from "./router.js";
 import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
@@ -45,6 +47,7 @@ function schedule() {
     if (all || dirty.has("stats")) renderStats(st);
     if (all || dirty.has("errors")) renderErrors(st);
     if (all || dirty.has("calls") || dirty.has("claims")) renderThinking(st);
+    if (all || dirty.has("session") || dirty.has("transcript")) renderChat(st);
     renderMenu(st);
     dirty.clear();
   });
@@ -67,6 +70,7 @@ function onOpen(id: string) {
   setRoute({ panel: panelName(id) });
   if (id === "dlg-recordings") void renderRecordings(st);
   if (id === "dlg-labels") renderLabels(st);
+  if (id === "dlg-chat") chatOpened();
 }
 
 function onFilter() {
@@ -101,6 +105,22 @@ async function loadCalls(target: State) {
 }
 
 let showPane: (paneId: string) => void = () => {};
+
+/**
+ * A time cited in a chat reply: a recording plays from there (the chat stays open, to read on while listening);
+ * on air, the chat closes and the transcript scrolls to that line.
+ */
+function jumpToTime(ms: number) {
+  if (st.session?.status === "archived") return seek(ms);
+  $<HTMLDialogElement>("#dlg-chat")?.close();
+  const lines = [...document.querySelectorAll<HTMLElement>("#transcript .utt[data-start]")];
+  const line = lines.filter((u) => Number(u.dataset.start) <= ms + 999).at(-1) ?? lines[0];
+  if (!line) return;
+  line.scrollIntoView({ behavior: "smooth", block: "center" });
+  line.classList.remove("flash");
+  void line.offsetWidth;
+  line.classList.add("flash");
+}
 
 /** Right column tabs: Fact-check, Fast · slow thinking, Jev log. */
 function bindTabs() {
@@ -218,6 +238,9 @@ setPositionListener((ms) => { if (st.session?.status === "archived") setRoute({ 
 // a settings window closing takes `?panel=` out of the URL
 for (const id of Object.values(PANELS)) $<HTMLDialogElement>(`#${id}`)?.addEventListener("close", () => { if (readRoute().panel === panelName(id)) setRoute({ panel: null }); });
 window.addEventListener("popstate", () => void applyRoute(readRoute(), "history"));
+bindBespoke();
+bindChat({ onTime: jumpToTime });
+$("#chat-btn")?.addEventListener("click", () => openChat());
 bindTabs();
 void checkEngine();
 setInterval(() => void checkEngine(), 15_000);

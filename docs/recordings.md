@@ -28,12 +28,13 @@ Every session — live or replay — is kept as one folder of plain files. There
 | `segments.jsonl`, `labels.jsonl`, `claims.jsonl`, `verdicts.jsonl`, `s1_versions.jsonl`, `audits.jsonl` | Pipeline results |
 | `speakers.json` | Final speaker list, written at session end |
 | `meta.json` | Library metadata: `name`, `notes` (only if set) |
+| `chats.jsonl` | The chat window's chats, messages, and calls with cost — written live and after the recording ended, since a recording can be chatted about (see [Chat](chat.md)) |
 
 The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the call rows in all of these folders, plus `sessions/deleted-spend.jsonl`: deleting a recording first appends its total there (`kind: "deleted_session"`), so deleting cannot lower the development total. Keys are redacted from every file and event.
 
 ## The library — `src/store/library.ts`
 
-`SessionLibrary` scans `sessions/` for folders with a `session.json`. Folders prefixed `smoke-`, `preflight-`, or `dev-` are hidden unless `includeTools` (`?all=1`) is set. Each recording is summarised from its files: name, notes, mode, start time, duration (from WAV size), whether `session.ended` was recorded, utterance count, speakers (from `speakers.json`, else from speaker events), segments, claims, and total cost. Summaries are cached per folder and recomputed when `events.jsonl`, `meta.json`, or `speakers.json` changes.
+`SessionLibrary` scans `sessions/` for folders with a `session.json`. Folders prefixed `smoke-`, `preflight-`, or `dev-` are hidden unless `includeTools` (`?all=1`) is set. Each recording is summarised from its files: name, notes, mode, start time, duration (from WAV size), whether `session.ended` was recorded, utterance count, speakers (from `speakers.json`, else from speaker events), segments, claims, and total cost (also by bucket: transcription, Jev, System 2, chat). Summaries are cached per folder and recomputed when `events.jsonl`, `meta.json`, `speakers.json`, or `chats.jsonl` changes.
 
 - **Search** (`list({ q })`) is case-insensitive. A recording matches when every word appears in its metadata (name, notes, id, speaker names), or every word appears in one single utterance; a word in the name plus another in a transcript line does not match. up to 5 matching lines are returned per recording as `{ utteranceId, startMs, speaker, snippet }`.
 - **Names and notes** are written to `meta.json`, never to the append-only files. An empty string clears the field. Names are limited to 120 characters and notes to 4,000.
@@ -45,7 +46,7 @@ The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the 
 | --- | --- | --- |
 | What happens | The recorded `events.jsonl` is loaded into the event bus (`EventBus.load`) and the page rebuilds the session from it | The session's WAVs run through the whole pipeline again as a new session |
 | API calls | None — free | All of them: transcription, Jev, System 2, and live text at speed 1 — about the original session's cost again (more than a `--speed max` replay, which skips live text) |
-| Editable | Speakers only: rename and merge are saved into the recording (below); every other command returns 409 | Yes, like any session |
+| Editable | Speakers (rename and merge are saved into the recording, below) and chats about it ([Chat](chat.md)); every other command returns 409 | Yes, like any session |
 | Result | Exactly what was seen at the time | A new session folder; answers can differ (Jev and GPT-6 Luna are not deterministic) |
 
 Renaming or merging a speaker on an open recording appends the `speaker.updated` or `speaker.merged` event to its `events.jsonl` (append-only, like every other event) and applies it to `speakers.json`, so the page updates at once, the library lists the new names, and reopening replays the edit. Search snippets show each line's speaker by their current name.

@@ -24,9 +24,10 @@
         "License",
         "Versioning"
       ],
-      "line_count": 102,
+      "line_count": 103,
       "links_to": [
         "docs/architecture.md",
+        "docs/chat.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
@@ -62,8 +63,9 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 161,
+      "line_count": 173,
       "links_to": [
+        "docs/chat.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
@@ -103,6 +105,49 @@
     },
     {
       "dangling": false,
+      "description": "The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.",
+      "has_frontmatter": true,
+      "headings": [
+        "Chat",
+        "How a chat keeps up with a live transcript",
+        "Models — `config/app.json` `chat`",
+        "Storage — `chats.jsonl`",
+        "Cost",
+        "API",
+        "The page — `web/src/chat.ts`, `web/src/markdown.ts`"
+      ],
+      "line_count": 153,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/mission.md",
+        "docs/recordings.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/chat.md",
+      "source": [
+        "src/chat/**",
+        "web/src/chat.ts",
+        "web/src/markdown.ts"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "chat",
+        "openrouter",
+        "llm",
+        "transcript",
+        "cost",
+        "api",
+        "web"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
       "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.",
       "has_frontmatter": true,
       "headings": [
@@ -111,10 +156,11 @@
         "sherpa-onnx",
         "OpenAI",
         "OpenRouter and GPT-6 Luna",
+        "Chat",
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 47,
+      "line_count": 52,
       "links_to": [],
       "over_size": false,
       "parse_error": null,
@@ -206,6 +252,7 @@
       "line_count": 49,
       "links_to": [
         "docs/architecture.md",
+        "docs/chat.md",
         "docs/jev.md",
         "docs/recordings.md",
         "docs/rehearsal.md",
@@ -239,9 +286,10 @@
         "Open vs Replay",
         "API"
       ],
-      "line_count": 74,
+      "line_count": 75,
       "links_to": [
         "docs/architecture.md",
+        "docs/chat.md",
         "docs/rehearsal.md",
         "docs/transcription.md"
       ],

@@ -4,7 +4,10 @@ import type { AppEvent } from "./events.ts";
 
 /** Folders written by tools, not recordings: hidden from the library unless asked for. */
 const TOOL_PREFIXES = ["smoke-", "preflight-", "dev-"];
-const COST_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription"]);
+const COST_KINDS = new Set(["jev_call", "s2_call", "transcription", "live_transcription", "chat_call"]);
+/** Which file's call rows make up each cost bucket. */
+const COST_FILES = { transcription: "transcriptions", jev: "jev_calls", s2: "s2_calls", chat: "chats" } as const;
+export type CostBreakdown = Record<keyof typeof COST_FILES, number>;
 
 export interface SessionMeta { name?: string; notes?: string }
 
@@ -23,6 +26,8 @@ export interface SessionSummary {
   segments: number;
   claims: number;
   costUsd: number;
+  /** costUsd by bucket; `chat` keeps growing after the recording ended, as the host asks about it. */
+  cost: CostBreakdown;
   tool: boolean;
 }
 
@@ -90,6 +95,7 @@ export class SessionLibrary {
       existsSync(eventsPath) ? statSync(eventsPath).mtimeMs : 0,
       existsSync(metaPath) ? statSync(metaPath).mtimeMs : 0,
       existsSync(join(dir, "speakers.json")) ? statSync(join(dir, "speakers.json")).mtimeMs : 0,
+      existsSync(join(dir, "chats.jsonl")) ? statSync(join(dir, "chats.jsonl")).mtimeMs : 0,
     );
     const hit = this.cache.get(id);
     if (hit && hit.mtimeMs === mtimeMs) return hit;
@@ -118,15 +124,16 @@ export class SessionLibrary {
       const p = join(dir, `${s}.wav`);
       if (existsSync(p)) durationMs = Math.max(durationMs, ((statSync(p).size - 44) / 32_000) * 1000);
     }
-    let costUsd = 0;
-    for (const f of ["jev_calls", "s2_calls", "transcriptions"]) {
-      for (const r of readJsonl(join(dir, `${f}.jsonl`))) if (COST_KINDS.has(r.kind) && typeof r.cost_usd === "number") costUsd += r.cost_usd;
+    const cost: CostBreakdown = { transcription: 0, jev: 0, s2: 0, chat: 0 };
+    for (const [bucket, f] of Object.entries(COST_FILES) as [keyof CostBreakdown, string][]) {
+      for (const r of readJsonl(join(dir, `${f}.jsonl`))) if (COST_KINDS.has(r.kind) && typeof r.cost_usd === "number") cost[bucket] += r.cost_usd;
     }
+    const costUsd = cost.transcription + cost.jev + cost.s2 + cost.chat;
     const summary: SessionSummary = {
       id, dir, name: meta.name?.trim() || null, notes: meta.notes?.trim() || null,
       mode: session.mode === "live" || session.mode === "replay" ? session.mode : "unknown",
       startedAt: session.startedAt ?? null, durationMs: Math.round(durationMs), streams: session.streams ?? [],
-      ended, utterances: utterances.length, speakers, segments, claims, costUsd, tool: TOOL_PREFIXES.some((p) => id.startsWith(p)),
+      ended, utterances: utterances.length, speakers, segments, claims, costUsd, cost, tool: TOOL_PREFIXES.some((p) => id.startsWith(p)),
     };
     const entry = { mtimeMs, summary, utterances, recorded };
     this.cache.set(id, entry);
@@ -229,6 +236,22 @@ export class SessionLibrary {
     this.cache.delete(id);
   }
 
+  /**
+   * The recording's transcript for the chat window, in the order the lines arrived (which is the order a live session
+   * sent them in), with each speaker's current name. Fillers are left out.
+   */
+  transcript(id: string): { id: string; startMs: number; speakerId: string; speaker: string; text: string }[] {
+    this.dirOf(id);
+    const { utterances, recorded } = this.load(id);
+    return utterances
+      .map((e) => e.data as any)
+      .filter((d) => !d.filler && typeof d.text === "string" && d.text.trim())
+      .map((d) => ({
+        id: d.id, startMs: d.startMs, speakerId: d.speakerId, text: d.text,
+        speaker: recorded.names.get(resolveRecorded(recorded, d.speakerId)) ?? d.speakerName,
+      }));
+  }
+
   /** A recording's folder and the voice limits it ran with (`voices` in session.json; absent before they existed). */
   voicesOf(id: string): { dir: string; voices: Partial<Record<"host" | "remote", number>> | null } {
     const dir = this.dirOf(id);
@@ -269,7 +292,7 @@ export class SessionLibrary {
       session: { id, mode: s.mode, status: "archived", dir, startedAt: s.startedAt, streams: s.streams, name: s.name },
       labels: session.labelSet ? { set: session.labelSet, stories: session.config?.timeline?.stories ?? [], version: session.labelSetVersion ?? "" } : undefined,
       s1: { active: session.s1Version ?? "s1@1", versions: [], memory: [] },
-      cost: { transcription: 0, jev: 0, s2: 0, session: s.costUsd, sessionCapUsd: session.config?.budget?.sessionCapUsd ?? 5 },
+      cost: { ...s.cost, session: s.costUsd, sessionCapUsd: session.config?.budget?.sessionCapUsd ?? 5 },
       archived: true,
     };
   }

@@ -35,7 +35,7 @@ The project will be open-sourced under the BSD 3-Clause license (Cloudless Consu
 
 ## Non-goals
 
-- Answering questions about the transcript after the fact: an LLM already does that well, and it would undercut the thesis. "When did we talk about X?" is a filter over existing labels.
+- Transcript Q&A as part of the demonstration: an LLM already does that well, so it proves nothing about Jev. The [Chat](chat.md) tab exists as a tool for the host (added 26 September 2026), kept apart from System 1 and System 2 and never used for a judgment Jev makes. "When did we talk about X?" stays a filter over existing labels.
 - An LLM writing or changing timeline labels, or a live System 2 on the timeline.
 - Fixed-interval chunking of audio.
 - Using Jev for anything code does exactly.

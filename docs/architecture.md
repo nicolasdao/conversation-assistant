@@ -102,6 +102,7 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | GET | `/api/about` | The project's name, version (the root `package.json`'s `version`, the only place it lives), and license (`id`, `holder`, and the `LICENSE` text); the page shows them in the settings menu's footer, the license opening in a window |
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
+| GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
 
 It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/`.
 
@@ -111,7 +112,7 @@ Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, r
 
 The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
-- **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover; for an opened recording, labelled Cost: what that recording cost when it ran), and the controls: microphone picker, how many people are on the call (1–4 or Any, sent with Start live and replays and remembered in the browser; see [Speakers](speakers.md)), Start live, Pause / Resume (live sessions), Stop, a replay popover (folder and 1× / max speed), and a settings cog.
+- **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover, chat included; for an opened recording, labelled Cost: what that recording cost when it ran, plus any chats about it), and the controls: microphone picker, how many people are on the call (1–4 or Any, sent with Start live and replays and remembered in the browser; see [Speakers](speakers.md)), Start live, Pause / Resume (live sessions), Stop, then **Chat** (an accent-outlined icon button, ⌘K; see [Chat](chat.md)), a replay popover (folder and 1× / max speed), and a settings cog.
 - **Transcript and fact-checks (two columns)**, split by a divider you can drag (25–75 %, arrow keys too; double-click resets; the split is remembered in the browser):
   - the transcript, caption style, with segment dividers, live text, filters (markers, speaker, subject), and click-to-rename; a speaker's name tag appears once per run of consecutive lines, and inferred speakers show as a muted "name *";
   - the right column has three tabs. **Fact-check**: a solid verdict block (False, Supported, Misleading…, or Queued / Checking / Dropped), queued → researching → verdict steps, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; a tally of verdicts sits in the column header, and the most recently active card is on top.
@@ -125,18 +126,29 @@ The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Ba
   | `/recordings/<id>` | That recording, opened read-only |
   | `?t=1:23:45` | The playback position in a recording (kept current on seeks, on pause, and every 5 s while playing) |
   | `?tab=thinking` · `?tab=jev-log` | The right column's tab (Fact-check is the default) |
-  | `?panel=recordings` · `speakers` · `system-1` · `labels` · `stats` · `log` | The settings window that is open |
+  | `?panel=recordings` · `speakers` · `system-1` · `labels` · `stats` · `log` · `chat` | The window that is open |
+  | `?panel=chat&chat=chat_2` | A chat of the session on screen ([Chat](chat.md)) |
 
   The URL follows the screen: opening or leaving a recording, or a session ending as one, adds a history entry; tabs, windows, and the position update it silently. Opening a URL makes the screen match: on load it opens the recording it names (unless a session is on air, which is shown instead, with a message), and Back to `/` leaves the recording (`POST /api/sessions/close`). Loading `/` while the engine shows a recording puts that recording in the URL rather than closing it. Transcript filters, timeline zoom, and column and timeline sizes are browser preferences, not part of the URL.
 - **Playback (recordings only, never on air):** a play/pause button, a speed picker (1×, 1.25×, 1.5×, 2×, 3×, 4×; voices keep their pitch), a volume boost (100–300 %, remembered in the browser), and the position, in the timeline's header (`web/src/player.ts`). The timeline is the progress bar: a yellow playhead moves with the audio and stays in view when zoomed; clicking the timeline outside segments and markers seeks there, and clicking a segment or marker seeks to its start. Every transcript timestamp becomes a button that plays from that line. Every jump, from either side, moves both at once, playing or paused: the transcript scrolls to the line at that time and the timeline brings the playhead into view. While playing, the line being heard is highlighted and kept centred, unless the reader scrolled in the last 4 s. Space plays and pauses. The audio is the recording's two streams mixed by the server (see [Recordings](recordings.md)).
 - **Timeline (bottom, full width):** HTML lanes positioned in percent of the session length, with an inline-SVG heat and hype chart: section brackets, the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines on 0–4, marker pins (disagreement, hot take, prediction, recommendation, clip-worthy, humour), a dashed "in progress" block for the open segment, hatched paused stretches, the axis, and a now line. Faded labels are dimmed; clicking a segment or marker jumps to the transcript. A dotted line follows the pointer with the exact time. Zoom with − / + / Fit or ⌘/Ctrl + scroll (a trackpad pinch), from the whole session down to about 30 s across; zoomed in, the strip scrolls sideways (the wheel scrolls through time), segment labels stay in view, axis ticks adapt to the zoom, and a live session stays pinned to the newest moment while scrolled to the end. Dragging the strip's top edge (or its arrow keys) makes the heat · hype chart taller or shorter; double-click resets it, and the height is remembered in the browser.
 - **Settings (the cog menu), each in a modal:** Recordings, System 1 (active version, counters, last promotion or rejection with its gate, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log.
+- **Chat**, a large modal from the header: questions about the transcript to any curated OpenRouter model, like ChatGPT with the transcript as its only attachment (see [Chat](chat.md)).
 
-Renames, merges, disputes, and replay confirmations use an in-page dialog rather than the browser's `prompt()` and `confirm()`, so they read well on a shared screen. The page is laid out to be legible when shared as a window in Riverside at 1280 × 720.
+**Every control is bespoke; none is the browser's own.**
+
+- Renames, merges, disputes, deletes, and replay confirmations use an in-page dialog rather than the browser's `prompt()` and `confirm()`, so they read well on a shared screen.
+- `web/src/ui.ts` upgrades every `<select>` on the page, including ones rendered later (a `MutationObserver` watches the page), into a styled button and listbox.
+  - Keyboard: ↑ ↓, Home, End, Enter, Space, Esc, and type-to-jump.
+  - The native select stays in the DOM, hidden, as the source of truth. Page code keeps using a plain `<select>`: it reads and sets `.value`, replaces `<option>`s, and listens for `change`.
+- `title` attributes show as styled tooltips instead of the browser's own. The text moves to `data-tip` and `aria-description` on first hover or keyboard focus.
+- Text fields get `autocomplete="off"`, so no browser autofill dropdown appears.
+- The Jev log's folded prompt draws its own caret.
+- Lists and tooltips are top-layer popovers, so they show above modals. The page is laid out to be legible when shared as a window in Riverside at 1280 × 720.
 
 ## Budgets — `src/budget.ts`
 
-One ledger per session, plus the development total read from `sessions/**/*.jsonl` when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in three buckets (`transcription` — final and live, `jev`, `s2`), which drive the `cost` event.
+One ledger per session, plus the development total read from `sessions/**/*.jsonl` when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in four buckets (`transcription` — final and live, `jev`, `s2`, `chat`), which drive the `cost` event. `chat` is in the session's total but not in the session cap's count: it has its own cap per recording, `chat.capUsd` ($2), so a chat never stops the pipeline (see [Chat](chat.md)).
 
 - **Session cap** (`budget.sessionCapUsd`, $10) — always enforced. It was $5 until 25 September 2026; raised so a long or busy show never stops mid-air.
 - **Development cap** (`budget.devCapUsd`, $3) — the total of `cost_usd` over call rows in `sessions/**/*.jsonl` (including `sessions/deleted-spend.jsonl`, which keeps the spend of deleted recordings), enforced by replays (including `serve --replay`) and `smoke`, not by live sessions or `preflight`. `--allow-over-dev-cap` lifts it.
@@ -148,7 +160,7 @@ One ledger per session, plus the development total read from `sessions/**/*.json
 
 | File | Holds |
 | --- | --- |
-| `config/app.json` | Server port, budgets, VAD, speakers, transcription (final and live), Jev client, segmentation, timeline, System 2, fact-check loop |
+| `config/app.json` | Server port, budgets, VAD, speakers, transcription (final and live), Jev client, segmentation, timeline, System 2, fact-check loop, chat |
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 
@@ -158,4 +170,4 @@ Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a `choice` with
 
 `npm test` runs offline: `tests/setup.ts` replaces `fetch` with a function that throws, and every client takes its `fetch` (or WebSocket) through its constructor so tests pass fakes. The suite covers audio and VAD on the fixture, speakers, transcription, live text, the Jev client's retry rules, the segmenter, the fact-checker loop and gate, the timeline, stats, the capture adapter (with a fake helper process), the HTTP API, the library, and an end-to-end session with fake services that also checks no API key reaches any file or event. `npm run smoke` and `npm run preflight` are the live checks.
 
-Related: [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md).
+Related: [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md), [Chat](chat.md).

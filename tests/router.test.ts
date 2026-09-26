@@ -6,10 +6,10 @@ const at = (url: string) => { const u = new URL(url, "http://x"); return readRou
 describe("the page's URLs", () => {
   test("a recording, its playback position, tab, and settings window", () => {
     expect(at("/recordings/20260925-202620?t=58:27&tab=thinking&panel=speakers")).toEqual(
-      { recording: "20260925-202620", t: (58 * 60 + 27) * 1000, tab: "thinking", panel: "speakers" });
-    expect(at("/")).toEqual({ recording: null, t: null, tab: null, panel: null });
+      { recording: "20260925-202620", t: (58 * 60 + 27) * 1000, tab: "thinking", panel: "speakers", chat: null });
+    expect(at("/")).toEqual({ recording: null, t: null, tab: null, panel: null, chat: null });
     // a position means nothing without a recording; unknown tabs and windows are ignored
-    expect(at("/?t=1:00&tab=nope&panel=nope")).toEqual({ recording: null, t: null, tab: null, panel: null });
+    expect(at("/?t=1:00&tab=nope&panel=nope")).toEqual({ recording: null, t: null, tab: null, panel: null, chat: null });
     expect(at("/recordings/../etc")).toMatchObject({ recording: null });
   });
 
@@ -21,5 +21,12 @@ describe("the page's URLs", () => {
     expect(parseTime("x")).toBeNull();
     const url = "/recordings/abc?t=12:34&tab=thinking&panel=log";
     expect(buildUrl(at(url))).toBe(url);
+  });
+
+  test("a chat, only with the chat window open", () => {
+    expect(at("/?panel=chat&chat=chat_3")).toMatchObject({ panel: "chat", chat: "chat_3" });
+    expect(at("/?panel=log&chat=chat_3").chat).toBeNull();
+    expect(at("/?panel=chat&chat=../x").chat).toBeNull();
+    expect(buildUrl(at("/recordings/abc?tab=thinking&panel=chat&chat=chat_3"))).toBe("/recordings/abc?tab=thinking&panel=chat&chat=chat_3");
   });
 });

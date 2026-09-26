@@ -24,6 +24,7 @@
       <symbol id="g-replay" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.6 1.8v3.4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="g-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" fill="currentColor"/><rect x="9.5" y="2.5" width="3" height="11" fill="currentColor"/></symbol>
       <symbol id="g-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></symbol>
+      <symbol id="g-chat" viewBox="0 0 16 16"><path d="M2 2.5h12v8.2H7.2L3.8 13.6v-2.9H2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M5 5.6h6M5 8h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
       <symbol id="g-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.8 6.5v4.5M9.2 6.5v4.5" stroke="currentColor" stroke-width="1.4"/></symbol>
     </defs>
   </svg>
@@ -51,6 +52,8 @@
         <button id="start-live" class="btn primary">Start live</button>
         <button id="pause" class="btn pause" hidden aria-pressed="false">Pause</button>
         <button id="stop" class="btn stop" disabled>Stop</button>
+        <span class="vsep"></span>
+        <button id="chat-btn" class="btn chat-btn" title="Chat about the transcript (⌘K)" aria-haspopup="dialog"><svg class="g"><use href="#g-chat"/></svg><span class="lbl">Chat</span><i class="dot" hidden></i></button>
         <button id="replay-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Replay a folder"><svg class="g"><use href="#g-replay"/></svg></button>
         <button id="cog-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Settings"><svg><use href="#g-cog"/></svg></button>
 
@@ -179,6 +182,11 @@
   <dialog id="dlg-log" aria-labelledby="h-lg">
     <div class="dlg-head"><h2 id="h-lg">Log</h2><span class="sub">Last 30 errors</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="errors" class="dlg-body"></div>
+  </dialog>
+
+  <dialog id="dlg-chat" class="chat-dlg" aria-labelledby="h-chat">
+    <div class="dlg-head"><h2 id="h-chat">Chat</h2><span id="chat-sub" class="sub">Ask about the transcript</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="chat" class="chat"></div>
   </dialog>
 
   <dialog id="dlg-license" aria-labelledby="h-license">

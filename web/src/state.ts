@@ -29,7 +29,7 @@ export interface Claim {
 export interface Health { rmsDbfs: number; msSinceLastFrame: number; utterancesLastMinute: number; receivedAt: number; lastSoundAt: number; detail?: any }
 export interface S1Version { id: string; parent: string | null; status: string; kind: string; rationale: string; gate: any; errors: string[] | null }
 export interface S1Outcome { active: string; candidate: string | null; outcome: string; rationale: string; gate: any; errors: string[] | null; at: string }
-export interface Cost { transcription: number; jev: number; s2: number; session: number; sessionCapUsd: number }
+export interface Cost { transcription: number; jev: number; s2: number; chat?: number; session: number; sessionCapUsd: number }
 export interface LabelQuestion { type: "noul" | "choice" | "score"; instructions: string; criteria?: any }
 export interface LabelSet { prefix: string; boundary: LabelQuestion; questions: Record<string, LabelQuestion>; story: { instructions: string; none: string } }
 export interface LivePartial { stream: Stream; itemId: string; text: string; utteranceId: string | null; final: boolean; receivedAt: number }

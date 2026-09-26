@@ -431,6 +431,13 @@ export class Session {
     if (this.status === "ended") this.store.writeJson("speakers.json", this.speakers.list());
   }
 
+  /** The final transcript for the chat window, in arrival order, with current speaker names; fillers left out. */
+  transcriptLines(): { id: string; startMs: number; speakerId: string; speaker: string; text: string }[] {
+    return this.utterances
+      .filter((u) => !u.filler && u.text.trim())
+      .map((u) => ({ id: u.id, startMs: u.startMs, speakerId: u.speakerId, speaker: this.speakers.displayName(u.speakerId), text: u.text }));
+  }
+
   state() {
     return {
       session: {

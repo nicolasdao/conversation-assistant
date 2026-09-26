@@ -33,7 +33,7 @@ describe("stats on a synthetic session", () => {
   ]);
   const names: Record<string, string> = { spk_1: "Nic", spk_2: "Ana", spk_3: "Sam" };
   const fc = { flagged: 3, researched: 2, verdicts: { supported: 1, contradicted: 0, misleading: 1, unverifiable: 0, not_a_claim: 0 }, repeats: 1, duplicates: 0, dropped: 1, goodFlags: 2, falseAlarms: 0, misses: 0, disputed: 0, promoted: 0, rejected: 0 };
-  const cost = { transcription: 0.01, jev: 0.02, s2: 0.03, session: 0.06, dev: 0.5 };
+  const cost = { transcription: 0.01, jev: 0.02, s2: 0.03, chat: 0, session: 0.06, dev: 0.5 };
   const st = computeStats({
     segments: segs, labels, resolveSpeaker: (id) => (id === "spk_3" ? "spk_2" : id), speakerName: (id) => names[id],
     factcheck: fc, cost, timeline: cfg.timeline,

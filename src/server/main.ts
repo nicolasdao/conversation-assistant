@@ -13,6 +13,20 @@ import { resolveRecorded, SessionLibrary } from "../store/library.ts";
 import { Embedder } from "../speakers/registry.ts";
 import { recordedVoiceprints, suggestMerges, type MergeSuggestion } from "../speakers/suggest.ts";
 import { serveMixedAudio } from "./audio.ts";
+import { ChatError, ChatService, type ChatEvent, type ChatSource } from "../chat/chat.ts";
+
+/** The chat window's commands, for the session on screen (see docs/chat.md). */
+export interface ChatApi {
+  models(): Promise<unknown>;
+  list(): unknown;
+  chat(id: string): Promise<unknown>;
+  create(model?: string): Promise<unknown>;
+  update(id: string, patch: { title?: unknown; model?: unknown }): Promise<unknown>;
+  remove(id: string): unknown;
+  stop(id: string): unknown;
+  /** Validates, then returns the run that streams the reply. */
+  prepare(id: string, body: { content?: unknown; mode?: unknown }): (sink: (e: ChatEvent) => void) => Promise<void>;
+}
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -51,6 +65,8 @@ export interface EngineApi {
   speakerSuggestions(remoteVoices?: number): Promise<unknown>;
   pause(): { paused: boolean };
   resume(): { paused: boolean };
+  /** Absent: the chat routes answer 501. */
+  chat?: ChatApi;
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -79,6 +95,9 @@ export interface EngineOptions {
   /** Tier 2: starts the native capture helper. */
   live?: (mic: string | undefined, onStatus: CaptureStatusHandler) => Promise<LiveCapture>;
   devices?: () => Promise<unknown[]>;
+  /** The chat window's network access (tests pass a fake). */
+  fetch?: typeof fetch;
+  openrouterKey?: string;
 }
 
 /** The engine: owns one session at a time, its event bus, and the host commands. */
@@ -90,11 +109,38 @@ export class Engine implements EngineApi {
   /** A past session being viewed read-only, rebuilt from its events. */
   private archived: string | null = null;
   readonly library: SessionLibrary;
+  readonly chat: ChatService;
   private readonly config: Config;
 
   constructor(private readonly opts: EngineOptions = {}) {
     this.config = opts.config ?? loadConfig();
     this.library = new SessionLibrary(opts.sessionsDir ?? "sessions");
+    this.chat = new ChatService(this.config.app.chat, {
+      fetch: (...a) => (opts.fetch ?? fetch)(...a),
+      apiKey: opts.openrouterKey ?? process.env.OPENROUTER_API_KEY ?? "",
+      source: () => this.chatSource(),
+      onSpend: (src) => this.chatSpent(src),
+    });
+  }
+
+  /** What the chat talks about: the session on air, or the recording on screen. */
+  private chatSource(): ChatSource | null {
+    const s = this.session;
+    if (s && !this.archived) {
+      return { sessionId: s.id, dir: s.store.dir, live: s.status === "running", lines: () => s.transcriptLines(), budget: s.budget };
+    }
+    const id = this.archived;
+    if (!id) return null;
+    const dir = this.libraryCall(() => this.library.dirOf(id));
+    return { sessionId: id, dir, live: false, lines: () => this.library.transcript(id) };
+  }
+
+  /** A recording has no running ledger: its header cost is refreshed from its files (the session's own emits `cost`). */
+  private chatSpent(src: ChatSource) {
+    if (src.budget || this.archived !== src.sessionId) return;
+    const s = this.library.get(src.sessionId);
+    const cap = this.library.snapshot(src.sessionId).cost.sessionCapUsd;
+    this.bus.emit("cost", { ...s.cost, session: s.costUsd, sessionCapUsd: cap }, { transient: true });
   }
 
   get current(): Session | null {
@@ -405,6 +451,19 @@ async function readJson(req: IncomingMessage): Promise<any> {
   }
 }
 
+/** Streams a chat reply as server-sent events: start, thinking, delta…, then done (after error, if it failed). */
+async function streamChat(res: ServerResponse, run: (sink: (e: ChatEvent) => void) => Promise<void>) {
+  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  // the page may leave mid-reply: the reply still completes and is saved, so a reload shows it
+  const sink = (e: ChatEvent) => { if (!res.writableEnded && !res.destroyed) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); };
+  try {
+    await run(sink);
+  } catch (e) {
+    sink({ type: "error", message: e instanceof Error ? e.message : String(e), chat: null });
+  }
+  res.end();
+}
+
 function sse(res: ServerResponse, e: AppEvent) {
   res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
 }
@@ -488,11 +547,26 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       if ((m === "GET" || m === "HEAD") && mm) return serveMixedAudio(engine.sessionDir(decodeURIComponent(mm[1])), req, res);
       mm = path.match(/^\/api\/sessions\/([^/]+)\/open$/);
       if (m === "POST" && mm) return send(res, 200, engine.openSession(decodeURIComponent(mm[1])));
+      if (path === "/api/chat/models" || path.startsWith("/api/chats")) {
+        const chat = engine.chat;
+        if (!chat) throw new ApiError(501, "chat is not available");
+        if (m === "GET" && path === "/api/chat/models") return send(res, 200, await chat.models());
+        if (m === "GET" && path === "/api/chats") return send(res, 200, chat.list());
+        if (m === "POST" && path === "/api/chats") return send(res, 200, await chat.create((await readJson(req)).model));
+        mm = path.match(/^\/api\/chats\/([^/]+)$/);
+        if (m === "GET" && mm) return send(res, 200, await chat.chat(decodeURIComponent(mm[1])));
+        if (m === "PATCH" && mm) return send(res, 200, await chat.update(decodeURIComponent(mm[1]), await readJson(req)));
+        if (m === "DELETE" && mm) return send(res, 200, chat.remove(decodeURIComponent(mm[1])));
+        mm = path.match(/^\/api\/chats\/([^/]+)\/stop$/);
+        if (m === "POST" && mm) return send(res, 200, chat.stop(decodeURIComponent(mm[1])));
+        mm = path.match(/^\/api\/chats\/([^/]+)\/messages$/);
+        if (m === "POST" && mm) return await streamChat(res, chat.prepare(decodeURIComponent(mm[1]), await readJson(req)));
+      }
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));
       if (m === "GET" && serveStatic(webRoot, path, res)) return;
       return send(res, 404, { error: "not found" });
     } catch (e) {
-      const status = e instanceof ApiError ? e.status : 400;
+      const status = e instanceof ApiError || e instanceof ChatError ? e.status : 400;
       return send(res, status, { error: e instanceof Error ? e.message : String(e) });
     }
   });

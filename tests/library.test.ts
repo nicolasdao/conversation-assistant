@@ -48,6 +48,22 @@ describe("session library", () => {
     expect(lib.list({ includeTools: true }).length).toBe(3);
   });
 
+  test("chats count in a recording's cost, by bucket, and its transcript is there for the Chat tab", () => {
+    const root = fixture();
+    const lib = new SessionLibrary(root);
+    expect(lib.get("20260924-100000").cost).toEqual({ transcription: 0, jev: 0.01, s2: 0, chat: 0 });
+    writeFileSync(join(root, "20260924-100000", "chats.jsonl"),
+      JSON.stringify({ kind: "chat_call", chat_id: "chat_1", message_id: "m_2", cost_usd: 0.004 }) + "\n");
+    const s = lib.get("20260924-100000");
+    expect(s.cost.chat).toBeCloseTo(0.004);
+    expect(s.costUsd).toBeCloseTo(0.014);
+    expect(lib.snapshot("20260924-100000").cost).toMatchObject({ chat: 0.004, jev: 0.01 });
+    expect(lib.transcript("20260924-100000")).toEqual([
+      { id: "u_1", startMs: 0, speakerId: "spk_1", speaker: "Nic", text: "Jev is four hundred times cheaper than GPT." },
+      { id: "u_2", startMs: 5000, speakerId: "spk_1", speaker: "Nic", text: "Surfing in Sydney was great." },
+    ]);
+  });
+
   test("names and notes go to meta.json; empty clears", () => {
     const root = fixture();
     const lib = new SessionLibrary(root);

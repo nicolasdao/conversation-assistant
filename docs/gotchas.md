@@ -36,6 +36,11 @@ source:
 - **Strict `json_schema` works together with the web plugin** on GPT-6 Luna (both the exa and native engines), so the `json_object` fallback has not been needed; it stays in place in case that changes.
 - **`provider: { data_collection: "deny" }` is sent on Jev and GPT-6 Luna calls** (`config/app.json`), and both still route. Adding `zdr: true` was not tested and may break Jev, whose endpoint is not confirmed on the zero-retention list.
 
+## Chat
+
+- **A stopped stream never reaches its `usage` chunk**, so a stopped reply's cost is unknown from the stream. OpenRouter's `GET /api/v1/generation?id=<gen id>` has it a second or two later: the chat asks up to 3 times before falling back to a price-list estimate (marked `estimated`). The id is the chunks' `id`.
+- **Headless Chrome never finishes loading the page** (`--virtual-time-budget` hangs), because `/api/events` keeps a server-sent event stream open. For a screenshot use `--timeout=6000` instead.
+
 ## Jev questions
 
 - **A memory question needs concrete criteria or it cannot recognise a repeat.** Worded only as "new_utterance restates or relies on this already-checked claim", a verbatim repeat scored 0.55 and a mere reaction to the claim 0.50. With the "Judge only new_utterance." opener and true/false criteria, repeats score 0.73–0.87 and non-repeats ≤ 0.06, hence `factcheck.knownMatchThreshold` 0.6.

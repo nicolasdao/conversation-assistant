@@ -811,7 +811,7 @@ export function renderCost(st: State) {
   box.classList.toggle("exhausted", !!st.budgetExhausted);
   box.setAttribute("aria-label", `Session spend ${usd(c.session)} of ${usd(cap)} cap`);
   const archived = st.session?.status === "archived";
-  box.title = archived ? "What this recording cost when it ran. Opening it costs nothing." : "";
+  box.removeAttribute("data-tip"); // its hover breakdown explains it; a tooltip would sit on top of it
   replace(box,
     h("span", { class: "k" }, archived ? "Cost" : "Spend"),
     h("span", { class: "v" }, usd(c.session), " ", h("small", {}, `/ $${Number.isInteger(cap) ? cap : cap.toFixed(2)}`)),
@@ -821,7 +821,10 @@ export function renderCost(st: State) {
       h("dl", {},
         h("dt", {}, "Transcription"), h("dd", {}, usd(c.transcription)),
         h("dt", {}, "Jev"), h("dd", {}, usd(c.jev)),
-        h("dt", {}, "System 2"), h("dd", {}, usd(c.s2))),
+        h("dt", {}, "System 2"), h("dd", {}, usd(c.s2)),
+        h("dt", {}, "Chat"), h("dd", {}, usd(c.chat ?? 0))),
+      archived ? h("p", { class: "note" }, "What this recording cost when it ran, plus any chats about it. Opening it costs nothing.") : null,
+      c.chat ? h("p", { class: "note" }, "Chat has its own cap per recording, so it never stops the pipeline.") : null,
       st.budgetExhausted ? h("p", { class: "error-text" }, `Budget exhausted: ${st.budgetExhausted}`) : null));
 }
 

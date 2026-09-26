@@ -72,6 +72,14 @@ export const AppConfigSchema = z.object({
     auditIntervalMs: int, auditMinUtterances: int, auditSample: int,
     rewriteOnFalseAlarms: int, rewriteOnMisses: int, rewriteCooldownMs: nonNegative, replayMaxItems: int,
   }).strict(),
+  // The chat window: questions about the transcript, to any of `models` through OpenRouter (see docs/chat.md)
+  chat: z.object({
+    defaultModel: z.string().min(1),
+    models: z.array(z.string().min(1)).min(1),
+    provider: z.object({}).passthrough(),
+    effort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
+    capUsd: positive, timeoutMs: int, maxAttempts: int,
+  }).strict().refine((c) => c.models.includes(c.defaultModel), { message: "chat.defaultModel must be one of chat.models" }),
 }).strict();
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 
