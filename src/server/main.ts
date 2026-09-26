@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -354,6 +354,16 @@ export class Engine implements EngineApi {
 const SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTED_AT = Date.now();
 
+/**
+ * The project's version and license, for the page's menu footer. The version lives only in the root package.json;
+ * both files are read on each request, so a release shows without restarting.
+ */
+export function about(root = resolve(SRC_DIR, "..")) {
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const text = existsSync(join(root, "LICENSE")) ? readFileSync(join(root, "LICENSE"), "utf8") : "";
+  return { name: pkg.name, version: pkg.version, license: { id: pkg.license ?? null, holder: pkg.author ?? null, text } };
+}
+
 /** True when engine code under src/ changed after this server started: the page asks for a restart. */
 export function engineStale(srcDir = SRC_DIR, since = BOOTED_AT): boolean {
   const walk = (dir: string): boolean => {
@@ -443,6 +453,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
         const limit = Number(url.searchParams.get("limit")) || undefined;
         return send(res, 200, engine.callLog(system, limit));
       }
+      if (m === "GET" && path === "/api/about") return send(res, 200, about());
       if (m === "GET" && path === "/api/engine") return send(res, 200, { startedAt: new Date(BOOTED_AT).toISOString(), stale: engineStale() });
       if (m === "GET" && path === "/api/stats") return send(res, 200, engine.stats());
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());

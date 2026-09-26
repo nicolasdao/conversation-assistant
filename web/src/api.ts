@@ -32,6 +32,7 @@ export interface MergeSuggestion {
 
 export const api = {
   state: () => call<any>("GET", "/api/state"),
+  about: () => call<{ name: string; version: string; license: { id: string | null; holder: string | null; text: string } }>("GET", "/api/about"),
   closeView: () => call<{ closed: string | null }>("POST", "/api/sessions/close"),
   calls: (system: "s1" | "s2", limit = 300) =>
     call<{ rows: unknown[]; models: { s1: string | null; s2: string | null } }>("GET", `/api/calls?system=${system}&limit=${limit}`),

@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { ApiError, createApiServer, engineStale, type EngineApi, type StartRequest } from "../src/server/main.ts";
+import { about, ApiError, createApiServer, engineStale, type EngineApi, type StartRequest } from "../src/server/main.ts";
 import { EventBus } from "../src/store/events.ts";
 import { wavHeader } from "../src/audio/wav.ts";
 import { limit, streamGain } from "../src/server/audio.ts";
@@ -189,6 +189,14 @@ describe("HTTP API", () => {
   test("the call log of System 1 or System 2", async () => {
     expect((await call("GET", "/api/calls?system=s2&limit=50")).json.rows).toEqual([{ system: "s2", limit: 50 }]);
     expect((await call("GET", "/api/calls")).json).toMatchObject({ rows: [{ system: "s1" }], models: { s1: "typesafe/jev-1.13" } });
+  });
+
+  test("the version comes from the root package.json, with the license", async () => {
+    const a = (await call("GET", "/api/about")).json;
+    expect(a.version).toBe(JSON.parse(readFileSync("package.json", "utf8")).version);
+    expect(a.license.id).toBe("BSD-3-Clause");
+    expect(a.license.text).toMatch(/Cloudless Consulting Pty Ltd/);
+    expect(about().version).toBe(a.version);
   });
 
   test("the page can tell when the engine code changed after the server started", async () => {

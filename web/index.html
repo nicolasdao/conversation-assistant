@@ -72,6 +72,7 @@
           <button role="menuitem" data-open="dlg-labels"><b>Labels</b><span id="m-labels"></span></button>
           <button role="menuitem" data-open="dlg-stats"><b>Stats</b><span id="m-stats"></span></button>
           <button role="menuitem" data-open="dlg-log"><b>Log</b><span id="m-log"></span></button>
+          <div class="menu-foot"><span id="app-version"></span><button id="license-link" class="linkbtn">BSD 3-Clause license</button></div>
         </div>
       </div>
     </div>
@@ -178,6 +179,11 @@
   <dialog id="dlg-log" aria-labelledby="h-lg">
     <div class="dlg-head"><h2 id="h-lg">Log</h2><span class="sub">Last 30 errors</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="errors" class="dlg-body"></div>
+  </dialog>
+
+  <dialog id="dlg-license" aria-labelledby="h-license">
+    <div class="dlg-head"><h2 id="h-license">License</h2><span id="license-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="dlg-body"><pre id="license-text" class="license-text"></pre></div>
   </dialog>
 
   <!-- A speaker, from a click on their name in the transcript: rename or merge -->

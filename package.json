@@ -2,7 +2,8 @@
   "name": "podcast-assistant",
   "version": "0.1.0",
   "description": "Live podcast transcript, Jev timeline, and fact-checker",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
+  "author": "Cloudless Consulting Pty Ltd <nic@cloudlesslabs.com>",
   "private": true,
   "type": "module",
   "engines": {

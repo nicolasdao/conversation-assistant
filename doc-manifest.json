@@ -21,9 +21,10 @@
         "Using it",
         "Documentation",
         "Design decisions",
-        "License"
+        "License",
+        "Versioning"
       ],
-      "line_count": 97,
+      "line_count": 102,
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
@@ -61,7 +62,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 160,
+      "line_count": 161,
       "links_to": [
         "docs/gotchas.md",
         "docs/jev.md",

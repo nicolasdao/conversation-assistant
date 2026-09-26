@@ -188,6 +188,11 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 .menu b { font: 700 16px/1.1 var(--cond); letter-spacing: 0.04em; text-transform: uppercase; }
 .menu span { font-size: 12.5px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .replay-pop { width: 300px; display: grid; gap: 10px; }
+.menu-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; padding: 9px 14px 5px; border-top: 1px solid var(--rule); font: 600 12px/1.2 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--mute); }
+.menu-foot .linkbtn { font-size: 12px; white-space: nowrap; }
+#app-version { text-transform: none; font-variant-numeric: tabular-nums; }
+.menu-foot .linkbtn:hover { color: var(--accent); }
+.license-text { margin: 0; white-space: pre-wrap; font: 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2); }
 .seg-ctl { display: inline-flex; border: 1px solid var(--rule); justify-self: start; }
 .seg-ctl button { background: none; border: 0; padding: 5px 14px; cursor: pointer; font: 700 14px/1 var(--cond); letter-spacing: 0.06em; }
 .seg-ctl button[aria-pressed="true"] { background: var(--ink); color: var(--paper-ink); }

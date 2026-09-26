@@ -21,7 +21,7 @@ Jev does not compete with chat LLMs, and ordinary users gain nothing from it dir
 
 Before Jev, a live app like this had two options: hand-built classifiers (slow to build, brittle) or an LLM call per sentence (slow, and dollars an hour). With Jev, the app makes about two thousand typed judgments an hour for cents, at roughly 0.4 s each. An LLM — **System 2** — is called only when **System 1** (Jev plus its questions) finds something worth checking, and System 2 makes System 1 better by rewriting its questions. See [Jev](jev.md) and [System 1 and System 2](system1-system2.md).
 
-The project will be open-sourced (MIT) as a reference for that pattern.
+The project will be open-sourced under the BSD 3-Clause license (Cloudless Consulting Pty Ltd) as a reference for that pattern.
 
 ## Principles
 

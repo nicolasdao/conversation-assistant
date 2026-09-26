@@ -9,6 +9,7 @@
 - [Documentation](#documentation)
 - [Design decisions](#design-decisions)
 - [License](#license)
+- [Versioning](#versioning)
 <!-- END toc -->
 
 
@@ -94,4 +95,8 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 
 ## License
 
-MIT
+BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it, with the version, at the bottom of the settings menu (the cog).
+
+## Versioning
+
+The project's version lives in one place: `version` in the root `package.json`. The server reads it from there (`GET /api/about`) and the page shows it at the bottom of the settings menu; nothing else holds a copy.

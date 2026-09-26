@@ -84,12 +84,28 @@ let onViewGone: () => void = () => {};
 /** How many people are on the call, from the header picker (0 = any number). */
 const voicesOnCall = () => Number($<HTMLSelectElement>("#voices")?.value ?? 2);
 
+/** The menu footer: the version from package.json, and the license, which opens in full in a window. */
+async function bindAbout() {
+  $("#license-link")?.addEventListener("click", () => {
+    closePops();
+    $<HTMLDialogElement>("#dlg-license")?.showModal();
+  });
+  try {
+    const a = await api.about();
+    replace($("#app-version"), `v${a.version}`);
+    $("#app-version")!.title = `${a.name} ${a.version}`;
+    replace($("#license-sub"), `${a.license.id ?? ""} · ${a.license.holder ?? ""}`);
+    replace($("#license-text"), a.license.text || "No LICENSE file.");
+  } catch { /* an older server has no /api/about */ }
+}
+
 /**
  * Opens and closes the replay popover and the settings menu; `onOpen` renders a settings dialog before it shows, and
  * `viewGone` reloads the page's state after the recording on screen was deleted.
  */
 export function bindControls(onOpen: (dialogId: string) => void, viewGone: () => void) {
   onViewGone = viewGone;
+  void bindAbout();
   $("#onair")?.addEventListener("animationend", (e) => {
     if (e.animationName === "onair-sweep") { entering = false; $("#onair")!.classList.remove("enter"); }
   });
