@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-26
+
+### Added
+- A Chat window, opened from the header's Chat button or ⌘K, to ask about the transcript of the show on air or any recording, like ChatGPT with the transcript as its only attachment: several saved chats per recording, streaming replies with Stop, edit and regenerate, copy, and cited times that jump to that moment
+- On air, each chat question brings every line said since the previous one, so answers cover the show up to the moment you ask
+- 14 OpenRouter models to chat with (GPT-6 Luna by default), switchable mid-chat, with a picker that searches and sorts by price or context window
+- A token and cost meter in the chat, and chat spend in the header's cost breakdown, with its own $2 cap per recording so it never stops fact-checking
+
+### Changed
+- Replace the browser's own dropdowns, tooltips, and autofill with controls styled like the rest of the app
+
 ## [0.1.0] - 2026-09-26
 
 ### Added
