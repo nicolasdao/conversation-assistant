@@ -1,6 +1,6 @@
 {
 	"lockVersion": 2,
-	"generatedAt": "2026-09-24T11:25:09.431Z",
+	"generatedAt": "2026-09-26T05:56:04.098Z",
 	"skills": {
 		"nicolasdao/_kit-essentials": {
 			"version": "0.7.0",
@@ -262,6 +262,36 @@
 			],
 			"dependencies": {},
 			"repo_id": "019d4d03-b579-7465-adf1-1c6ee05b882d",
+			"type": "skill"
+		},
+		"nicolasdao/create-release-skill": {
+			"version": "0.4.1",
+			"ref": "refs/tags/v0.4.1",
+			"commit": "69166c4aacb48d1fbe99987b12447600d3823ef474372b2f77df3aebf42befa3",
+			"integrity": "sha256-c9eb81479b4ef75d9cf0d60909bc9d2bba9920a66d01b42069c046a1faf05ca7",
+			"base_commit": "69166c4aacb48d1fbe99987b12447600d3823ef474372b2f77df3aebf42befa3",
+			"base_integrity": "sha256-c9eb81479b4ef75d9cf0d60909bc9d2bba9920a66d01b42069c046a1faf05ca7",
+			"requested_by": [
+				"__root__"
+			],
+			"dependencies": {
+				"happyskillsai/happyskills-design": ">=0.14.1"
+			},
+			"repo_id": "019db4c0-6422-72bb-aeae-a48d890ca6d4",
+			"type": "skill"
+		},
+		"happyskillsai/happyskills-design": {
+			"version": "0.14.3",
+			"ref": "refs/tags/v0.14.3",
+			"commit": "4ec156e254b3c21cba3b9feb04c00eff22f635497dcbfad9527146d11ef811b5",
+			"integrity": "sha256-74943fb197c93327c5280d2f47da165bcdf33a204a1005c80cead5b082324d29",
+			"base_commit": "4ec156e254b3c21cba3b9feb04c00eff22f635497dcbfad9527146d11ef811b5",
+			"base_integrity": "sha256-74943fb197c93327c5280d2f47da165bcdf33a204a1005c80cead5b082324d29",
+			"requested_by": [
+				"nicolasdao/create-release-skill"
+			],
+			"dependencies": {},
+			"repo_id": "019dee2b-76d2-73c6-bd77-9c89d278fdb3",
 			"type": "skill"
 		}
 	}

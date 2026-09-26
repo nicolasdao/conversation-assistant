@@ -1,0 +1,33 @@
+{
+	"name": "release-podcast-assistant",
+	"version": "0.1.0",
+	"description": "Release workflow for podcast-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags and pushes, plus an [Unreleased] ledger mode.",
+	"type": "skill",
+	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "podcast-assistant"],
+	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],
+	"license": "BSD-3-Clause",
+	"repository": "https://github.com/nicolasdao/podcast-ai-assistant",
+	"dependencies": {
+		"nicolasdao/update-doc": "^1.9.0",
+		"nicolasdao/git-commit": "^1.1.0"
+	},
+	"systemDependencies": {
+		"git": {
+			"description": "Git version control: commits, annotated tags, and pushes the release",
+			"version": ">=2.20.0",
+			"check": "git --version",
+			"install": { "darwin": "brew install git", "linux": "apt install git", "win32": "winget install Git.Git" }
+		},
+		"node": {
+			"description": "Node.js runtime: reads the version from package.json",
+			"version": ">=18.0.0",
+			"check": "node --version",
+			"install": { "darwin": "brew install node", "linux": "apt install nodejs", "win32": "winget install OpenJS.NodeJS.LTS" }
+		},
+		"npm": {
+			"description": "npm: bumps package.json and package-lock.json and runs the release gates",
+			"check": "npm --version",
+			"install": { "darwin": "brew install node", "linux": "apt install npm", "win32": "winget install OpenJS.NodeJS.LTS" }
+		}
+	}
+}
