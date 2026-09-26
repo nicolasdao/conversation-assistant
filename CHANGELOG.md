@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
+### Added
+- A Start live window to choose the microphone, the people on the call, and whether to turn off fact-checking and labels for that session; with both off, a session is a plain recording with a transcript (about $1.23 an hour) that never calls Jev or System 2
+- Export a recording as one .podcast-recording file to share over WhatsApp or email, with compressed audio (about 30 MB an hour), the original audio, or none, and your chats only if you choose
+- Import a shared recording from the header, the Recordings window, or by dropping the file on the page; rename it on the spot, or import one you already have again as a named copy
+- The app version that recorded, and that exported, each recording, shown in the Recordings window
+
+### Changed
+- The header shows only what applies to the screen: Export and Import on a recording, Stop only on air, and the microphone and people pickers in Start live
+
+### Fixed
+- Header buttons ran off the right edge while recording
+- Opening an imported copy while viewing the original kept showing the original
+- Starting a session with a name left it stuck and never running
+
 ## [0.2.0] - 2026-09-26
 
 ### Added
