@@ -22,6 +22,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export interface SessionSummary {
   id: string; name: string | null; notes: string | null; mode: string; startedAt: string | null; durationMs: number; ended: boolean;
   utterances: number; speakers: string[]; segments: number; claims: number; costUsd: number;
+  hasAudio?: boolean; appVersion?: string | null; imported?: { at: string; exportedWith: string | null; fileName: string | null } | null;
   matches?: { utteranceId: string; startMs: number; speaker: string; snippet: string }[];
 }
 
@@ -83,6 +84,32 @@ async function streamChat(id: string, body: { content?: string; mode?: string },
   }
 }
 
+export interface ExportInfo {
+  id: string; name: string | null; fileName: string; recordedWith: string | null; app: { name: string; version: string };
+  bytes: Record<"compressed" | "original" | "none", number>; chats: number; hasAudio: boolean;
+}
+/** `copyToken`: when the library already had it, the upload is kept for 15 minutes so it can be imported again as a copy. */
+export interface ImportResult { summary: SessionSummary; already: boolean; copyToken?: string }
+
+/** Uploads a recording file with progress (fetch cannot report upload progress). */
+function importRecording(file: File, onProgress: (done: number) => void): Promise<ImportResult> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/sessions/import");
+    x.setRequestHeader("Content-Type", "application/octet-stream");
+    x.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => {
+      let json: any = null;
+      try { json = JSON.parse(x.responseText); } catch { /* not JSON */ }
+      if (x.status >= 200 && x.status < 300) resolve(json);
+      else reject(new ApiError(x.status, json?.error ?? x.statusText));
+    };
+    x.onerror = () => reject(new ApiError(0, "the upload failed: is the server running?"));
+    x.send(file);
+  });
+}
+
 export const api = {
   state: () => call<any>("GET", "/api/state"),
   about: () => call<{ name: string; version: string; license: { id: string | null; holder: string | null; text: string } }>("GET", "/api/about"),
@@ -93,7 +120,8 @@ export const api = {
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),
   startReplay: (dir: string, speed: 1 | "max", voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices }),
-  startLive: (mic?: string, voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices }),
+  startLive: (mic?: string, voices?: number, features?: { factcheck: boolean; labels: boolean }) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices, features }),
   stop: () => call<{ sessionId: string }>("POST", "/api/session/stop"),
   rename: (id: string, displayName: string) => call("POST", `/api/speakers/${encodeURIComponent(id)}/rename`, { displayName }),
   suggestMerges: (voices?: number) => call<{ suggestions: MergeSuggestion[]; voices: { host: number; remote: number } }>(
@@ -118,5 +146,10 @@ export const api = {
   deleteChat: (id: string) => call<{ deleted: string }>("DELETE", `/api/chats/${encodeURIComponent(id)}`),
   stopChat: (id: string) => call<{ stopped: boolean }>("POST", `/api/chats/${encodeURIComponent(id)}/stop`),
   sendChat: streamChat,
+  exportInfo: (id: string) => call<ExportInfo>("GET", `/api/sessions/${encodeURIComponent(id)}/export`),
+  exportPrepare: (id: string, audio: string, chats: boolean) =>
+    call<{ token: string; fileName: string; bytes: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/export`, { audio, chats }),
+  importRecording,
+  importCopy: (token: string, name: string) => call<ImportResult>("POST", `/api/sessions/import/${encodeURIComponent(token)}`, { name }),
   rollback: (version: string) => call<{ active: string }>("POST", "/api/s1/rollback", { version }),
 };

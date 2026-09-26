@@ -4,7 +4,7 @@
 //   - "Jev log": every call to Jev in plain words (what it was asked, what it answered, what the app did next), with
 //     the exact HTTP request and response a click away.
 import { $, clock, h, pretty, replace } from "./dom.js";
-import type { CallRow, Claim, State, SystemId } from "./state.js";
+import { featuresOf, type CallRow, type Claim, type State, type SystemId } from "./state.js";
 
 const JEV_URL = "https://openrouter.ai/api/alpha/decisions";
 const S2_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -305,10 +305,21 @@ function thinking(st: State): HTMLElement {
 /** Renders whichever thinking tab is showing. */
 export function renderThinking(st: State) {
   rerender = () => renderThinking(st);
+  const f = featuresOf(st);
+  if (st.session && !f.factcheck && !f.labels) {
+    const off = "Jev is off for this session: fact-checking and labels were turned off when it started, so nothing is asked.";
+    replace($("#jev-log"), h("div", { class: "empty" }, off));
+    replace($("#think"), h("div", { class: "empty" }, off));
+    replace($("#jev-count"), "");
+    return;
+  }
   if (!$("#pane-jev")?.hidden) {
     feed($("#jev-log"), st, st.calls.s1, jevRow,
       "Every call to Jev appears here as it happens: what it was asked, what it answered, and what the app did next.");
   }
-  if (!$("#pane-think")?.hidden) replace($("#think"), thinking(st));
+  if (!$("#pane-think")?.hidden) {
+    replace($("#think"), f.factcheck ? thinking(st)
+      : h("div", { class: "empty" }, "Fact-checking is off for this session, so System 1 and System 2 do not run. Jev still labels the timeline (see the Jev log)."));
+  }
   replace($("#jev-count"), st.calls.s1.length ? String(st.calls.s1.length) : "");
 }

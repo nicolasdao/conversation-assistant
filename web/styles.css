@@ -101,7 +101,9 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
   background: var(--paper); color: var(--paper-ink); display: flex; flex-direction: column; justify-content: center;
   padding: 0 26px 0 22px; margin-left: -14px; clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); min-width: 0;
 }
-.onair, .strap, .clock { flex: none; }
+.onair, .clock { flex: none; }
+/* short of room, the session name gives way (it ends in an ellipsis) before any control does */
+.strap { flex: 0 1 auto; }
 /* no live or replay session: the strap starts the header on its own */
 .top.no-onair .strap { margin-left: 0; padding-left: 16px; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
 /* going on air: the block wipes in like a breaking-news strap, then its label slides in behind a light sweep */
@@ -135,7 +137,13 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 }
 .clock .k { font: 700 10.5px/1 var(--cond); letter-spacing: 0.16em; color: var(--mute); text-transform: uppercase; }
 .clock .t { font: 700 26px/1 var(--cond); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; margin-top: 3px; }
-.top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 16px; min-width: 0; }
+.top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 16px; min-width: 0; flex: 0 1 auto; }
+/* the controls never shrink or leave the screen: the stream meters narrow first */
+.top-right .controls, .top-right .cost, .top-right .vsep { flex: none; }
+.top-right .health { flex: 0 1 auto; }
+.top-right .health .meter { width: auto; flex: 0 1 136px; min-width: 88px; overflow: hidden; }
+/* on air: Start live and Replay only apply to starting a session */
+.top.on-air #start-live, .top.on-air #replay-btn { display: none; }
 
 .health { display: flex; gap: 12px; align-items: center; }
 .meter { width: 136px; display: grid; gap: 3px; }
@@ -617,6 +625,77 @@ dialog.ask form { display: contents; }
 .ask-message { margin: 0; color: var(--ink-2); }
 .ask-message:empty { display: none; }
 
+/* Start live's microphone and people pickers */
+.start-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.start-fields .select { width: 100%; font: 400 14px/1 var(--body); letter-spacing: 0; text-transform: none; color: var(--ink); }
+/* export: the audio choices, as radio cards */
+.choice-list { display: grid; gap: 6px; }
+.choice {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 11px 14px; text-align: left; color: var(--ink); cursor: pointer;
+  background: var(--deck-2); border: 0; border-left: 3px solid var(--rule);
+}
+.choice:hover:not(:disabled) { background: var(--deck-3); }
+.choice[aria-checked="true"] { border-left-color: var(--accent); background: var(--deck-3); }
+.choice:disabled { opacity: 0.45; cursor: default; }
+.choice .radio { flex: none; width: 16px; height: 16px; border: 2px solid var(--mute); border-radius: 50%; }
+.choice[aria-checked="true"] .radio { border-color: var(--accent); background: radial-gradient(var(--accent) 0 3.5px, transparent 4.5px); }
+.choice-size { flex: none; font: 700 15px/1 var(--cond); letter-spacing: 0.04em; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.feat.compact { padding: 10px 14px; }
+.feat:disabled { opacity: 0.45; cursor: default; }
+/* import: the drop zone, progress, and result */
+.drop-zone {
+  display: grid; justify-items: center; gap: 8px; padding: 30px 20px; text-align: center; cursor: pointer;
+  border: 2px dashed var(--rule); background: var(--ground); color: var(--ink-2); font-size: 14px;
+}
+.drop-zone b { font: 800 19px/1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+.drop-zone:hover, .drop-zone:focus-visible, .drop-zone.over { border-color: var(--accent); background: rgba(43, 212, 240, 0.06); outline: none; }
+.drop-zone .btn { margin-top: 6px; pointer-events: none; }
+.import-progress { display: grid; gap: 8px; font-size: 14px; color: var(--ink-2); }
+.import-progress .bar { height: 6px; background: var(--deck-3); }
+.import-progress .bar b { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+.import-done { display: grid; gap: 4px; padding: 12px 14px; background: var(--deck-2); border-left: 3px solid var(--good); font-size: 13.5px; color: var(--ink-2); }
+.import-done b { font: 700 12px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--good); }
+.import-done .import-name { font: 700 20px/1.15 var(--cond); color: var(--ink); }
+.drop-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4, 10, 20, 0.78); pointer-events: none; }
+.drop-overlay > div { display: grid; gap: 8px; justify-items: center; padding: 40px 60px; border: 3px dashed var(--accent); background: var(--deck); }
+.drop-overlay b { font: 800 30px/1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; }
+.drop-overlay span { color: var(--ink-2); }
+.rec-tools { display: flex; gap: 8px; }
+#import-body .row .input { flex: 1; width: auto; }
+#import-body .input { font: 400 14px/1 var(--body); letter-spacing: 0; text-transform: none; color: var(--ink); }
+.rec-tools .rec-search { flex: 1; }
+.badge.imp { background: var(--deck-3); color: var(--accent); }
+/* the search field's own clear button is the browser's: typing replaces it */
+input[type="search"]::-webkit-search-cancel-button { appearance: none; }
+
+/* a session without labels: the timeline keeps its segments and time, and says why the lanes are empty */
+.tl-off { display: none; font: 700 12px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.tl.labels-off .legend { display: none; }
+.tl.labels-off .tl-off { display: inline; }
+
+/* Start live: the features, as switches */
+dialog.start-dlg { width: min(560px, calc(100vw - 32px)); }
+.feat {
+  display: flex; align-items: center; gap: 16px; width: 100%; padding: 12px 14px; text-align: left; background: var(--deck-2);
+  border: 0; border-left: 3px solid var(--accent); cursor: pointer; color: var(--ink);
+}
+button.feat:hover { background: var(--deck-3); }
+.feat[aria-checked="false"] { border-left-color: var(--rule); }
+.feat[aria-checked="false"] .feat-text { opacity: 0.6; }
+.feat.always { cursor: default; border-left-color: var(--good); }
+.feat-text { flex: 1; display: grid; gap: 3px; }
+.feat-text b { font: 800 17px/1.1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; }
+.feat-text span { font-size: 13.5px; color: var(--ink-2); }
+.feat-on { font: 700 11.5px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--good); white-space: nowrap; }
+.toggle { flex: none; position: relative; width: 42px; height: 22px; background: var(--rule); transition: background 0.15s; }
+.toggle i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: var(--ink-2); transition: transform 0.15s, background 0.15s; }
+.feat[aria-checked="true"] .toggle { background: var(--accent); }
+.feat[aria-checked="true"] .toggle i { transform: translateX(20px); background: var(--paper-ink); }
+.start-summary { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); line-height: 1.5; }
+.start-summary b { font: 700 15px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+/* next to the session name: which features this session runs without */
+.features-chip { margin-left: 4px; padding: 2px 6px; background: var(--paper-ink); color: var(--hype); letter-spacing: 0.12em; }
+
 .rec-list { display: grid; gap: 12px; }
 .rec { background: var(--deck-2); padding: 12px 14px; display: grid; gap: 6px; cursor: pointer; transition: background 0.12s; }
 .rec:hover, .rec:focus-visible { background: var(--deck-3); }
@@ -864,6 +943,12 @@ dialog.chat-dlg { width: min(1240px, calc(100vw - 32px)); height: min(92vh, 1000
   .meter { width: 118px; }
   .meter .bar b { background-size: 118px 100%; }
   .controls .select { width: 124px; }
+}
+/* on air in a narrow window, the meters and controls take a second row rather than run off the right edge */
+@media (max-width: 1100px) {
+  .top.on-air { flex-wrap: wrap; height: auto; }
+  .top.on-air .onair, .top.on-air .strap, .top.on-air .clock { height: 60px; }
+  .top.on-air .top-right { width: 100%; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--rule); }
 }
 @media (max-width: 900px) {
   body { overflow: auto; }

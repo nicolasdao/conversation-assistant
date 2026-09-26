@@ -17,7 +17,7 @@ interface Harness {
   add(id: string, stream: "host" | "remote", startMs: number, endMs: number, t?: Partial<Transcribed>): void;
 }
 
-function harness(boundaries: Record<string, number | "fail">, opts: { streams?: StreamStatus[] } = {}): Harness {
+function harness(boundaries: Record<string, number | "fail">, opts: { streams?: StreamStatus[]; jev?: boolean } = {}): Harness {
   const closed: Segment[] = [];
   const asked: Harness["asked"] = [];
   const errors: string[] = [];
@@ -42,6 +42,7 @@ function harness(boundaries: Record<string, number | "fail">, opts: { streams?: 
     onError: (c, m) => errors.push(`${c}: ${m}`),
     now: () => clock.t,
     setTimer: () => {},
+    jev: opts.jev,
   });
   return {
     seg, closed, asked, errors, factAnswers, streams, clock,
@@ -58,6 +59,24 @@ function harness(boundaries: Record<string, number | "fail">, opts: { streams?: 
 const ids = (s: Segment) => s.utterances.map((u) => u.id);
 
 describe("segmenter", () => {
+  test("without Jev (fact-checking and labels off): never asks, and a long enough segment ends at a 2 s pause", async () => {
+    const h = harness({}, { jev: false });
+    h.add("u_1", "host", 0, 6000);
+    h.add("u_2", "remote", 7000, 11000);   // 1 s gap: continues
+    h.add("u_3", "host", 14000, 20000);    // 3 s gap, but the segment is only 11 s long: continues
+    h.add("u_4", "host", 20500, 26000);    // 0.5 s gap: continues
+    h.add("u_5", "remote", 28500, 33000);  // 2.5 s gap and the segment is 26 s long: a new segment
+    await h.seg.idle();
+    expect(h.asked).toHaveLength(0);
+    expect(h.factAnswers).toEqual([]);
+    expect(h.closed.map(ids)).toEqual([["u_1", "u_2", "u_3", "u_4"]]);
+    expect(h.closed[0].forced).toBe(false);
+    h.add("u_6", "remote", 33100, 105000); // the segment would pass 75 s: forced, whatever the pause
+    await h.seg.idle();
+    expect(h.closed.map(ids)).toEqual([["u_1", "u_2", "u_3", "u_4"], ["u_5"]]);
+    expect(h.closed[1].forced).toBe(true);
+  });
+
   test("closes on a boundary once the segment is long enough; state carries names, text, and tags only", async () => {
     const h = harness({ u_1: 0, u_2: 0.1, u_3: 0.9 });
     h.add("u_1", "host", 0, 6000);

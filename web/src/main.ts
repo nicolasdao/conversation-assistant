@@ -9,6 +9,7 @@ import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
 import { renderThinking } from "./calls.js";
 import { bindChat, chatOpened, openChat, renderChat } from "./chat.js";
 import { bindBespoke } from "./ui.js";
+import { bindTransfer, renderTransferButtons } from "./transfer.js";
 import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
 import { panelName, PANELS, readRoute, setRoute, tabName, TABS, type Route } from "./router.js";
 import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
@@ -32,6 +33,7 @@ function schedule() {
     const all = dirty.has("session");
     if (all || dirty.has("session")) {
       renderSession(st);
+      renderTransferButtons(st);
       syncPlayer(st);
       followState();
       if (isOpen("dlg-recordings")) void renderRecordings(st);
@@ -239,6 +241,7 @@ setPositionListener((ms) => { if (st.session?.status === "archived") setRoute({ 
 for (const id of Object.values(PANELS)) $<HTMLDialogElement>(`#${id}`)?.addEventListener("close", () => { if (readRoute().panel === panelName(id)) setRoute({ panel: null }); });
 window.addEventListener("popstate", () => void applyRoute(readRoute(), "history"));
 bindBespoke();
+bindTransfer(() => st);
 bindChat({ onTime: jumpToTime });
 $("#chat-btn")?.addEventListener("click", () => openChat());
 bindTabs();

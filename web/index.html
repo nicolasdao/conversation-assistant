@@ -25,6 +25,8 @@
       <symbol id="g-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" fill="currentColor"/><rect x="9.5" y="2.5" width="3" height="11" fill="currentColor"/></symbol>
       <symbol id="g-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z" fill="currentColor"/></symbol>
       <symbol id="g-chat" viewBox="0 0 16 16"><path d="M2 2.5h12v8.2H7.2L3.8 13.6v-2.9H2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M5 5.6h6M5 8h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="g-export" viewBox="0 0 16 16"><path d="M8 10.5V1.8M4.6 5 8 1.6 11.4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 9.5v4h11v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+      <symbol id="g-import" viewBox="0 0 16 16"><path d="M8 1.6v8.7M4.6 7 8 10.4 11.4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 9.5v4h11v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
       <symbol id="g-trash" viewBox="0 0 16 16"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.8 6.5v4.5M9.2 6.5v4.5" stroke="currentColor" stroke-width="1.4"/></symbol>
     </defs>
   </svg>
@@ -33,7 +35,7 @@
   <header id="top" class="top no-onair">
     <div id="onair" class="onair" hidden><i></i><span id="onair-label">On air</span></div>
     <div class="strap">
-      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Podcast Assistant</div>
+      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Podcast Assistant<span id="features-chip" class="features-chip" hidden></span></div>
       <button id="session-name" class="name" title="Click to rename this session" disabled>No session</button>
     </div>
     <div class="clock"><span class="k">Elapsed</span><span id="clock" class="t">00:00</span></div>
@@ -43,12 +45,8 @@
       <div id="cost" class="cost" tabindex="0"></div>
       <span class="vsep"></span>
       <div class="controls">
-        <label class="sr" for="mic">Microphone</label>
-        <select id="mic" class="select"><option value="builtin">Built-in microphone</option></select>
-        <label class="sr" for="voices">People on the call</label>
-        <select id="voices" class="select voices" title="How many people you will hear on the call. Voices beyond this count go to the closest one instead of becoming new speakers.">
-          <option value="1">1 on call</option><option value="2" selected>2 on call</option><option value="3">3 on call</option><option value="4">4 on call</option><option value="0">Any</option>
-        </select>
+        <button id="export-btn" class="btn" hidden title="Save this recording as one file to share (WhatsApp, email)"><svg class="g"><use href="#g-export"/></svg>Export</button>
+        <button id="import-btn" class="btn" title="Add a recording someone shared with you (or drop the file on the page)"><svg class="g"><use href="#g-import"/></svg>Import</button>
         <button id="start-live" class="btn primary">Start live</button>
         <button id="pause" class="btn pause" hidden aria-pressed="false">Pause</button>
         <button id="stop" class="btn stop" disabled>Stop</button>
@@ -135,6 +133,7 @@
         <span id="play-time" class="play-time">0:00</span>
       </div>
       <div id="legend" class="legend"></div>
+      <span class="tl-off">Labels off for this session: segments and time only</span>
       <div class="zoom" role="group" aria-label="Timeline zoom">
         <button id="zoom-out" class="btn icon sm" title="Zoom out (⌘ or Ctrl + scroll)" aria-label="Zoom out">−</button>
         <span id="zoom-level" class="zoom-level">Whole show</span>
@@ -188,6 +187,47 @@
     <div class="dlg-head"><h2 id="h-chat">Chat</h2><span id="chat-sub" class="sub">Ask about the transcript</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="chat" class="chat"></div>
   </dialog>
+
+  <!-- Start live: what runs beyond the transcript, fixed for the session -->
+  <dialog id="dlg-start" class="start-dlg" aria-labelledby="h-start">
+    <div class="dlg-head"><h2 id="h-start">Start live</h2><span class="sub">Choose what runs during this show</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="dlg-body">
+      <div class="start-fields">
+        <label class="fieldlabel">Microphone<select id="mic" class="select"><option value="builtin">Built-in microphone</option></select></label>
+        <label class="fieldlabel" title="How many people you will hear on the call. Voices beyond this count go to the closest one instead of becoming new speakers.">People on the call
+          <select id="voices" class="select voices">
+            <option value="1">1 on the call</option><option value="2" selected>2 on the call</option><option value="3">3 on the call</option><option value="4">4 on the call</option><option value="0">Any number</option>
+          </select>
+        </label>
+      </div>
+      <div class="feat always">
+        <span class="feat-text"><b>Transcript</b><span>Both streams recorded and transcribed live, speakers identified, a timeline to find your way around it, and chat about it.</span></span>
+        <span class="feat-on">Always on</span>
+      </div>
+      <button id="feat-factcheck" class="feat" role="switch" aria-checked="true">
+        <span class="feat-text"><b>Fact-check</b><span>System 1 (Jev) flags checkable claims on every line; System 2 (GPT-6 Luna) researches them with sources.</span></span>
+        <span class="toggle" aria-hidden="true"><i></i></span>
+      </button>
+      <button id="feat-labels" class="feat" role="switch" aria-checked="true">
+        <span class="feat-text"><b>Labels</b><span>Jev labels each part of the timeline: subject, mode, heat and hype, and moments like hot takes, predictions, and clip-worthy segments.</span></span>
+        <span class="toggle" aria-hidden="true"><i></i></span>
+      </button>
+      <p id="start-summary" class="start-summary"></p>
+      <p class="note">A feature you turn off stays off until the session ends. Pause, Resume, Stop, and chat work either way.</p>
+      <div class="row end"><button class="btn" data-cancel>Cancel</button><button id="start-go" class="btn primary">Start live</button></div>
+    </div>
+  </dialog>
+
+  <!-- Export and import: one .podcast-recording file -->
+  <dialog id="dlg-export" class="start-dlg" aria-labelledby="h-export">
+    <div class="dlg-head"><h2 id="h-export">Export</h2><span id="export-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="export-body" class="dlg-body"></div>
+  </dialog>
+  <dialog id="dlg-import" class="start-dlg" aria-labelledby="h-import">
+    <div class="dlg-head"><h2 id="h-import">Import</h2><span class="sub">A recording someone shared with you</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="import-body" class="dlg-body"></div>
+  </dialog>
+  <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .podcast-recording file</span></div></div>
 
   <dialog id="dlg-license" aria-labelledby="h-license">
     <div class="dlg-head"><h2 id="h-license">License</h2><span id="license-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>

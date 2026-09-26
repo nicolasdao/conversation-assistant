@@ -88,7 +88,7 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | --- | --- | --- |
 | GET | `/api/events` | SSE: the session's events so far, then live |
 | GET | `/api/state` | Full current state (or a recorded session's snapshot) |
-| POST | `/api/session/start` | `{ mode: "live", mic?, name? }` or `{ mode: "replay", dir \| sessionId, speed, name? }` |
+| POST | `/api/session/start` | `{ mode: "live", mic?, name?, features? }` or `{ mode: "replay", dir \| sessionId, speed, name?, features? }`; `features: { factcheck?, labels? }` (booleans, both on by default; see [Features](#features-transcript-only-sessions)) |
 | POST | `/api/session/stop` | Stop reading input; in-flight work completes. When the session ends, the engine serves it as an opened recording (see [Recordings](recordings.md)) |
 | POST | `/api/session/pause`, `/api/session/resume` | Live sessions only: while paused, incoming audio is replaced by silence, so nothing is heard, transcribed, or spent, and the WAVs and session times stay aligned; Stop still works |
 | GET | `/api/devices` | The helper's input devices |
@@ -102,6 +102,7 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | GET | `/api/about` | The project's name, version (the root `package.json`'s `version`, the only place it lives), and license (`id`, `holder`, and the `LICENSE` text); the page shows them in the settings menu's footer, the license opening in a window |
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
+| GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.podcast-recording` file (see [Recordings](recordings.md#export-and-import)) |
 | GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
 
 It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/`.
@@ -112,7 +113,7 @@ Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, r
 
 The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
-- **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover, chat included; for an opened recording, labelled Cost: what that recording cost when it ran, plus any chats about it), and the controls: microphone picker, how many people are on the call (1–4 or Any, sent with Start live and replays and remembered in the browser; see [Speakers](speakers.md)), Start live, Pause / Resume (live sessions), Stop, then **Chat** (an accent-outlined icon button, ⌘K; see [Chat](chat.md)), a replay popover (folder and 1× / max speed), and a settings cog.
+- **Header (one row):** an ON AIR block, only while a session is capturing (On air, Paused, Replay, or Stopping; it wipes in like a breaking-news strap when a session starts, and with a recording open or no session the header starts at the strap), the session name (click it to rename the session in place: Enter or leaving the field saves, Escape cancels; the name goes to the session's `meta.json`), with a chip — Transcript only, No fact-check, or No labels — when the session runs without some [features](#features-transcript-only-sessions), the elapsed clock, stream meters with device and last-frame age (red when a stream's level stays at or below −50 dBFS for more than 10 s, or no frame arrives for more than 3 s), the spend against the session cap (breakdown on hover, chat included; for an opened recording, labelled Cost: what that recording cost when it ran, plus any chats about it), and the controls: **Export** (a recording on screen) and **Import** (anything but a session on air; see [Recordings](recordings.md#export-and-import)), Start live (which first opens a window with the microphone, how many people are on the call — 1–4 or Any, also used by replays and remembered in the browser; see [Speakers](speakers.md) — and the session's [features](#features-transcript-only-sessions)), Pause / Resume (live sessions), Stop (only while a session is on air), then **Chat** (an accent-outlined icon button, ⌘K; see [Chat](chat.md)), a replay popover (folder and 1× / max speed), and a settings cog. The header shows only what applies to the screen: with no session, Import, Start live, Chat, Replay, and the cog; on a recording, Export and Import join them; on air, Start live, Replay, Export, and Import give way to Pause and Stop, so Pause, Stop, Chat, and the cog always fit. Short of room, the stream meters narrow and the session name ends in an ellipsis; the controls never shrink. Below 1100 px wide, the on-air header puts the meters and controls on a second row rather than let them run off the right edge.
 - **Transcript and fact-checks (two columns)**, split by a divider you can drag (25–75 %, arrow keys too; double-click resets; the split is remembered in the browser):
   - the transcript, caption style, with segment dividers, live text, filters (markers, speaker, subject), and click-to-rename; a speaker's name tag appears once per run of consecutive lines, and inferred speakers show as a muted "name *";
   - the right column has three tabs. **Fact-check**: a solid verdict block (False, Supported, Misleading…, or Queued / Checking / Dropped), queued → researching → verdict steps, the restated claim, correction, sources, research latency, a repeat badge, and a "Host disputes" button; a tally of verdicts sits in the column header, and the most recently active card is on top.
@@ -146,6 +147,27 @@ The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Ba
 - The Jev log's folded prompt draws its own caret.
 - Lists and tooltips are top-layer popovers, so they show above modals. The page is laid out to be legible when shared as a window in Riverside at 1280 × 720.
 
+## Features: transcript-only sessions
+
+A session runs two features beyond its transcript, **fact-checking** (System 1 and System 2) and **labels** (Jev labels each closed segment). Both are on unless the start request turns them off (`features` in `POST /api/session/start`; `Features` in `src/pipeline/session.ts`). A session's features are fixed for its whole run: no command turns a feature back on. They are recorded in `session.json`, `session.started`, and `GET /api/state` (`session.features`); a recording from before features existed ran with both on.
+
+| Features | What runs | Jev per line (`utterance`) | Jev per segment | System 2 |
+| --- | --- | --- | --- | --- |
+| Both on (default) | Everything | `boundary` + System 1 + memory | Timeline labels | Research, audits, rewrites |
+| Fact-check off | Transcript, timeline labels | `boundary` only (version `off`) | Timeline labels | Never |
+| Labels off | Transcript, fact-checks | `boundary` + System 1 + memory | Never; segments are kept, unlabelled | As usual |
+| Both off ("transcript only") | Transcript, segments, chat | **Never** | Never | Never |
+
+- **Segments without Jev.** With both features off, Jev is never asked. The segmenter closes a segment at a pause of at least `segmentation.pauseBoundaryMs` (2 s), once the segment is at least `minSegmentMs` (12 s) long, and before it would pass `maxSegmentMs` (75 s, marked `forced`). So the timeline still divides the show into stretches to jump between.
+- **What still works:** capture, transcription and live text, speakers, the timeline's segments and playhead, Pause, Resume, Stop, recordings and playback, and [Chat](chat.md).
+- **Refused commands:** for a feature that is off, the engine answers 409 ("labels are off for this session", "fact-checking is off for this session"). This covers `PUT /api/labels`, `PUT /api/stories`, `POST /api/labels/relabel`, `POST /api/claims/:id/override`, and `POST /api/s1/rollback`.
+- **The page:**
+  - **Start live** opens a window with the microphone and people-on-the-call pickers and two switches, both on each time. It shows an estimated cost per hour: about $1.23 for the transcript alone, $0.04 more for Jev, and up to $0.35 more for fact-checking.
+  - The header chip names what is off.
+  - The Fact-check tab, Fast · slow thinking, the Jev log, System 1, and Labels say why they are empty.
+  - With labels off, the transcript's marker and subject filters and the timeline's legend give way to "Labels off for this session".
+- **Replays** run with both features on unless their start request says otherwise.
+
 ## Budgets — `src/budget.ts`
 
 One ledger per session, plus the development total read from `sessions/**/*.jsonl` when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in four buckets (`transcription` — final and live, `jev`, `s2`, `chat`), which drive the `cost` event. `chat` is in the session's total but not in the session cap's count: it has its own cap per recording, `chat.capUsd` ($2), so a chat never stops the pipeline (see [Chat](chat.md)).
@@ -160,7 +182,7 @@ One ledger per session, plus the development total read from `sessions/**/*.json
 
 | File | Holds |
 | --- | --- |
-| `config/app.json` | Server port, budgets, VAD, speakers, transcription (final and live), Jev client, segmentation, timeline, System 2, fact-check loop, chat |
+| `config/app.json` | Server port, budgets, VAD, speakers, transcription (final and live), Jev client, segmentation (including `pauseBoundaryMs`, used only without Jev), timeline, System 2, fact-check loop, chat |
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 

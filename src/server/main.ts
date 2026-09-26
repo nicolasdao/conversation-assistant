@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
-import { Session, type SessionOptions } from "../pipeline/session.ts";
+import { Session, type Features, type SessionOptions } from "../pipeline/session.ts";
 import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
@@ -14,6 +14,24 @@ import { Embedder } from "../speakers/registry.ts";
 import { recordedVoiceprints, suggestMerges, type MergeSuggestion } from "../speakers/suggest.ts";
 import { serveMixedAudio } from "./audio.ts";
 import { ChatError, ChatService, type ChatEvent, type ChatSource } from "../chat/chat.ts";
+import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
+import {
+  discard, exportEstimate, exportFileName, exportRecording, importRecording, MAX_UPLOAD_BYTES, saveUpload, TransferError, type AudioChoice,
+} from "../store/transfer.ts";
+import { appInfo } from "../version.ts";
+
+/** Export and import of recordings as one `.podcast-recording` file (see docs/recordings.md § Export and import). */
+export interface TransferApi {
+  /** What an export would contain and weigh. */
+  info(id: string): unknown;
+  /** Writes the export file; the download follows with `file(token)`. */
+  prepare(id: string, body: { audio?: unknown; chats?: unknown }): Promise<{ token: string; fileName: string; bytes: number }>;
+  file(token: string): { path: string; fileName: string };
+  importFile(body: AsyncIterable<Buffer>, fileName: string | null): Promise<unknown>;
+  /** Imports a file the library already had, again, as a copy under `name` (the upload was kept by `importFile`). */
+  importCopy(token: string, name: unknown): Promise<unknown>;
+}
 
 /** The chat window's commands, for the session on screen (see docs/chat.md). */
 export interface ChatApi {
@@ -34,9 +52,23 @@ export class ApiError extends Error {
   }
 }
 
+/** `features`: what runs beyond the transcript, fixed for the session; both on unless set to false. */
 export type StartRequest =
-  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string; voices?: number }
-  | { mode: "live"; mic?: string; name?: string; voices?: number };
+  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string; voices?: number; features?: Partial<Features> }
+  | { mode: "live"; mic?: string; name?: string; voices?: number; features?: Partial<Features> };
+
+function parseFeatures(f: unknown): Partial<Features> {
+  if (f === undefined || f === null) return {};
+  if (typeof f !== "object") throw new ApiError(400, "features must be an object");
+  const out: Partial<Features> = {};
+  for (const k of ["factcheck", "labels"] as const) {
+    const v = (f as Record<string, unknown>)[k];
+    if (v === undefined) continue;
+    if (typeof v !== "boolean") throw new ApiError(400, `features.${k} must be true or false`);
+    out[k] = v;
+  }
+  return out;
+}
 
 /** What the HTTP layer needs from the engine. The front end is a thin client of exactly this. */
 export interface EngineApi {
@@ -67,6 +99,8 @@ export interface EngineApi {
   resume(): { paused: boolean };
   /** Absent: the chat routes answer 501. */
   chat?: ChatApi;
+  /** Absent: the export and import routes answer 501. */
+  transfer?: TransferApi;
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -121,6 +155,87 @@ export class Engine implements EngineApi {
       source: () => this.chatSource(),
       onSpend: (src) => this.chatSpent(src),
     });
+  }
+
+  private readonly exports = new Map<string, { path: string; fileName: string }>();
+  /** Uploads of a recording the library already had, kept for a possible copy. */
+  private readonly uploads = new Map<string, { path: string; fileName: string | null }>();
+
+  readonly transfer: TransferApi = {
+    info: (id) => {
+      const dir = this.libraryCall(() => this.library.dirOf(id));
+      const s = this.library.get(id);
+      return { id, name: s.name, fileName: exportFileName(s.name, id), recordedWith: s.appVersion, app: appInfo(), ...exportEstimate(dir) };
+    },
+    prepare: async (id, body) => {
+      const dir = this.libraryCall(() => this.library.dirOf(id));
+      if (this.session && this.session.id === id && this.session.status !== "ended") throw new ApiError(409, "stop the session before exporting it");
+      const audio = (body?.audio ?? "compressed") as AudioChoice;
+      if (!["compressed", "original", "none"].includes(audio)) throw new ApiError(400, "audio must be compressed, original, or none");
+      if (body?.chats !== undefined && typeof body.chats !== "boolean") throw new ApiError(400, "chats must be true or false");
+      const r = await this.transferCall(() => exportRecording(dir, id, { audio, chats: body?.chats === true, app: appInfo() }));
+      const token = randomUUID();
+      this.exports.set(token, { path: r.path, fileName: r.fileName });
+      // a download not collected within 15 minutes is deleted
+      setTimeout(() => { if (this.exports.delete(token)) void rm(r.path, { force: true }); }, 15 * 60_000).unref();
+      return { token, fileName: r.fileName, bytes: r.bytes };
+    },
+    file: (token) => {
+      const f = this.exports.get(token);
+      if (!f) throw new ApiError(404, "this export has expired: export again");
+      return f;
+    },
+    importFile: async (body, fileName) => {
+      const tmp = await this.transferCall(() => saveUpload(body, MAX_UPLOAD_BYTES));
+      let keep = false;
+      try {
+        const { id, manifest } = await importRecording(tmp, this.library.root, fileName);
+        return { summary: this.library.get(id), manifest, already: false };
+      } catch (e) {
+        // the same recording again: nothing is added, and the page offers the one already here — or a copy of it,
+        // from this same upload, kept for 15 minutes so a long show is not sent twice
+        if (e instanceof TransferError && e.status === 409 && (e as any).id) {
+          keep = true;
+          const copyToken = randomUUID();
+          this.uploads.set(copyToken, { path: tmp, fileName });
+          setTimeout(() => { if (this.uploads.delete(copyToken)) void discard(tmp); }, 15 * 60_000).unref();
+          return { summary: this.library.get((e as any).id), already: true, copyToken };
+        }
+        throw e instanceof TransferError ? new ApiError(e.status, e.message) : e;
+      } finally {
+        if (!keep) await discard(tmp);
+      }
+    },
+    importCopy: async (token, name) => {
+      const up = this.uploads.get(token);
+      if (!up) throw new ApiError(404, "the upload has expired: import the file again");
+      if (typeof name !== "string" || !name.trim()) throw new ApiError(400, "a name is required for the copy");
+      if (name.trim().length > 120) throw new ApiError(400, "name is too long");
+      this.uploads.delete(token);
+      try {
+        const { id, manifest } = await this.transferCall(() => importRecording(up.path, this.library.root, up.fileName, { copy: true }));
+        return { summary: this.library.update(id, { name: name.trim() }), manifest, already: false };
+      } finally {
+        await discard(up.path);
+      }
+    },
+  };
+
+  private async transferCall<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof TransferError) throw new ApiError(e.status, e.message);
+      throw e;
+    }
+  }
+
+  /** A prepared export, once downloaded, is deleted. */
+  exportSent(token: string) {
+    const f = this.exports.get(token);
+    if (!f) return;
+    this.exports.delete(token);
+    void rm(f.path, { force: true });
   }
 
   /** What the chat talks about: the session on air, or the recording on screen. */
@@ -268,6 +383,7 @@ export class Engine implements EngineApi {
 
   async start(req: StartRequest): Promise<{ sessionId: string }> {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
+    const features = parseFeatures(req?.features);
     let sources: AudioSource[];
     let mode: "replay" | "live";
     let liveText = false;
@@ -295,17 +411,18 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features,
       // how many people are on the call (the remote stream); 0 means no limit
       ...(Number.isInteger(req.voices) && req.voices! >= 0 ? { voices: { remote: req.voices } } : {}),
       ...this.opts.session,
     });
     const s = this.session;
-    if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
     // When it ends, the session becomes a recording: the page shows it exactly as a reopened one.
     s.run()
       .then(() => { if (this.session === s) { this.session = null; this.archived = s.id; } })
       .catch((e) => console.error("session failed:", e));
+    // after run() has written session.json, which makes the folder a recording the library can name
+    if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
     return { sessionId: s.id };
   }
 
@@ -359,8 +476,17 @@ export class Engine implements EngineApi {
     return s.mergeSpeakers(fromId, intoId);
   }
 
-  putLabels(body: unknown) {
+  /** The running session, if it runs `feature`: a command for a feature that is off cannot turn it on. */
+  private needFeature(feature: keyof Features): Session {
     const s = this.need();
+    if (!s.features[feature]) {
+      throw new ApiError(409, feature === "labels" ? "labels are off for this session" : "fact-checking is off for this session");
+    }
+    return s;
+  }
+
+  putLabels(body: unknown) {
+    const s = this.needFeature("labels");
     try {
       return { version: s.timeline.replaceLabels(body) };
     } catch (e) {
@@ -370,22 +496,22 @@ export class Engine implements EngineApi {
   }
 
   relabel() {
-    return { segments: this.need().timeline.relabel() };
+    return { segments: this.needFeature("labels").timeline.relabel() };
   }
 
   putStories(headlines: string[]) {
     if (!Array.isArray(headlines) || headlines.some((h) => typeof h !== "string")) throw new ApiError(400, "headlines must be an array of strings");
-    return { version: this.need().timeline.setStories(headlines) };
+    return { version: this.needFeature("labels").timeline.setStories(headlines) };
   }
 
   override(claimId: string, note?: string) {
-    const s = this.need();
+    const s = this.needFeature("factcheck");
     if (!s.factcheck.claims.has(claimId)) throw new ApiError(404, `unknown claim ${claimId}`);
     return s.factcheck.override(claimId, note);
   }
 
   rollback(version: string) {
-    const s = this.need();
+    const s = this.needFeature("factcheck");
     if (!s.factcheck.versions.some((v) => v.id === version)) throw new ApiError(404, `unknown version ${version}`);
     return { active: s.factcheck.rollback(version).id };
   }
@@ -561,6 +687,34 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
         if (m === "POST" && mm) return send(res, 200, chat.stop(decodeURIComponent(mm[1])));
         mm = path.match(/^\/api\/chats\/([^/]+)\/messages$/);
         if (m === "POST" && mm) return await streamChat(res, chat.prepare(decodeURIComponent(mm[1]), await readJson(req)));
+      }
+      if (path.startsWith("/api/sessions/import") || path.startsWith("/api/exports/") || /^\/api\/sessions\/[^/]+\/export$/.test(path)) {
+        const t = engine.transfer;
+        if (!t) throw new ApiError(501, "export and import are not available");
+        if (m === "POST" && path === "/api/sessions/import") {
+          let name: string | null = null;
+          try { name = req.headers["x-file-name"] ? decodeURIComponent(String(req.headers["x-file-name"])) : null; } catch { /* keep null */ }
+          return send(res, 200, await t.importFile(req as AsyncIterable<Buffer>, name));
+        }
+        mm = path.match(/^\/api\/sessions\/import\/([0-9a-f-]{36})$/);
+        if (m === "POST" && mm) return send(res, 200, await t.importCopy(mm[1], (await readJson(req)).name));
+        mm = path.match(/^\/api\/sessions\/([^/]+)\/export$/);
+        if (m === "GET" && mm) return send(res, 200, t.info(decodeURIComponent(mm[1])));
+        if (m === "POST" && mm) return send(res, 200, await t.prepare(decodeURIComponent(mm[1]), await readJson(req)));
+        mm = path.match(/^\/api\/exports\/([0-9a-f-]{36})$/);
+        if (m === "GET" && mm) {
+          const token = mm[1];
+          const f = t.file(token);
+          const ascii = f.fileName.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
+          res.writeHead(200, {
+            "Content-Type": "application/octet-stream", "Content-Length": statSync(f.path).size, "Cache-Control": "no-store",
+            "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
+          });
+          const stream = createReadStream(f.path);
+          stream.pipe(res);
+          res.on("finish", () => (engine as { exportSent?: (t: string) => void }).exportSent?.(token));
+          return;
+        }
       }
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));
       if (m === "GET" && serveStatic(webRoot, path, res)) return;

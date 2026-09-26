@@ -79,7 +79,8 @@ export function sumDevSpend(sessionsDir = "sessions"): number {
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
-      if (statSync(p).isDirectory()) walk(p);
+      // an imported recording's spend was someone else's
+      if (statSync(p).isDirectory()) { if (!existsSync(join(p, "imported.json"))) walk(p); }
       else if (name.endsWith(".jsonl")) {
         for (const line of readFileSync(p, "utf8").split("\n")) {
           if (!line.trim()) continue;

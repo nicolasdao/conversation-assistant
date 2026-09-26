@@ -4,7 +4,7 @@
 // visible width, so zooming only widens the track and the strip scrolls sideways. The strip can be made taller by
 // dragging its top edge, and a dotted line follows the pointer with the exact time.
 import { clock, glyph, h, pretty, replace, s } from "./dom.js";
-import type { Segment, State } from "./state.js";
+import { featuresOf, type Segment, type State } from "./state.js";
 
 export const SUBJECT_COLORS: Record<string, string> = {
   ai_models: "#3f7df0", ai_tools: "#6fa0ff", ai_industry: "#2a58c9",
@@ -208,6 +208,7 @@ export function renderTimeline(
   box: HTMLElement, st: State, opts: { matches: (seg: Segment) => boolean; onJump: (segmentId: string) => void; nowMs: number },
 ) {
   const segs = [...st.segments.values()].sort((a, b) => a.startMs - b.startMs);
+  const labelsOn = featuresOf(st).labels;
   const lastUtt = Math.max(0, ...[...st.utterances.values()].map((u) => u.endMs));
   const endMs = Math.max(60_000, opts.nowMs, lastUtt, ...segs.map((g) => g.endMs));
   const x = (ms: number) => (ms / endMs) * 100;
@@ -248,17 +249,18 @@ export function renderTimeline(
     // jump the transcript there; in a recording, playback moves there too
     const jump = () => { opts.onJump(g.id); onSeek?.(g.startMs); };
     const span = `${clock(g.startMs)}–${clock(g.endMs)}`;
-    const tip = l && !l.unlabeled
+    const plain = !labelsOn; // labels off: a segment is only a stretch of time to jump to
+    const tip = plain ? span : l && !l.unlabeled
       ? `${span} · ${pretty(subj?.choice ?? "?")} (${Math.round((subj?.confidence ?? 0) * 100)}%) · ${pretty(md?.choice ?? "?")}${l.story ? ` · story: ${l.story}` : ""}${l.mentions.length ? ` · mentions: ${l.mentions.join(", ")}` : ""}`
       : `${span} · ${l?.unlabeled ? "unlabeled" : "labelling…"}`;
     const state = `${dim ? " dim" : ""}${l?.unlabeled ? " unlabeled" : ""}`;
     subject.append(h("button", {
       class: `blk${subj?.faded ? " faded" : ""}${state}`, style: `${geo}${subj ? `;background:${SUBJECT_COLORS[subj.choice] ?? "#6a7d98"}` : ""}`,
       title: `${tip} · click to jump`, onclick: jump,
-    }, h("span", { class: "blk-t" }, subj ? pretty(subj.choice) : l?.unlabeled ? "unlabeled" : "")));
+    }, h("span", { class: "blk-t" }, subj ? pretty(subj.choice) : plain ? "" : l?.unlabeled ? "unlabeled" : "")));
     mode.append(h("button", {
       class: `blk${md?.faded ? " faded" : ""}${state}`, style: `${geo}${md ? `;background:${MODE_COLORS[md.choice] ?? "#4e5b6c"}` : ""}`,
-      title: `${span} · ${md ? `${pretty(md.choice)}${md.faded ? " (low confidence)" : ""}` : "no mode yet"}`, onclick: jump, tabindex: -1,
+      title: `${span}${plain ? "" : ` · ${md ? `${pretty(md.choice)}${md.faded ? " (low confidence)" : ""}` : "no mode yet"}`}`, onclick: jump, tabindex: -1,
     }, h("span", { class: "blk-t" }, md ? pretty(md.choice) : "")));
 
     const mid = x((g.startMs + g.endMs) / 2);
@@ -283,7 +285,7 @@ export function renderTimeline(
     const end = Math.max(...open.map((u) => u.endMs), st.session?.status === "running" ? opts.nowMs : 0);
     const geo = `left:${pct(x(start))};width:${pct(Math.max(0.4 / zoom, x(end) - x(start)))}`;
     const wide = ((end - start) / endMs) * trackPx > 90;
-    subject.append(h("span", { class: "blk open", style: geo, title: "Segment in progress: labelled when it closes" }, wide ? "In progress" : ""));
+    subject.append(h("span", { class: "blk open", style: geo, title: labelsOn ? "Segment in progress: labelled when it closes" : "Segment in progress" }, wide ? "In progress" : ""));
     mode.append(h("span", { class: "blk open", style: geo }));
   }
 

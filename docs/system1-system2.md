@@ -24,6 +24,8 @@ The point: a slow, expensive model is called only when the fast one finds someth
 2. **Criteria** — false alarms (a flag that was not a checkable claim) and misses (a claim that was not flagged) lead System 2 to rewrite System 1's instructions, criteria, and thresholds.
 3. **Attention** — System 2 can add up to 3 `attention_<n>` questions that raise the priority of kinds of claims that turned out to matter.
 
+Fact-checking can be turned off when a session starts; then System 1's questions leave the per-utterance request and System 2 is never called (see [Architecture](architecture.md#features-transcript-only-sessions)).
+
 The outcome signal that makes improvement possible is the **grade**: every research verdict grades the flag that triggered it. (The timeline has no such signal, so no LLM changes the timeline's questions — the host is System 2 there. See [Jev](jev.md).)
 
 ```mermaid

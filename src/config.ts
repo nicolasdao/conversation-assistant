@@ -46,6 +46,8 @@ export const AppConfigSchema = z.object({
   segmentation: z.object({
     boundaryThreshold: probability, speakerChangeGapMs: nonNegative, speakerChangeBonus: probability,
     minSegmentMs: nonNegative, maxSegmentMs: positive, reorderTimeoutMs: int,
+    // with fact-checking and labels both off, Jev is never asked: a pause this long ends a segment instead
+    pauseBoundaryMs: positive,
   }).strict().refine((s) => s.minSegmentMs <= s.maxSegmentMs, {
     message: "segmentation.minSegmentMs must not exceed segmentation.maxSegmentMs",
   }),

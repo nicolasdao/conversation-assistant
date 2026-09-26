@@ -17,8 +17,23 @@ import { Timeline } from "./timeline.ts";
 import { computeStats, type SessionStats } from "./stats.ts";
 import { EventBus, processSecrets, type EventType } from "../store/events.ts";
 import { SessionStore, type JsonlFile } from "../store/sessionStore.ts";
+import { appInfo } from "../version.ts";
 
 export type SessionMode = "replay" | "live";
+
+/**
+ * What a session runs beyond the transcript, chosen when it starts and fixed for its whole run (an off feature cannot
+ * be turned back on). With both off, Jev is never asked: the session is a plain recording with a transcript.
+ */
+export interface Features {
+  /** System 1 (Jev flags claims on every line) and System 2 (research, audits, rewrites). */
+  factcheck: boolean;
+  /** Jev labels each closed segment of the timeline. */
+  labels: boolean;
+}
+
+/** System 1's questions and answers, when fact-checking is off: none. */
+const NO_FACTCHECK = { questions: () => ({ questions: {}, version: "off" }), onAnswers: () => {} };
 
 /** The external services, injectable so tests never touch the network. */
 /** Streamed to the page but never stored in the replayable history or events.jsonl. */
@@ -53,6 +68,8 @@ export interface SessionOptions {
   liveConnect?: LiveDeps["connect"];
   /** Overrides `speakers.voicesPerStream`, e.g. how many people are on the call tonight. */
   voices?: VoiceLimits;
+  /** Both on unless set to false. */
+  features?: Partial<Features>;
 }
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
@@ -133,7 +150,9 @@ export class Session {
       this.emit("error", { component, message, ...(detail ?? {}) });
     const speakerName = (id: string) => this.speakers.displayName(id);
 
+    const features = this.features;
     this.timeline = new Timeline(cfg.app, cfg.labels, {
+      labels: features.labels,
       ask: (s, q, m) => this.services.ask(s, q, m),
       speakerName,
       emit: (t, d) => this.emit(t as EventType, d),
@@ -154,7 +173,8 @@ export class Session {
     this.segmenter = new Segmenter(cfg.app.segmentation, {
       ask: (s, q, m) => this.services.ask(s, q, m),
       boundary: () => this.timeline.labelSetActive.boundary,
-      factcheck: this.factcheck,
+      factcheck: features.factcheck ? this.factcheck : NO_FACTCHECK,
+      jev: features.factcheck || features.labels,
       speakerName,
       resolveSpeaker: (id) => this.speakers.resolve(id),
       streams: () => [...this.vads.values()].map((v) => ({ stream: v.stream, watermark: v.watermark, midSpeech: v.isDetected() })),
@@ -180,6 +200,10 @@ export class Session {
 
   get mode(): SessionMode {
     return this.opts.mode;
+  }
+
+  get features(): Features {
+    return { factcheck: this.opts.features?.factcheck !== false, labels: this.opts.features?.labels !== false };
   }
 
   private realServices(log: (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => void): Services {
@@ -220,14 +244,16 @@ export class Session {
   private async runInner(): Promise<void> {
     const cfg = this.opts.config;
     this.store.writeJson("session.json", {
-      id: this.id, mode: this.opts.mode, startedAt: this.startedAt.toISOString(),
+      // the version that made the recording, which an export carries along
+      id: this.id, app: appInfo(), mode: this.opts.mode, startedAt: this.startedAt.toISOString(),
       streams: this.opts.sources.map((s) => s.stream),
-      config: cfg.app, voices: this.voices, labelSet: cfg.labels, labelSetVersion: this.timeline.version,
+      config: cfg.app, voices: this.voices, features: this.features, labelSet: cfg.labels, labelSetVersion: this.timeline.version,
       s1Version: this.factcheck.active.id, s1: cfg.s1,
     });
     this.emit("session.started", {
       sessionId: this.id, mode: this.opts.mode, dir: this.store.dir, s1Version: this.factcheck.active.id,
       labelSetVersion: this.timeline.version, streams: this.opts.sources.map((s) => s.stream), startedAt: this.startedAt.toISOString(),
+      features: this.features,
     });
     this.timers.push(setInterval(() => this.emitHealth(), 1000));
     this.timers.push(setInterval(() => this.emitStats(), this.opts.statsIntervalMs ?? 60_000));
@@ -442,7 +468,7 @@ export class Session {
     return {
       session: {
         id: this.id, mode: this.opts.mode, status: this.status, paused: this.paused, dir: this.store.dir, startedAt: this.startedAt.toISOString(),
-        streams: this.opts.sources.map((s) => s.stream),
+        streams: this.opts.sources.map((s) => s.stream), features: this.features,
       },
       speakers: this.speakers.list(),
       utterances: this.utterances.map((u) => ({

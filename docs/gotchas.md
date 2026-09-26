@@ -8,6 +8,7 @@ source:
   - src/factcheck/s1.ts
   - src/factcheck/s2.ts
   - scripts/make-fixtures.ts
+  - src/store/transfer.ts
 ---
 
 # Gotchas
@@ -35,6 +36,13 @@ source:
 - **Verdicts embed inline markdown citations** (`([site](url))`) in `correction` and in source titles, because of the web plugin. They clutter the cards and count as one "word", which defeats the 25-word correction limit. `stripCitations` in `src/factcheck/s2.ts` removes them.
 - **Strict `json_schema` works together with the web plugin** on GPT-6 Luna (both the exa and native engines), so the `json_object` fallback has not been needed; it stays in place in case that changes.
 - **`provider: { data_collection: "deny" }` is sent on Jev and GPT-6 Luna calls** (`config/app.json`), and both still route. Adding `zdr: true` was not tested and may break Jev, whose endpoint is not confirmed on the zero-retention list.
+
+## Export and import
+
+- **Safari unzips a downloaded `.zip` into a folder** ("Open safe files after downloading"), which would break import. That is why exports use their own extension, `.podcast-recording`, and are served as `application/octet-stream`.
+- **`afconvert`'s WAV output has extra chunks**: decoding AAC to WAVE puts the audio at byte 4088, not 44. The app assumes a 44-byte header everywhere (durations from file size, the playback mixer), so import rewrites the header (`canonicalWav` in `src/store/transfer.ts`). The AAC round trip itself is exact: the same sample count and no time shift, measured on a two-minute stream.
+
+- **A recording's session events must carry its own folder id.** The page switches to a newly opened recording only when the `session.started` it receives names a different session from the one on screen. A copy imported as `<id>-2` whose events still said `<id>` opened in the engine, but the page kept showing the original. Import now rewrites the ids, and `SessionLibrary.events` corrects mismatches on open (see [Recordings](recordings.md#export-and-import)).
 
 ## Chat
 

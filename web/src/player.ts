@@ -16,7 +16,8 @@ let jumped = false;
 let boost: GainNode | null = null;
 const SPEED_KEY = "pa.playSpeed";
 
-const isRecording = (st: State) => st.session?.status === "archived";
+/** A recording with audio to play (one imported without audio has none). */
+const isRecording = (st: State) => st.session?.status === "archived" && st.session.hasAudio !== false;
 
 /** Session ms of the playback position. */
 const positionMs = () => (audio ? audio.currentTime * 1000 : 0);

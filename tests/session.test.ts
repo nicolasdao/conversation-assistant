@@ -169,6 +169,51 @@ describe("session (offline, fake services)", () => {
     }
   });
 
+  test("transcript only: with fact-checking and labels off, Jev and System 2 are never called, and segments still form", async () => {
+    requireAssets();
+    const root = mkdtempSync(join(tmpdir(), "sessions-"));
+    const { f } = fakeFetch(loadScript());
+    const urls: string[] = [];
+    const spy = ((url: string, init: RequestInit) => { urls.push(url); return f(url, init); }) as unknown as typeof fetch;
+    const bus = new EventBus();
+    const s = new Session({
+      mode: "replay", config: loadConfig(), bus, sessionsDir: root, fetch: spy, keys: { openrouter: OPENROUTER, openai: OPENAI },
+      sources: [new FileSource(`${FIXTURE_DIR}/host.wav`, "host", "max"), new FileSource(`${FIXTURE_DIR}/remote.wav`, "remote", "max")],
+      features: { factcheck: false, labels: false },
+    });
+    await s.run();
+    expect(urls.some((u) => u.includes("alpha/decisions") || u.includes("chat/completions"))).toBe(false);
+    expect(urls.some((u) => u.includes("audio/transcriptions"))).toBe(true);
+    const types = bus.history().map((e) => e.type);
+    expect(types).toContain("utterance");
+    expect(types).toContain("segment.closed");
+    for (const t of ["segment.labels", "claim.flagged", "claim.verdict"]) expect(types, t).not.toContain(t);
+    expect(bus.history().find((e) => e.type === "session.started")?.data.features).toEqual({ factcheck: false, labels: false });
+    expect(JSON.parse(readFileSync(join(s.store.dir, "session.json"), "utf8")).features).toEqual({ factcheck: false, labels: false });
+    expect(readFileSync(join(s.store.dir, "jev_calls.jsonl"), "utf8")).toBe("");
+    expect((s.state() as any).session.features).toEqual({ factcheck: false, labels: false });
+  });
+
+  test("fact-checking off, labels on: the line request asks only the boundary, and segments are labelled", async () => {
+    requireAssets();
+    const root = mkdtempSync(join(tmpdir(), "sessions-"));
+    const { f } = fakeFetch(loadScript());
+    const bus = new EventBus();
+    const s = new Session({
+      mode: "replay", config: loadConfig(), bus, sessionsDir: root, fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI },
+      sources: [new FileSource(`${FIXTURE_DIR}/host.wav`, "host", "max"), new FileSource(`${FIXTURE_DIR}/remote.wav`, "remote", "max")],
+      features: { factcheck: false },
+    });
+    await s.run();
+    const rows = readFileSync(join(s.store.dir, "jev_calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    for (const r of rows.filter((x) => x.purpose === "utterance")) expect(r.question_ids).toEqual(["boundary"]);
+    expect(rows.some((r) => r.purpose === "segment")).toBe(true);
+    expect(readFileSync(join(s.store.dir, "s2_calls.jsonl"), "utf8")).toBe("");
+    const types = bus.history().map((e) => e.type);
+    expect(types).toContain("segment.labels");
+    expect(types).not.toContain("claim.flagged");
+  });
+
   test("a paused session hears silence: nothing is transcribed and the recorded audio is silent", async () => {
     requireAssets();
     const root = mkdtempSync(join(tmpdir(), "sessions-"));
@@ -189,6 +234,22 @@ describe("session (offline, fake services)", () => {
     expect(rec.length).toBeGreaterThan(16_000 * 60); // the file keeps its length, so times stay aligned
     expect(rec.every((v: number) => v === 0)).toBe(true);
     expect(s.resume()).toBe(false); // ended
+  });
+
+  test("the engine starts a named, transcript-only session; commands for its off features are refused", async () => {
+    requireAssets();
+    const root = mkdtempSync(join(tmpdir(), "sessions-"));
+    const { f } = fakeFetch(loadScript());
+    const engine = new Engine({ sessionsDir: root, session: { fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI } } });
+    await expect(engine.start({ mode: "replay", dir: FIXTURE_DIR, speed: "max", features: { labels: "no" as any } })).rejects.toThrow(/features.labels/);
+    const { sessionId } = await engine.start({ mode: "replay", dir: FIXTURE_DIR, speed: "max", name: "Pilot", features: { factcheck: false, labels: false } });
+    // naming used to fail here, before the session had written session.json
+    expect(engine.library.get(sessionId).name).toBe("Pilot");
+    expect(() => engine.relabel()).toThrow(/labels are off/);
+    expect(() => engine.putStories(["x"])).toThrow(/labels are off/);
+    expect(() => engine.rollback("s1@1")).toThrow(/fact-checking is off/);
+    await engine.current!.run();
+    expect((engine.state() as any).session.features).toEqual({ factcheck: false, labels: false });
   });
 
   test("an ended session becomes a recording, which can be deleted without lowering the development spend", async () => {

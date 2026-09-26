@@ -29,6 +29,12 @@ export interface SessionSummary {
   /** costUsd by bucket; `chat` keeps growing after the recording ended, as the host asks about it. */
   cost: CostBreakdown;
   tool: boolean;
+  /** False for a recording imported without its audio: no playback or replay. */
+  hasAudio: boolean;
+  /** The app version that made the recording (null before versions were recorded). */
+  appVersion: string | null;
+  /** Set for a recording imported from a `.podcast-recording` file. */
+  imported: { at: string; exportedWith: string | null; fileName: string | null } | null;
 }
 
 export interface SearchMatch { utteranceId: string; startMs: number; speaker: string; snippet: string }
@@ -73,6 +79,8 @@ function readJson(path: string): any | null {
 }
 
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** Events that name their session by id. */
+const SESSION_EVENTS = new Set(["session.started", "session.ended", "session.paused", "session.resumed"]);
 
 /** The recordings library: every session folder, with names, search, and read-only reopening (no API calls). */
 export class SessionLibrary {
@@ -120,10 +128,14 @@ export class SessionLibrary {
       ? speakersFile.filter((s: any) => !s.mergedInto).map((s: any) => String(s.displayName))
       : [...recorded.names].filter(([id]) => !recorded.mergedInto.has(id)).map(([, n]) => n);
     let durationMs = 0;
+    let hasAudio = false;
     for (const s of ["host", "remote"]) {
       const p = join(dir, `${s}.wav`);
-      if (existsSync(p)) durationMs = Math.max(durationMs, ((statSync(p).size - 44) / 32_000) * 1000);
+      if (existsSync(p)) { hasAudio = true; durationMs = Math.max(durationMs, ((statSync(p).size - 44) / 32_000) * 1000); }
     }
+    const imported = readJson(join(dir, "imported.json"));
+    // no audio (imported without it): the exported duration, else the last line
+    if (!hasAudio) durationMs = imported?.manifest?.recording?.durationMs ?? Math.max(0, ...utterances.map((e) => Number((e.data as any).endMs) || 0));
     const cost: CostBreakdown = { transcription: 0, jev: 0, s2: 0, chat: 0 };
     for (const [bucket, f] of Object.entries(COST_FILES) as [keyof CostBreakdown, string][]) {
       for (const r of readJsonl(join(dir, `${f}.jsonl`))) if (COST_KINDS.has(r.kind) && typeof r.cost_usd === "number") cost[bucket] += r.cost_usd;
@@ -134,6 +146,8 @@ export class SessionLibrary {
       mode: session.mode === "live" || session.mode === "replay" ? session.mode : "unknown",
       startedAt: session.startedAt ?? null, durationMs: Math.round(durationMs), streams: session.streams ?? [],
       ended, utterances: utterances.length, speakers, segments, claims, costUsd, cost, tool: TOOL_PREFIXES.some((p) => id.startsWith(p)),
+      hasAudio, appVersion: session.app?.version ?? imported?.manifest?.recording?.recordedWith ?? null,
+      imported: imported ? { at: imported.importedAt, exportedWith: imported.manifest?.app?.version ?? null, fileName: imported.fileName ?? null } : null,
     };
     const entry = { mtimeMs, summary, utterances, recorded };
     this.cache.set(id, entry);
@@ -203,7 +217,13 @@ export class SessionLibrary {
 
   /** The recorded event stream, for reopening a session exactly as it was, without calling any service. */
   events(id: string): AppEvent[] {
-    return readJsonl(join(this.dirOf(id), "events.jsonl")) as AppEvent[];
+    const dir = this.dirOf(id);
+    // A recording's session events name it by its folder. An imported copy (id-2) recorded them under the original's
+    // id; left as is, a page showing the original would take the copy's events for its own and never switch.
+    return (readJsonl(join(dir, "events.jsonl")) as AppEvent[]).map((e) =>
+      SESSION_EVENTS.has(e.type) && (e.data as any)?.sessionId !== id
+        ? { ...e, data: { ...e.data, sessionId: id, ...((e.data as any).dir !== undefined ? { dir } : {}) } }
+        : e);
   }
 
   /** The recording's speakers as they stand now, including renames and merges made after it was recorded. */
@@ -276,7 +296,8 @@ export class SessionLibrary {
   remove(id: string): void {
     const dir = this.dirOf(id);
     const summary = this.load(id).summary;
-    if (summary.costUsd > 0) {
+    // an imported recording's spend was someone else's, and never counted here
+    if (summary.costUsd > 0 && !summary.imported) {
       appendFileSync(join(this.root, "deleted-spend.jsonl"),
         JSON.stringify({ kind: "deleted_session", session_id: id, deleted_at: new Date().toISOString(), cost_usd: summary.costUsd }) + "\n");
     }
@@ -289,7 +310,10 @@ export class SessionLibrary {
     const session = readJson(join(dir, "session.json")) ?? {};
     const s = this.get(id);
     return {
-      session: { id, mode: s.mode, status: "archived", dir, startedAt: s.startedAt, streams: s.streams, name: s.name },
+      // recordings from before features existed ran with everything on
+      session: { id, mode: s.mode, status: "archived", dir, startedAt: s.startedAt, streams: s.streams, name: s.name,
+        hasAudio: s.hasAudio, appVersion: s.appVersion, imported: s.imported,
+        features: { factcheck: session.features?.factcheck !== false, labels: session.features?.labels !== false } },
       labels: session.labelSet ? { set: session.labelSet, stories: session.config?.timeline?.stories ?? [], version: session.labelSetVersion ?? "" } : undefined,
       s1: { active: session.s1Version ?? "s1@1", versions: [], memory: [] },
       cost: { ...s.cost, session: s.costUsd, sessionCapUsd: session.config?.budget?.sessionCapUsd ?? 5 },

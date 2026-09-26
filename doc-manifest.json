@@ -59,11 +59,12 @@
         "The session pipeline — `src/pipeline/session.ts`",
         "Event bus and API — `src/store/events.ts`, `src/server/main.ts`",
         "Web front end — `web/`",
+        "Features: transcript-only sessions",
         "Budgets — `src/budget.ts`",
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 173,
+      "line_count": 195,
       "links_to": [
         "docs/chat.md",
         "docs/gotchas.md",
@@ -156,12 +157,15 @@
         "sherpa-onnx",
         "OpenAI",
         "OpenRouter and GPT-6 Luna",
+        "Export and import",
         "Chat",
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 52,
-      "links_to": [],
+      "line_count": 60,
+      "links_to": [
+        "docs/recordings.md"
+      ],
       "over_size": false,
       "parse_error": null,
       "path": "docs/gotchas.md",
@@ -171,7 +175,8 @@
         "src/transcribe/**",
         "src/factcheck/s1.ts",
         "src/factcheck/s2.ts",
-        "scripts/make-fixtures.ts"
+        "scripts/make-fixtures.ts",
+        "src/store/transfer.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -205,7 +210,7 @@
         "The client — `src/jev/client.ts`",
         "Measured performance and cost"
       ],
-      "line_count": 177,
+      "line_count": 179,
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
@@ -277,16 +282,17 @@
     },
     {
       "dangling": false,
-      "description": "Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, and deletes past sessions.",
+      "description": "Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, exports, imports, and deletes past sessions.",
       "has_frontmatter": true,
       "headings": [
         "Recordings",
         "Session folders",
         "The library — `src/store/library.ts`",
         "Open vs Replay",
+        "Export and import",
         "API"
       ],
-      "line_count": 75,
+      "line_count": 133,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
@@ -301,7 +307,10 @@
         "src/store/library.ts",
         "src/store/events.ts",
         "src/server/main.ts",
-        "src/server/audio.ts"
+        "src/server/audio.ts",
+        "src/store/transfer.ts",
+        "src/store/zip.ts",
+        "web/src/transfer.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -310,6 +319,8 @@
         "library",
         "replay",
         "playback",
+        "export",
+        "import",
         "api"
       ],
       "toc": {
@@ -419,7 +430,7 @@
         "Events and files",
         "Measured so far"
       ],
-      "line_count": 260,
+      "line_count": 262,
       "links_to": [
         "docs/architecture.md",
         "docs/jev.md",

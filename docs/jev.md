@@ -97,8 +97,8 @@ Calibration reported by OpenRouter (Banking77): 96.3% accuracy on the 58% of inp
 
 | Purpose | When | State | Questions | Settings |
 | --- | --- | --- | --- | --- |
-| `utterance` | Every non-filler utterance, in time order (`src/pipeline/segmenter.ts`) | `{ current_segment, new_utterance }` | `boundary` + the active System 1 set (`claim`, `claim_type`, `public`, `hedged`, `worth`, 0–3 `attention_*`) + memory questions (0–40 `known_*`) → 6 to 49 questions | Live: 3 s timeout, 2 attempts |
-| `segment` | Each closed segment (`src/pipeline/timeline.ts`) | `{ previous_segment, segment }` | The timeline label set: 10 questions, plus `story` when stories are set | Live: 5 s timeout, 2 attempts; up to 4 in parallel |
+| `utterance` | Every non-filler utterance, in time order (`src/pipeline/segmenter.ts`); with fact-checking off, `boundary` only; with fact-checking and labels both off, never | `{ current_segment, new_utterance }` | `boundary` + the active System 1 set (`claim`, `claim_type`, `public`, `hedged`, `worth`, 0–3 `attention_*`) + memory questions (0–40 `known_*`) → 6 to 49 questions | Live: 3 s timeout, 2 attempts |
+| `segment` | Each closed segment (`src/pipeline/timeline.ts`); never when labels are off | `{ previous_segment, segment }` | The timeline label set: 10 questions, plus `story` when stories are set | Live: 5 s timeout, 2 attempts; up to 4 in parallel |
 | `relabel` | `POST /api/labels/relabel` | Same as `segment` | The current label set | Background: 30 s timeout, 5 attempts |
 | `gate` | Replay gate for a System 1 rewrite (`src/factcheck/gate.ts`) | The logged `utterance` states of graded flags and audit misses (up to 300) | The candidate System 1 set only (no `boundary`, no memory) | Background |
 | `preflight`, `smoke` | Pre-show and development checks | Fixture text | `boundary` + `s1@1`; the label set; a 48-question worst case | Background, or as each check states |
@@ -120,6 +120,8 @@ It is a **comparison**, not "is this a complete idea?", because Jev reads questi
 2. If adding the utterance would make the segment longer than `maxSegmentMs` (75 s), the segment closes first, marked `forced`.
 3. Otherwise the segment closes before the utterance when `boundary ≥ boundaryThreshold` (0.6) **and** the segment is already at least `minSegmentMs` (12 s) long. The threshold drops by `speakerChangeBonus` (0.1) when the speaker changes after a gap of at least `speakerChangeGapMs` (1.5 s).
 4. If the Jev call fails, `boundary` counts as 0 (the segment stays open) and fact-checking is skipped for that utterance.
+
+A session started with fact-checking and labels both off never asks Jev (see [Architecture](architecture.md#features-transcript-only-sessions)). Its segments close by code alone: at a pause of at least `pauseBoundaryMs` (2 s) once the segment is 12 s long, or forced before 75 s.
 
 The boundary question is part of the label set file but is **not** host-editable live: `PUT /api/labels` returns 409 if it changes, because its threshold is calibrated (`npm run calibrate:boundary`).
 

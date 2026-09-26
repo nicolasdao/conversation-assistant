@@ -1,7 +1,8 @@
 import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.js";
+import { openExport, openImport } from "./transfer.js";
 import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
-import { resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
+import { featuresOf, resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
 
 export interface Filters { markers: Set<string>; speaker: string; subject: string }
 export const filters: Filters = { markers: new Set(), speaker: "", subject: "" };
@@ -113,7 +114,8 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
     const paused = $("#pause")!.dataset.paused === "1";
     void run(() => (paused ? api.resume() : api.pause()), paused ? "Resumed" : "Paused: nothing is heard or transcribed until you resume");
   });
-  $("#start-live")?.addEventListener("click", () => run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined, voicesOnCall())));
+  $("#start-live")?.addEventListener("click", () => openStartLive());
+  bindStartLive();
   const voices = $<HTMLSelectElement>("#voices");
   try { const saved = localStorage.getItem("pa.voices"); if (voices && saved !== null) voices.value = saved; } catch { /* storage may be unavailable */ }
   voices?.addEventListener("change", () => { try { localStorage.setItem("pa.voices", voices.value); } catch { /* storage may be unavailable */ } });
@@ -155,6 +157,44 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
     d.querySelectorAll("[data-close]").forEach((x) => x.addEventListener("click", () => d.close()));
     d.querySelectorAll("[data-cancel]").forEach((x) => x.addEventListener("click", () => d.close("cancel")));
     d.addEventListener("click", (e) => { if (e.target === d) d.close(); }); // a click on the backdrop
+  });
+}
+
+// ---------- Start live: choose the features ----------
+
+/** Rough cost per hour of show (README): transcription always, Jev for labels or fact-checking, System 2 for fact-checking. */
+const PER_HOUR = { transcript: 1.23, jev: 0.04, factcheck: 0.35 };
+
+const feature = (id: "factcheck" | "labels") => $<HTMLButtonElement>(`#feat-${id}`)!;
+const isOn = (id: "factcheck" | "labels") => feature(id).getAttribute("aria-checked") === "true";
+
+function renderStartSummary() {
+  const fc = isOn("factcheck"), lb = isOn("labels");
+  const perHour = PER_HOUR.transcript + (fc || lb ? PER_HOUR.jev : 0) + (fc ? PER_HOUR.factcheck : 0);
+  const what = fc && lb ? "Everything on" : !fc && !lb ? "Transcript only: Jev and System 2 are not called" : fc ? "No labels" : "No fact-checking";
+  replace($("#start-summary"), h("b", {}, what), h("br", {}), `About $${perHour.toFixed(2)} an hour${fc ? " at most" : ""}.`);
+}
+
+/** Start live asks first: every feature is on unless the host turns it off, for this session only. */
+function openStartLive() {
+  for (const id of ["factcheck", "labels"] as const) feature(id).setAttribute("aria-checked", "true");
+  renderStartSummary();
+  const d = $<HTMLDialogElement>("#dlg-start")!;
+  d.showModal();
+  $<HTMLButtonElement>("#start-go")?.focus();
+}
+
+function bindStartLive() {
+  for (const id of ["factcheck", "labels"] as const) {
+    feature(id).addEventListener("click", () => {
+      feature(id).setAttribute("aria-checked", String(!isOn(id)));
+      renderStartSummary();
+    });
+  }
+  $("#start-go")?.addEventListener("click", () => {
+    const features = { factcheck: isOn("factcheck"), labels: isOn("labels") };
+    $<HTMLDialogElement>("#dlg-start")!.close();
+    void run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined, voicesOnCall(), features));
   });
 }
 
@@ -227,6 +267,8 @@ export function renderSession(st: State) {
   const block = !running ? null : s!.mode === "replay" ? "replay" : s!.paused ? "paused" : "live";
   const onair = $("#onair")!;
   $("#top")!.classList.toggle("no-onair", !block);
+  // on air, the controls that only apply to starting a session make way for the ones that work now
+  $("#top")!.classList.toggle("on-air", running);
   onair.hidden = !block;
   if (block) {
     const [cls, label] = ONAIR[block]!;
@@ -242,6 +284,8 @@ export function renderSession(st: State) {
   nameBtn.title = s ? `Click to rename · ${s.mode} session ${s.id}` : "";
   for (const id of ["#start-live", "#start-replay"]) $<HTMLButtonElement>(id)!.disabled = running;
   $<HTMLButtonElement>("#stop")!.disabled = !running;
+  // Stop only exists while something is on air
+  $<HTMLButtonElement>("#stop")!.hidden = !running;
   const pause = $<HTMLButtonElement>("#pause")!;
   pause.hidden = !(running && s?.mode === "live");
   pause.disabled = s?.status !== "running";
@@ -250,6 +294,14 @@ export function renderSession(st: State) {
   replace(pause, glyph(s?.paused ? "play" : "pause"), s?.paused ? "Resume" : "Pause");
   pause.title = s?.paused ? "Resume listening" : "Pause: audio becomes silence until you resume; Stop still works";
   replace($("#replay-note"), running ? "Stop the current session first." : "");
+  // a session that runs without some features says so, next to its name
+  const f = featuresOf(st);
+  const chip = $("#features-chip")!;
+  const off = !s ? "" : !f.factcheck && !f.labels ? "Transcript only" : !f.factcheck ? "No fact-check" : !f.labels ? "No labels" : "";
+  chip.hidden = !off;
+  replace(chip, off);
+  chip.title = off ? "Chosen when the session started; it stays this way for the whole session" : "";
+  $("#tl")!.classList.toggle("labels-off", !!s && !f.labels);
 }
 
 /** The elapsed clock: 05:39, or 1:05:39 past an hour. */
@@ -326,7 +378,10 @@ export function segmentMatches(g: Segment): boolean {
 }
 
 export function renderFilters(st: State, onChange: () => void) {
-  const chips = Object.entries(MARKERS).filter(([k]) => k !== "humour").map(([k, m]) =>
+  // without labels there are no markers or subjects to filter by; a filter left from another session would hide every line
+  const labels = featuresOf(st).labels;
+  if (!labels) { filters.markers.clear(); filters.subject = ""; }
+  const chips = !labels ? [] : Object.entries(MARKERS).filter(([k]) => k !== "humour").map(([k, m]) =>
     h("button", {
       class: "chip", "aria-pressed": String(filters.markers.has(k)),
       onclick: () => { filters.markers.has(k) ? filters.markers.delete(k) : filters.markers.add(k); onChange(); },
@@ -337,7 +392,7 @@ export function renderFilters(st: State, onChange: () => void) {
     h("select", { class: "select", "aria-label": "Speaker filter", onchange: (e: Event) => { filters.speaker = (e.target as HTMLSelectElement).value; onChange(); } },
       h("option", { value: "" }, "All speakers"),
       speakers.map((s) => h("option", { value: s.id, selected: filters.speaker === s.id }, s.displayName))),
-    h("select", { class: "select", "aria-label": "Subject filter", onchange: (e: Event) => { filters.subject = (e.target as HTMLSelectElement).value; onChange(); } },
+    !labels ? null : h("select", { class: "select", "aria-label": "Subject filter", onchange: (e: Event) => { filters.subject = (e.target as HTMLSelectElement).value; onChange(); } },
       h("option", { value: "" }, "All subjects"),
       h("option", { value: "ai", selected: filters.subject === "ai" }, "AI (all)"),
       Object.keys(SUBJECT_COLORS).map((k) => h("option", { value: k, selected: filters.subject === k }, pretty(k)))),
@@ -543,7 +598,10 @@ function card(st: State, c: Claim): HTMLElement {
 export function renderClaims(st: State) {
   const claims = [...st.claims.values()].sort((a, b) =>
     (b.activity ?? "").localeCompare(a.activity ?? "") || Number(b.id.slice(2)) - Number(a.id.slice(2)));
-  replace($("#claims"), claims.length ? claims.map((c) => card(st, c)) : h("div", { class: "empty" }, "Checkable claims appear here as they are said."));
+  const empty = featuresOf(st).factcheck
+    ? "Checkable claims appear here as they are said."
+    : "Fact-checking is off for this session: it was turned off when the session started.";
+  replace($("#claims"), claims.length ? claims.map((c) => card(st, c)) : h("div", { class: "empty" }, empty));
   replace($("#claims-count"), claims.length ? String(claims.length) : "");
   const count = (f: (c: Claim) => boolean) => claims.filter(f).length;
   const tally: [string, number, string][] = [
@@ -680,6 +738,7 @@ export function renderSpeakers(st: State) {
 export async function renderS1(st: State) {
   const box = $("#s1");
   if (editing(box)) return;
+  if (!featuresOf(st).factcheck) return replace(box, h("div", { class: "empty" }, "Fact-checking is off for this session, so System 1 does not run."));
   const c = s1Counters(st);
   const last = st.s1.last;
   const restorable = st.s1.versions.filter((v) => v.id === "s1@1" || v.status === "promoted");
@@ -764,6 +823,10 @@ function readEditor(base: LabelSet): LabelSet {
 }
 
 export function renderLabels(st: State, force = false) {
+  if (st.session && !featuresOf(st).labels) {
+    editorVersion = "";
+    return replace($("#labels"), h("div", { class: "empty" }, "Labels are off for this session: its timeline shows segments and time only."));
+  }
   const set = st.labels.set;
   if (!set) return replace($("#labels"), h("div", { class: "empty" }, "The label set loads with a session."));
   if (!force && (editorTouched || editorVersion === st.labels.version)) return;
@@ -900,9 +963,16 @@ function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undef
       title,
       current ? h("span", { class: "badge cur" }, viewing ? "Viewing" : "Current") : null,
       !r.ended && !current ? h("span", { class: "badge inc", title: "No session.ended: the recording stopped abruptly" }, "Incomplete") : null,
+      r.imported ? h("span", { class: "badge imp", title: `Imported${r.imported.fileName ? ` from ${r.imported.fileName}` : ""}${r.imported.exportedWith ? `, exported with v${r.imported.exportedWith}` : ""}` }, "Imported") : null,
+      r.hasAudio === false ? h("span", { class: "badge inc", title: "Imported without its audio: no playback or replay" }, "No audio") : null,
       h("button", {
-        class: "btn sm rec-replay", disabled: running,
-        title: running ? "Stop the current session first" : "Run the audio through the pipeline again (costs money: transcription, Jev, System 2)",
+        class: "btn sm rec-export", disabled: current && running,
+        title: current && running ? "Stop the session before exporting it" : "Save it as one file to share (WhatsApp, email)",
+        onclick: (e: Event) => { e.stopPropagation(); void openExport(r.id); },
+      }, glyph("export"), "Export"),
+      h("button", {
+        class: "btn sm rec-replay", disabled: running || r.hasAudio === false,
+        title: running ? "Stop the current session first" : r.hasAudio === false ? "No audio to replay" : "Run the audio through the pipeline again (costs money: transcription, Jev, System 2)",
         onclick: async (e: Event) => {
           e.stopPropagation();
           const ok = await ask(`Replay “${label}”?`, {
@@ -933,7 +1003,7 @@ function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undef
       }, glyph("trash"))),
     h("div", { class: "meta" },
       [r.name ? when(r.startedAt, r.id) : null, clock(r.durationMs), r.mode, `${r.utterances} lines`, r.speakers.join(", ") || null,
-        r.claims ? `${r.claims} claims` : null, usd(r.costUsd)].filter(Boolean).join(" · ")),
+        r.claims ? `${r.claims} claims` : null, usd(r.costUsd), r.appVersion ? `v${r.appVersion}` : null].filter(Boolean).join(" · ")),
     (r.matches ?? []).map((m) => h("div", { class: "match" }, h("span", { class: "t" }, clock(m.startMs)), `${m.speaker}: `, m.snippet)));
 }
 
@@ -949,8 +1019,11 @@ export async function renderRecordings(st: State) {
       clearTimeout(libraryTimer);
       libraryTimer = window.setTimeout(refresh, 250);
     });
-    replace(box, search, h("div", { class: "rec-list" }),
-      h("p", { class: "note" }, "Click a recording to open it exactly as it was, for free. Click its name to rename it. Replay runs its audio through the pipeline again and costs about what it cost the first time."));
+    replace(box,
+      h("div", { class: "rec-tools" }, search,
+        h("button", { class: "btn", title: "Add a recording someone shared with you", onclick: () => openImport() }, glyph("import"), "Import")),
+      h("div", { class: "rec-list" }),
+      h("p", { class: "note" }, "Click a recording to open it exactly as it was, for free. Click its name to rename it. Export saves it as one file to share; Replay runs its audio through the pipeline again and costs about what it cost the first time."));
   }
   const list = box.querySelector(".rec-list")!;
   try {

@@ -59,6 +59,11 @@ export interface SegmenterDeps {
   onSegmentClosed(s: Segment): void;
   onProcessed?(u: PipelineUtterance): void;
   onError(component: string, message: string, detail?: Record<string, unknown>): void;
+  /**
+   * False when the session runs with fact-checking and labels both off: Jev is never asked, and a segment closes at a
+   * pause of at least `pauseBoundaryMs` instead of on the boundary question. True by default.
+   */
+  jev?: boolean;
   now?: () => number;
   setTimer?: (fn: () => void, ms: number) => void;
 }
@@ -76,7 +81,7 @@ export function stateUtterance(u: PipelineUtterance, name: (id: string) => strin
   return { speaker: name(u.speakerId), text: u.text, tags: [...u.tags] };
 }
 
-/** Groups utterances into segments with the Jev boundary question plus code rules (§4.7). */
+/** Groups utterances into segments with the Jev boundary question plus code rules (§4.7), or with code alone. */
 export class Segmenter {
   private readonly pending: Pending[] = [];
   private readonly recent: { stream: StreamName; startMs: number; endMs: number }[] = [];
@@ -196,28 +201,35 @@ export class Segmenter {
       return;
     }
 
-    const name = (id: string) => this.deps.speakerName(id);
-    const fc = this.deps.factcheck.questions();
-    const questions: QuestionSet = { boundary: this.deps.boundary(), ...fc.questions };
-    const state = {
-      current_segment: (this.open?.utterances ?? []).filter((x) => !x.failed).map((x) => stateUtterance(x, name)),
-      new_utterance: stateUtterance(u, name),
-    };
+    const useJev = this.deps.jev !== false;
     let answers: Record<string, JevAnswer> | null = null;
-    try {
-      const res = await this.deps.ask(state, questions, { purpose: "utterance", utterance_id: u.id, question_set_version: fc.version });
-      answers = res.answers;
-    } catch (e) {
-      this.deps.onError("jev", e instanceof Error ? e.message : String(e), { utterance_id: u.id, purpose: "utterance" });
+    if (useJev) {
+      const name = (id: string) => this.deps.speakerName(id);
+      const fc = this.deps.factcheck.questions();
+      const questions: QuestionSet = { boundary: this.deps.boundary(), ...fc.questions };
+      const state = {
+        current_segment: (this.open?.utterances ?? []).filter((x) => !x.failed).map((x) => stateUtterance(x, name)),
+        new_utterance: stateUtterance(u, name),
+      };
+      try {
+        const res = await this.deps.ask(state, questions, { purpose: "utterance", utterance_id: u.id, question_set_version: fc.version });
+        answers = res.answers;
+      } catch (e) {
+        this.deps.onError("jev", e instanceof Error ? e.message : String(e), { utterance_id: u.id, purpose: "utterance" });
+      }
     }
     const boundary = answers ? noul(answers, "boundary") ?? 0 : 0;
-    u.boundary = boundary;
+    if (useJev) u.boundary = boundary;
 
     if (this.open) {
+      const prev = this.open.utterances[this.open.utterances.length - 1];
       if (this.span(this.open, u) > this.cfg.maxSegmentMs) {
         this.close(true);
+      } else if (!useJev) {
+        // no Jev: a long enough segment ends at a natural pause
+        const gap = prev === undefined ? 0 : u.startMs - prev.endMs;
+        if (gap >= this.cfg.pauseBoundaryMs && this.span(this.open) >= this.cfg.minSegmentMs) this.close(false);
       } else {
-        const prev = this.open.utterances[this.open.utterances.length - 1];
         const resolve = this.deps.resolveSpeaker ?? ((id: string) => id);
         const speakerChange = prev !== undefined && resolve(prev.speakerId) !== resolve(u.speakerId)
           && u.startMs - prev.endMs >= this.cfg.speakerChangeGapMs;

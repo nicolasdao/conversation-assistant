@@ -59,8 +59,16 @@ export interface Calls {
   keys: Set<string>;
 }
 
+/** What a session runs beyond the transcript, chosen at its start (see the engine's Features). */
+export interface Features { factcheck: boolean; labels: boolean }
+
 export interface State {
-  session: { id: string; mode: string; status: string; paused?: boolean; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null } | null;
+  session: {
+    id: string; mode: string; status: string; paused?: boolean; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null;
+    features?: Features;
+    /** Recordings only: false when imported without audio; the version that recorded it; where it was imported from. */
+    hasAudio?: boolean; appVersion?: string | null; imported?: { at: string; exportedWith: string | null; fileName: string | null } | null;
+  } | null;
   /** Paused stretches of session time; `endMs` is null while still paused. */
   pauses: { startMs: number; endMs: number | null }[];
   speakers: Map<string, Speaker>;
@@ -108,6 +116,11 @@ export function emptyState(): State {
   };
 }
 
+/** The session on screen's features; sessions and recordings from before features existed ran with both on. */
+export function featuresOf(s: State): Features {
+  return { factcheck: s.session?.features?.factcheck !== false, labels: s.session?.features?.labels !== false };
+}
+
 /** Follows merges to the surviving speaker. */
 export function resolveSpeaker(s: State, id: string): Speaker | undefined {
   let sp = s.speakers.get(id);
@@ -150,6 +163,7 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
     case "session.started":
       if (!s.session || s.session.id !== d.sessionId) return "reset";
       if (s.session.status !== "archived") s.session.status = "running";
+      if (d.features) s.session.features = d.features;
       dirty.add("session");
       break;
     case "session.ended":

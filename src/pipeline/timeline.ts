@@ -115,6 +115,8 @@ export interface TimelineDeps {
   emit(type: string, data: Record<string, unknown>): void;
   write(row: Record<string, unknown>): void;
   onError(component: string, message: string, detail?: Record<string, unknown>): void;
+  /** False when the session runs with labels off: segments are kept, for navigation, but never labelled. */
+  labels?: boolean;
 }
 
 /** Labels each closed segment with the host-editable label set (§4.9). No LLM writes or changes these labels. */
@@ -184,7 +186,7 @@ export class Timeline {
   /** A segment closed: label it in the background. */
   onSegmentClosed(seg: Segment): void {
     this.segments.push(seg);
-    this.track(this.label(seg, "segment"));
+    if (this.deps.labels !== false) this.track(this.label(seg, "segment"));
   }
 
   /** POST /api/labels/relabel: asks the active set again on every closed segment, in the background. */
