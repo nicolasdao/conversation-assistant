@@ -89,11 +89,11 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 
 ## Updates
 
-`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/podcast-ai-assistant`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**.
+`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/conversation-assistant`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**.
 
 - It needs a signed app: macOS refuses to update an ad-hoc build.
 - It reads `latest-mac.yml` from the newest published (not draft, not pre-release) GitHub Release.
-- When the GitHub repository is renamed, update `publish` in `electron-builder.yml`: installed copies look for the name they were built with (GitHub redirects renamed repositories, but that is not relied on).
+- Installed copies look for updates in the repository they were built with. The project moved to `nicolasdao/conversation-assistant` on 27 September 2026, before its first published app, so no installed copy points at the old `podcast-ai-assistant` repository. If it moves again, change `publish` in `electron-builder.yml` and the `REPO` link in `desktop/main.ts`, and keep publishing to the old repository until installed copies have updated.
 
 ## Building
 
@@ -121,14 +121,23 @@ The icon is `desktop/icon.svg`, the page's favicon as an app icon. After changin
 
 | Keychain | Result | Runs on |
 | --- | --- | --- |
-| A "Developer ID Application" certificate, and notary credentials in the environment | Signed, notarized, and stapled | Any Mac, with one "downloaded from the internet" question |
+| A "Developer ID Application" certificate, and notary credentials | Signed, notarized, and stapled | Any Mac, with one "downloaded from the internet" question |
 | The certificate, no notary credentials | Signed, **not notarized** (the script says so) | Blocked by Gatekeeper on other Macs |
 | No certificate | Signed **ad hoc**, with `desktop/entitlements.adhoc.plist` | This Mac only: for testing |
 
-- **Notary credentials:** `APPLE_API_KEY` (path to the `.p8` key), `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER` (an App Store Connect API key), or `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
+- **The certificate** is "Developer ID Application: Nicolas Dao (UX774V7BK2)", created in Xcode (Settings → Accounts → Manage Certificates → + → Developer ID Application), which puts it and its private key in the login keychain. The app's identity is not tied to this certificate: its designated requirement is the bundle id, a Developer ID certificate from Apple, and the Team ID `UX774V7BK2` (`codesign -d -r-`). So if the private key is lost, a new Developer ID certificate from the same account signs updates that keep every user's permissions and install over the old version. A `.p12` export (Keychain Access, which macOS 26 keeps in `/System/Library/CoreServices/Applications/`: login → My Certificates → right-click → Export) only saves recreating it. What cannot be replaced is the Apple account, and its yearly membership: when it lapses, installed copies keep working (their signatures are timestamped and notarized), but no new version can be signed or notarized.
+- **Notary credentials** are an App Store Connect API key (Users and Access → Integrations → Team Keys, Developer role), saved once in the keychain as the profile `conversation-assistant`: `xcrun notarytool store-credentials conversation-assistant --key AuthKey_<id>.p8 --key-id <id> --issuer <issuer id>`, which checks them with Apple. `scripts/build-mac.sh` and `publish-app.sh` use that profile when nothing else is set, so nothing goes in the shell profile, and the `.p8` file is no longer needed. They also accept `APPLE_KEYCHAIN_PROFILE`, `APPLE_API_KEY` (path to the `.p8`) with `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`, or `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
 - **Entitlements** (`desktop/entitlements.mac.plist`, for the app and every binary in it, the helper included): `cs.allow-jit` and `cs.allow-unsigned-executable-memory` for V8, and `device.audio-input` for the microphone under the hardened runtime.
 - **`desktop/entitlements.adhoc.plist`** adds `cs.disable-library-validation`, without which an ad-hoc build does not launch (see [Gotchas](gotchas.md#mac-app-electron)). A release never uses it.
-- As of 27 September 2026 the Developer ID is not issued yet: signing with it, notarization, Gatekeeper on a downloaded DMG, updates, and permissions surviving an update are wired but untested. Every other part was tested on a packaged ad-hoc build.
+- **Tested on 27 September 2026** with the first Developer ID build (0.5.0): signed, notarized (Apple took 31 minutes for the account's first submission) and stapled; `syspolicy_check distribution` passes; Gatekeeper accepts the app as "Notarized Developer ID", also when copied out of a quarantined DMG; the fuses read as set; the app opens normally, and refuses `ELECTRON_RUN_AS_NODE` and `--remote-debugging-port`. **Not yet tested:** updates, and permissions surviving an update (both need two published versions).
+- **The DMG itself is not signed**, only the app inside it (`spctl --assess --type open` on the DMG says "no usable signature"). Gatekeeper judges the app when it is opened, which is accepted. This is electron-builder's default and advice (`dmg.sign` is off): a DMG signed but not notarized is judged more harshly than an unsigned one.
+
+### Hardening
+
+A signed app holds the user's Microphone and System Audio Recording grants, so it must not run anyone else's code with them.
+
+- **Fuses** (`electronFuses` in `electron-builder.yml`, flipped in the Electron binary at build time): no `ELECTRON_RUN_AS_NODE` (which would turn the app into a Node interpreter with its grants), no `NODE_OPTIONS`, no `--inspect`; the app loads only from `app.asar`, and Electron checks the archive against the hash signed into the app, so a modified archive does not start.
+- **No remote debugging.** Chromium's `--remote-debugging-port` and `--remote-debugging-pipe` have no fuse, and would let any local program drive the window, and through it the engine. The packaged app exits when started with either (`desktop/main.ts`). Test a packaged build by opening it normally; drive the page with `npm run app`, which allows DevTools.
 
 ### Publishing
 
