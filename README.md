@@ -8,6 +8,8 @@
 - [Using it](#using-it)
 - [Documentation](#documentation)
 - [Design decisions](#design-decisions)
+- [Built with Claude Code](#built-with-claude-code)
+- [Releasing](#releasing)
 - [License](#license)
 - [Versioning](#versioning)
 <!-- END toc -->
@@ -95,10 +97,67 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - Chrome's system audio and BlackHole had other risks (see the spec's background notes).
 - A local web page needs nothing installed, runs in any browser, and can be shared as a window in Riverside.
 
+## Built with Claude Code
+
+This project was designed and built with [Claude Code](https://claude.com/claude-code), and it is meant to be maintained the same way. Everything an agent needs to work on it safely is under source control:
+
+- **`docs/`** holds the project's memory: the [Mission](docs/mission.md) (the compass for every decision), one doc per subsystem, and [Gotchas](docs/gotchas.md), the traps found in production, each with its fix. Every doc declares the source files it covers, and `doc-manifest.json` indexes them, so an agent can find the docs for any file it is about to change.
+- **`.claude/skills/`** holds the skills below. In Claude Code, type `/<skill-name>` (for example `/init-context`) or just describe the task; the matching skill loads itself.
+
+A good session starts with `/init-context <what you want to do>`: it loads the mission, the gotchas, and the docs that matter for the task, and nothing else.
+
+| Area | Skills | What they do |
+| --- | --- | --- |
+| Project memory | `init-context`, `update-doc`, `init-doc`, `refactor-doc`, `init-mission`, `project-memory` | Load the right docs before work; keep them in step with the code after it (`update-doc` after every feature or fix); bootstrap or restructure them; maintain the mission |
+| Committing and releasing | `git-commit`, `release-conversation-assistant`, `create-release-skill` | Conventional commits of a session's work; cut a release (see [Releasing](#releasing)); generate a release skill for another project |
+| Planning | `init-spec` | Write a `SPEC.md` for a feature, and archive it when done |
+| Session control | `open-items`, `session-status`, `go-with-recommendations` | What is still open and what waits on you; a done / left / waiting ledger; carry out the recommendations in dependency order |
+| Checking work | `scrutinize`, `second-opinion` | Review and fix the session's own changes with evidence; audit an analysis and fix plan before it is implemented |
+| Explaining | `decision-brief`, `unconfuse` | Recast the last answer as a brief to act on, or re-explain it plainly |
+| Skill authoring | `happyskills-design` | Design, audit, and update skills like these |
+
+Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.claude/` holds a secret.
+
+## Releasing
+
+A release bumps the version in `package.json` (the only place it lives; see [Versioning](#versioning)), adds an entry to [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com) format, [Semantic Versioning](https://semver.org/)), commits, tags `v<version>`, and pushes. The project is not published to npm or deployed anywhere: a release is a tagged, documented point in the history.
+
+**With Claude Code**, run:
+
+```
+/release-conversation-assistant            # decides the bump from what changed
+/release-conversation-assistant minor      # or force patch, minor, or major
+/release-conversation-assistant unreleased # record work under [Unreleased] without releasing
+```
+
+It does, in order:
+
+1. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
+2. Refuses to continue if anything is still uncommitted.
+3. Runs the gates, all offline and free: `npm run typecheck`, `npm test`, `npm run build:web`. A failure stops the release.
+4. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
+5. Shows you the version, the bump, and the entry, and waits for your go.
+6. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): conversation-assistant v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and creates the annotated tag.
+7. Asks again before pushing `master` and that one tag.
+
+**Without Claude Code**, the same steps are plain shell scripts, run from the project root:
+
+```bash
+S=.claude/skills/release-conversation-assistant/scripts
+sh $S/preflight.sh release          # the working tree must be clean
+sh $S/checks.sh                     # typecheck, tests, web build
+sh $S/release-info.sh               # current version, last tag, commits since it
+# edit CHANGELOG.md: move [Unreleased] into "## [x.y.z] - YYYY-MM-DD", leave [Unreleased] empty
+sh $S/apply-release.sh x.y.z        # npm version, release commit, tag vx.y.z
+sh $S/push.sh x.y.z                 # push master and the tag
+```
+
+After a release, reload the page: the settings menu (the cog) shows the new version.
+
 ## License
 
 BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it, with the version, at the bottom of the settings menu (the cog).
 
 ## Versioning
 
-The project's version lives in one place: `version` in the root `package.json`. The server reads it from there (`GET /api/about`) and the page shows it at the bottom of the settings menu; nothing else holds a copy.
+The project's version lives in one place: `version` in the root `package.json`. The server reads it from there (`GET /api/about`) and the page shows it at the bottom of the settings menu; nothing else holds a copy. It changes only through a release (see [Releasing](#releasing)).

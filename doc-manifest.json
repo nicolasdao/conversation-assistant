@@ -21,11 +21,14 @@
         "Using it",
         "Documentation",
         "Design decisions",
+        "Built with Claude Code",
+        "Releasing",
         "License",
         "Versioning"
       ],
-      "line_count": 104,
+      "line_count": 163,
       "links_to": [
+        "CHANGELOG.md",
         "docs/architecture.md",
         "docs/chat.md",
         "docs/gotchas.md",
