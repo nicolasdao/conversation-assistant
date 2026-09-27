@@ -133,7 +133,7 @@ export class Session {
       sessionCapUsd: cfg.app.budget.sessionCapUsd,
       devCapUsd: cfg.app.budget.devCapUsd,
       enforceDevCap: opts.mode !== "live" && !opts.allowOverDevCap,
-      devSpentUsd: sumDevSpend(opts.sessionsDir ?? "sessions"),
+      devSpentUsd: sumDevSpend(opts.sessionsDir),
       onExhausted: (e) => this.emit("budget.exhausted", { cap: e.cap, purpose: e.purpose, message: e.message, totals: e.totals }),
       onCost: (t) => this.emit("cost", { ...t, sessionCapUsd: cfg.app.budget.sessionCapUsd }),
     });
@@ -480,6 +480,7 @@ export class Session {
   /** End of input, in order (§4.10). */
   private async finish(reason: string) {
     this.status = "ending";
+    this.store.closeAudio(); // no frame comes after the input: the recording's audio is complete
     for (const s of this.vads.keys()) if (!this.vads.get(s)!.ended) this.endStream(s); // 1. flush every VAD
     while (this.transcriptions.size > 0) await Promise.all([...this.transcriptions]); // 2. transcription and segmenter
     // a last try for lines lost to a network drop; whatever still fails is given up

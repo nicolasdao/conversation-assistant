@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { appPaths } from "./paths.ts";
 
 /** `chat` has its own cap per recording (chat.capUsd), so the session cap counts only the pipeline's buckets. */
 export type Bucket = "transcription" | "jev" | "s2" | "chat";
@@ -73,7 +74,7 @@ export class Budget {
 }
 
 /** Sums cost_usd over call rows in sessions/**\/*.jsonl. */
-export function sumDevSpend(sessionsDir = "sessions"): number {
+export function sumDevSpend(sessionsDir = appPaths().sessions): number {
   if (!existsSync(sessionsDir)) return 0;
   let total = 0;
   const walk = (dir: string) => {

@@ -2,8 +2,8 @@ import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import type { Readable, Writable } from "node:stream";
 import { FRAME_SAMPLES, type AudioFrame, type AudioSource, type StreamName } from "./source.ts";
+import { appPaths } from "../paths.ts";
 
-export const HELPER_PATH = "native/capture/.build/release/conversation-capture";
 const HEADER = 20;
 const MAX_SAMPLES = 16_000 * 10; // a frame longer than 10 s is impossible: the helper sends 1,600
 
@@ -123,7 +123,7 @@ export interface NativeCapture {
 
 /** Spawns conversation-capture and exposes its two streams as AudioSources (§4.14b). */
 export function startNativeCapture(opts: NativeCaptureOptions = {}): Promise<NativeCapture> {
-  const bin = opts.bin ?? HELPER_PATH;
+  const bin = opts.bin ?? appPaths().helper;
   const spawn = opts.spawn ?? ((b: string, a: string[]) => nodeSpawn(b, a, { stdio: ["pipe", "pipe", "pipe"] }) as unknown as HelperProcess);
   if (!opts.spawn && !existsSync(bin)) return Promise.reject(new Error(`the capture helper is not built: run npm run build:capture (${bin})`));
   const useHost = opts.host ?? true;
@@ -234,7 +234,7 @@ export function startNativeCapture(opts: NativeCaptureOptions = {}): Promise<Nat
 }
 
 /** GET /api/devices: the helper's --list-devices output. */
-export function listDevices(bin = HELPER_PATH): Promise<unknown[]> {
+export function listDevices(bin = appPaths().helper): Promise<unknown[]> {
   if (!existsSync(bin)) return Promise.reject(new Error("the capture helper is not built: run npm run build:capture"));
   return new Promise((resolve, reject) => {
     const p: ChildProcess = nodeSpawn(bin, ["--list-devices"], { stdio: ["ignore", "pipe", "pipe"] });

@@ -1,7 +1,6 @@
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { dirname, extname, join, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { extname, join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
@@ -21,6 +20,7 @@ import {
 } from "../store/transfer.ts";
 import { appInfo } from "../version.ts";
 import { KeyError, KeySetup, KeyStore } from "../keys.ts";
+import { appPaths } from "../paths.ts";
 
 /** Export and import of recordings as one `.conversation-recording` file (see docs/recordings.md § Export and import). */
 export interface TransferApi {
@@ -149,7 +149,7 @@ export class Engine implements EngineApi {
 
   constructor(private readonly opts: EngineOptions = {}) {
     this.config = opts.config ?? loadConfig();
-    this.library = new SessionLibrary(opts.sessionsDir ?? "sessions");
+    this.library = new SessionLibrary(opts.sessionsDir);
     this.chat = new ChatService(this.config.app.chat, {
       fetch: (...a) => (opts.fetch ?? fetch)(...a),
       // read on each call: a key saved from the setup page applies at once
@@ -537,21 +537,21 @@ export class Engine implements EngineApi {
 
 // ---------- HTTP ----------
 
-const SRC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BOOTED_AT = Date.now();
 
 /**
  * The project's version and license, for the page's menu footer. The version lives only in the root package.json;
  * both files are read on each request, so a release shows without restarting.
  */
-export function about(root = resolve(SRC_DIR, "..")) {
+export function about(root = appPaths().root) {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const text = existsSync(join(root, "LICENSE")) ? readFileSync(join(root, "LICENSE"), "utf8") : "";
   return { name: pkg.name, version: pkg.version, license: { id: pkg.license ?? null, holder: pkg.author ?? null, text } };
 }
 
-/** True when engine code under src/ changed after this server started: the page asks for a restart. */
-export function engineStale(srcDir = SRC_DIR, since = BOOTED_AT): boolean {
+/** True when engine code under src/ changed after this server started: the page asks for a restart. Never in the Mac app, which has no sources. */
+export function engineStale(srcDir = appPaths().src, since = BOOTED_AT): boolean {
+  if (!srcDir) return false;
   const walk = (dir: string): boolean => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name);
@@ -651,7 +651,7 @@ function fromThisPage(req: IncomingMessage): boolean {
 const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/about", "/api/engine"]);
 
 export function createApiServer(engine: EngineApi, opts: { webRoot?: string; setup?: SetupApi } = {}): Server {
-  const webRoot = opts.webRoot ?? "web";
+  const webRoot = opts.webRoot ?? appPaths().web;
   const setup = opts.setup;
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -773,6 +773,28 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
   });
 }
 
+// ---------- Start-up, shared by npm run serve and the Mac app ----------
+
+/**
+ * Loads the keys (the environment and .env first, then the keys saved from the setup page), the config, and an engine
+ * with native capture, and returns the API server for them, not yet listening: `npm run serve` listens on a port, the
+ * Mac app serves it in-process (src/server/inProcess.ts).
+ */
+export function bootEngine(opts: { allowOverDevCap?: boolean } = {}) {
+  const keys = new KeyStore().load();
+  const config = loadConfig();
+  const setup = new KeySetup(keys, {
+    fetch: (...a) => fetch(...a),
+    models: [config.app.transcription.model, ...(config.app.transcription.live?.enabled ? [config.app.transcription.live.model] : [])],
+  });
+  const engine = new Engine({
+    config, allowOverDevCap: opts.allowOverDevCap,
+    live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
+    devices: () => listDevices(),
+  });
+  return { keys, config, engine, server: createApiServer(engine, { setup }) };
+}
+
 // ---------- CLI: npm run serve [-- --replay <dir> --speed 1|max] ----------
 
 async function main() {
@@ -782,20 +804,8 @@ async function main() {
       "allow-over-dev-cap": { type: "boolean", default: false },
     },
   });
-  // before anything reads a key: the environment (.env) first, then the keys saved from the setup page
-  const keys = new KeyStore().load();
-  const config = loadConfig();
-  const setup = new KeySetup(keys, {
-    fetch: (...a) => fetch(...a),
-    models: [config.app.transcription.model, ...(config.app.transcription.live?.enabled ? [config.app.transcription.live.model] : [])],
-  });
-  const engine = new Engine({
-    config, allowOverDevCap: values["allow-over-dev-cap"],
-    live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
-    devices: () => listDevices(),
-  });
+  const { keys, config, engine, server } = bootEngine({ allowOverDevCap: values["allow-over-dev-cap"] });
   const port = Number(values.port ?? config.app.server.port);
-  const server = createApiServer(engine, { setup });
   server.listen(port, "127.0.0.1", () => {
     console.log(`Conversation Assistant on http://127.0.0.1:${port}`);
     const missing = keys.missing();

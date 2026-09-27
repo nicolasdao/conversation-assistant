@@ -3,8 +3,7 @@ import type { AppConfig } from "../config.ts";
 import type { StreamName } from "../audio/source.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
 import type { Voiceprint } from "./suggest.ts";
-
-export const SPEAKER_MODEL = "models/wespeaker_en_voxceleb_resnet34_LM.onnx";
+import { speakerModelPath } from "../paths.ts";
 
 export interface Speaker {
   id: string;
@@ -24,7 +23,7 @@ export interface Assignment {
 export class Embedder {
   private readonly extractor: SpeakerEmbeddingExtractor;
 
-  constructor(modelPath = SPEAKER_MODEL) {
+  constructor(modelPath = speakerModelPath()) {
     this.extractor = new sherpa.SpeakerEmbeddingExtractor({ model: modelPath, numThreads: 1, debug: false });
   }
 

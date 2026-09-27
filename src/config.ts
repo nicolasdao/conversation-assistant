@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { appPaths } from "./paths.ts";
 import { ChoiceQuestion, JevQuestion, NoulQuestion, QuestionId, ScoreQuestion } from "./jev/types.ts";
 
 const positive = z.number().positive();
@@ -155,7 +156,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown, file: string): T {
   return r.data;
 }
 
-export function loadConfig(dir = "config"): Config {
+export function loadConfig(dir = appPaths().config): Config {
   const f = (name: string) => join(dir, name);
   return {
     app: parse(AppConfigSchema, readJson(f("app.json")), f("app.json")),

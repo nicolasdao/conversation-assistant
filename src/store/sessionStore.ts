@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { StreamName } from "../audio/source.ts";
 import { WavWriter } from "../audio/wav.ts";
+import { appPaths } from "../paths.ts";
 
 export const JSONL_FILES = [
   "utterances", "transcriptions", "jev_calls", "s2_calls", "segments", "labels", "claims", "verdicts", "s1_versions", "audits", "events",
@@ -21,7 +22,7 @@ export class SessionStore {
   private closed = false;
 
   constructor(opts: { root?: string; prefix?: string; streams?: StreamName[]; redact?: (s: string) => string } = {}) {
-    const root = opts.root ?? "sessions";
+    const root = opts.root ?? appPaths().sessions;
     const base = `${opts.prefix ?? ""}${timestampId()}`;
     let id = base;
     for (let n = 2; existsSync(join(root, id)); n++) id = `${base}-${n}`;
@@ -49,9 +50,14 @@ export class SessionStore {
     writeFileSync(join(this.dir, name), this.redact(JSON.stringify(value, null, 2)) + "\n");
   }
 
+  /** Writes the WAVs' final headers once input has ended, so they are complete however long the rest of the ending takes (or if the app quits during it). */
+  closeAudio(): void {
+    for (const w of this.wavs.values()) w.close();
+  }
+
   close(): void {
     if (this.closed) return;
-    for (const w of this.wavs.values()) w.close();
+    this.closeAudio();
     this.closed = true;
   }
 }

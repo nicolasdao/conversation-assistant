@@ -1,5 +1,6 @@
 import sherpa, { type Vad } from "sherpa-onnx-node";
 import type { AppConfig } from "../config.ts";
+import { vadModelPath } from "../paths.ts";
 import { FRAME_SAMPLES, type StreamName } from "./source.ts";
 import { SAMPLE_RATE } from "./wav.ts";
 
@@ -32,7 +33,7 @@ export class StreamVad {
     readonly stream: StreamName,
     private readonly cfg: AppConfig["vad"],
     private readonly ids: UtteranceIds,
-    modelPath = "models/silero_vad.onnx",
+    modelPath = vadModelPath(),
   ) {
     this.vad = new sherpa.Vad({
       sileroVad: {

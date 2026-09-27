@@ -5,12 +5,11 @@ import { existsSync, statfsSync } from "node:fs";
 import { promisify } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { Budget } from "../budget.ts";
-import { HELPER_PATH } from "../audio/nativeSource.ts";
 import { readWav16k, SAMPLE_RATE } from "../audio/wav.ts";
 import { Transcriber } from "../transcribe/openai.ts";
 import { JevClient } from "../jev/client.ts";
 import { S2Client } from "../factcheck/s2.ts";
-import { SPEAKER_MODEL } from "../speakers/registry.ts";
+import { appPaths, speakerModelPath, vadModelPath } from "../paths.ts";
 import { processSecrets } from "../store/events.ts";
 import { KeyStore } from "../keys.ts";
 import { SessionStore } from "../store/sessionStore.ts";
@@ -30,15 +29,15 @@ async function check(name: string, fn: () => Promise<string>) {
 }
 
 await check("models are present", async () => {
-  const missing = ["models/silero_vad.onnx", SPEAKER_MODEL].filter((p) => !existsSync(p));
+  const missing = [vadModelPath(), speakerModelPath()].filter((p) => !existsSync(p));
   if (missing.length) throw new Error(`missing ${missing.join(", ")}: run npm run models`);
   return "Silero VAD and WeSpeaker";
 });
 
 await check("capture helper is built and has both permissions", async () => {
-  if (!existsSync(HELPER_PATH)) throw new Error("not built: run npm run build:capture");
+  if (!existsSync(appPaths().helper)) throw new Error("not built: run npm run build:capture");
   const ping = spawn("sh", ["-c", "sleep 0.8; afplay /System/Library/Sounds/Ping.aiff; afplay /System/Library/Sounds/Ping.aiff"], { stdio: "ignore" });
-  const { stdout } = await run(HELPER_PATH, ["--probe", "3"], { timeout: 40_000 });
+  const { stdout } = await run(appPaths().helper, ["--probe", "3"], { timeout: 40_000 });
   ping.kill();
   const lv = JSON.parse(stdout.trim().split("\n").pop()!);
   const problems: string[] = [];

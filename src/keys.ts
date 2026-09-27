@@ -4,6 +4,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { appSupportDir } from "./paths.ts";
 
 export const KEY_ENV = { openai: "OPENAI_API_KEY", openrouter: "OPENROUTER_API_KEY" } as const;
 export type KeyName = keyof typeof KEY_ENV;
@@ -11,7 +12,7 @@ export const KEY_NAMES = Object.keys(KEY_ENV) as KeyName[];
 
 /** Where the page saves the keys: ~/Library/Application Support/Conversation Assistant/credentials.json (tests override it). */
 export function credentialsPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.CONVERSATION_ASSISTANT_CREDENTIALS || join(homedir(), "Library", "Application Support", "Conversation Assistant", "credentials.json");
+  return env.CONVERSATION_ASSISTANT_CREDENTIALS || join(appSupportDir(), "credentials.json");
 }
 
 export interface KeyStatus {

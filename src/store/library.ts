@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AppEvent } from "./events.ts";
+import { appPaths } from "../paths.ts";
 
 /** Folders written by tools, not recordings: hidden from the library unless asked for. */
 const TOOL_PREFIXES = ["smoke-", "preflight-", "dev-"];
@@ -86,7 +87,7 @@ const SESSION_EVENTS = new Set(["session.started", "session.ended", "session.pau
 export class SessionLibrary {
   private readonly cache = new Map<string, { mtimeMs: number; summary: SessionSummary; utterances: AppEvent[]; recorded: RecordedSpeakers }>();
 
-  constructor(readonly root = "sessions") {}
+  constructor(readonly root = appPaths().sessions) {}
 
   dirOf(id: string): string {
     if (!SAFE_ID.test(id)) throw new Error(`invalid session id ${id}`);
