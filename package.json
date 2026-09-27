@@ -1,6 +1,6 @@
 {
   "name": "conversation-assistant",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Live podcast transcript, Jev timeline, and fact-checker",
   "license": "BSD-3-Clause",
   "author": "Cloudless Consulting Pty Ltd <nic@cloudlesslabs.com>",

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-27
+
+### Added
+- Add speaker mode: when the call plays through the Mac's speakers, the microphone is muted while the call plays, so guests are no longer transcribed a second time as you. A Speakers chip next to the meters explains it and recommends earbuds; with earbuds nothing changes
+- Keep lines that fail to transcribe (a network drop) in the transcript as "Not transcribed yet" and retry them every 15 s; recovered text joins the transcript and the chat, and lines still missing at the end play from their timestamp in the recording
+
+### Changed
+- Start live lists microphones connected after the page loaded, preselects the one you used last, and starts People on the call at Any number for each show
+
+### Fixed
+- Fix other apps freezing or reporting the microphone as busy when they started recording during a session
+- Fix the microphone going silent for the rest of a session after a call app changed the audio setup (a WhatsApp call on Bluetooth earbuds); it now restarts within 1.5 s
+- Fix the Start live microphone and People on the call pickers ignoring mouse clicks, which made every session run on the built-in microphone with 2 on the call
+
 ## [0.4.0] - 2026-09-27
 
 ### Added
