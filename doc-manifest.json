@@ -61,11 +61,12 @@
         "Event bus and API — `src/store/events.ts`, `src/server/main.ts`",
         "Web front end — `web/`",
         "Features: transcript-only sessions",
+        "Speaker mode: the echo gate",
         "Budgets — `src/budget.ts`",
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 198,
+      "line_count": 216,
       "links_to": [
         "docs/chat.md",
         "docs/gotchas.md",
@@ -164,8 +165,9 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 60,
+      "line_count": 62,
       "links_to": [
+        "docs/architecture.md",
         "docs/recordings.md"
       ],
       "over_size": false,
@@ -432,6 +434,7 @@
       ],
       "line_count": 72,
       "links_to": [
+        "docs/architecture.md",
         "docs/gotchas.md",
         "docs/recordings.md",
         "docs/rehearsal.md",

@@ -3,9 +3,13 @@ import AVFoundation
 import CoreAudio
 import Foundation
 
-/// The remote stream: a private global Core Audio tap of everything the Mac plays, read through a private aggregate
-/// device whose main sub-device is the current default output device (Apple's "Capturing system audio with Core Audio
-/// taps" sample and AudioCap). The aggregate is rebuilt when the default output device changes.
+/// The remote stream: a private Core Audio tap of everything the Mac plays, read through a private aggregate device whose
+/// main sub-device is the current default output device (Apple's "Capturing system audio with Core Audio taps" sample and
+/// AudioCap). The aggregate is rebuilt when the default output device changes.
+///
+/// By default the tap lists the processes playing sound right now and follows them as they start and stop. A global tap
+/// (`--tap global`) captures the same sound, but on macOS 26.2 it made other apps hang when they started a microphone
+/// (AudioDeviceStart waiting on coreaudiod), in 28 of 32 attempts; a tap that lists processes froze none in 12.
 @available(macOS 14.2, *)
 final class SystemTap {
     private let queue = DispatchQueue(label: "conversation-capture.tap", qos: .userInteractive)
@@ -28,15 +32,26 @@ final class SystemTap {
     private(set) var outputName = ""
     /// `speakers`, `headphones`, or `virtual` (Devices.outputKind): the engine mutes the microphone while speakers play the call.
     private(set) var outputKind = "speakers"
+    /// The old global tap instead of one that follows the processes playing sound.
+    private let global: Bool
+    /// The tap's description, whose process list is updated in place (followed taps only).
+    private var tapDesc: CATapDescription?
+    /// Watches each audio process's "is playing" flag, and the list of audio processes itself.
+    private var processListeners: [(AudioObjectID, AudioObjectPropertyListenerBlock)] = []
+    private var processListListener: AudioObjectPropertyListenerBlock?
+    /// A process can start playing before its listener is attached: a check every second catches it.
+    private var processPoll: DispatchSourceTimer?
+    private var tapUpdateFailed = false
 
-    init(status: @escaping ([String: Any]) -> Void) {
+    init(status: @escaping ([String: Any]) -> Void, global: Bool = false) {
         self.status = status
+        self.global = global
     }
 
     func start(clock: ClockLock, stream: UInt8) throws {
         self.clock = clock
         self.stream = stream
-        let desc = CATapDescription(monoGlobalTapButExcludeProcesses: [])
+        let desc = global ? CATapDescription(monoGlobalTapButExcludeProcesses: []) : CATapDescription(monoMixdownOfProcesses: SystemTap.playingProcesses())
         desc.isPrivate = true
         desc.muteBehavior = .unmuted
         desc.name = "conversation-capture"
@@ -47,6 +62,95 @@ final class SystemTap {
         tapUID = desc.uuid.uuidString
         try buildAggregate()
         listenForOutputChanges()
+        if !global {
+            tapDesc = desc
+            queue.sync { followProcesses() }
+        }
+    }
+
+    // ---------- the processes the tap follows ----------
+
+    static func processObjects() -> [AudioObjectID] {
+        var addr = Devices.address(kAudioHardwarePropertyProcessObjectList)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size) == noErr else { return [] }
+        var ids = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids) == noErr else { return [] }
+        return ids
+    }
+
+    /// Every other process playing sound right now, as Core Audio process objects.
+    static func playingProcesses() -> [AudioObjectID] {
+        let me = getpid()
+        return processObjects().filter { id in
+            var pidAddr = Devices.address(kAudioProcessPropertyPID)
+            var pid: Int32 = 0
+            var size = UInt32(MemoryLayout<Int32>.size)
+            guard AudioObjectGetPropertyData(id, &pidAddr, 0, nil, &size, &pid) == noErr, pid != me else { return false }
+            var outAddr = Devices.address(kAudioProcessPropertyIsRunningOutput)
+            var running: UInt32 = 0
+            size = UInt32(MemoryLayout<UInt32>.size)
+            return AudioObjectGetPropertyData(id, &outAddr, 0, nil, &size, &running) == noErr && running != 0
+        }
+    }
+
+    /// On the tap queue: follows processes appearing, disappearing, and starting or stopping sound.
+    private func followProcesses() {
+        var addr = Devices.address(kAudioHardwarePropertyProcessObjectList)
+        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            self?.watchEachProcess()
+            self?.updateTapProcesses()
+        }
+        processListListener = block
+        AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, queue, block)
+        watchEachProcess()
+        let poll = DispatchSource.makeTimerSource(queue: queue)
+        poll.schedule(deadline: .now() + 1, repeating: 1)
+        poll.setEventHandler { [weak self] in self?.updateTapProcesses() }
+        poll.resume()
+        processPoll = poll
+        updateTapProcesses() // anything that started between the tap's creation and now
+    }
+
+    private func watchEachProcess() {
+        unwatchEachProcess()
+        processListeners = SystemTap.processObjects().map { id in
+            var addr = Devices.address(kAudioProcessPropertyIsRunningOutput)
+            let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.updateTapProcesses() }
+            AudioObjectAddPropertyListenerBlock(id, &addr, queue, block)
+            return (id, block)
+        }
+    }
+
+    private func unwatchEachProcess() {
+        for (id, block) in processListeners {
+            var addr = Devices.address(kAudioProcessPropertyIsRunningOutput)
+            AudioObjectRemovePropertyListenerBlock(id, &addr, queue, block)
+        }
+        processListeners = []
+    }
+
+    /// Sets the tap's process list to the processes playing now, in place: the aggregate and its IO keep running.
+    private func updateTapProcesses() {
+        guard let desc = tapDesc, tapID != kAudioObjectUnknown else { return }
+        let playing = SystemTap.playingProcesses()
+        if Set(playing) == Set(desc.processes) { return }
+        let previous = desc.processes
+        desc.processes = playing
+        var addr = Devices.address(kAudioTapPropertyDescription)
+        var value: CATapDescription = desc
+        let st = withUnsafeMutablePointer(to: &value) {
+            AudioObjectSetPropertyData(tapID, &addr, 0, nil, UInt32(MemoryLayout<CATapDescription>.size), $0)
+        }
+        if st != noErr {
+            desc.processes = previous // retried on the next change or poll
+            if !tapUpdateFailed {
+                tapUpdateFailed = true
+                status(["type": "warning", "message": "could not update which apps the system audio tap follows (OSStatus \(st)); an app that started playing may not be captured"])
+            }
+        } else {
+            tapUpdateFailed = false
+        }
     }
 
     private func buildAggregate() throws {
@@ -182,6 +286,17 @@ final class SystemTap {
     }
 
     func stop() {
+        queue.sync {
+            processPoll?.cancel()
+            processPoll = nil
+            unwatchEachProcess()
+            if let block = processListListener {
+                var addr = Devices.address(kAudioHardwarePropertyProcessObjectList)
+                AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, queue, block)
+                processListListener = nil
+            }
+            tapDesc = nil
+        }
         if let block = listener {
             var addr = Devices.address(kAudioHardwarePropertyDefaultOutputDevice)
             AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &addr, queue, block)

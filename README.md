@@ -81,7 +81,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 
 **Capture: a native Swift helper, `conversation-capture`.**
 - `host`: the MacBook's built-in microphone, chosen explicitly whatever the system default input is.
-- `remote`: a global Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session.
+- `remote`: a Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session. Since 27 September 2026 the tap lists the apps playing sound and follows them, instead of being one global tap: a global tap made other apps hang when they started a microphone (see [Gotchas](docs/gotchas.md#capture-macos)).
 - It works whether Riverside runs in Chrome or as the Mac app.
 
 **Front end: a local web page served by the engine**, in plain TypeScript compiled with `tsc` to browser ES modules. No bundler, no UI framework, no new dependencies.
@@ -91,7 +91,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 **Why:**
 - Browser capture tied the engine to a Chrome tab that had to be re-picked every session and could be closed or throttled.
 - AudioTee captures system audio only, not the microphone. One helper that captures both streams gives them a single clock.
-- A global tap, rather than one app's output, is independent of the output device and of which Riverside client is used. Notification sounds are handled by the show checklist (Focus mode).
+- A tap of every app playing sound, rather than one app's output, is independent of the output device and of which Riverside client is used. Notification sounds are handled by the show checklist (Focus mode).
 - Chrome's system audio and BlackHole had other risks (see the spec's background notes).
 - A local web page needs nothing installed, runs in any browser, and can be shared as a window in Riverside.
 

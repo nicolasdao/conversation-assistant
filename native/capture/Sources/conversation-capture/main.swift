@@ -2,7 +2,7 @@
 // and writes framed 16 kHz PCM16 to stdout. Status goes to stderr as JSON lines.
 //
 //   conversation-capture --list-devices
-//   conversation-capture [--mic builtin|<uid>] [--no-mic] [--no-system]
+//   conversation-capture [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global]
 //   conversation-capture --probe <seconds>
 import Darwin
 import Foundation
@@ -26,6 +26,9 @@ var micSpec = "builtin"
 var useMic = true
 var useSystem = true
 var probeSeconds: Double?
+// `apps` (default): the tap follows the apps playing sound. `global`: the old global tap, which can make other apps hang
+// when they start a microphone. CONVERSATION_CAPTURE_TAP=global sets it through the engine, which passes no flag.
+var tapMode = ProcessInfo.processInfo.environment["CONVERSATION_CAPTURE_TAP"] ?? "apps"
 var args = CommandLine.arguments.dropFirst()
 while let a = args.popFirst() {
     switch a {
@@ -35,11 +38,14 @@ while let a = args.popFirst() {
         micSpec = v
     case "--no-mic": useMic = false
     case "--no-system": useSystem = false
+    case "--tap":
+        guard let v = args.popFirst() else { fail("--tap needs apps or global", code: 64) }
+        tapMode = v
     case "--probe":
         guard let v = args.popFirst().flatMap(Double.init), v > 0 else { fail("--probe needs a number of seconds", code: 64) }
         probeSeconds = v
     case "-h", "--help":
-        print("usage: conversation-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] | --probe <seconds>")
+        print("usage: conversation-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global] | --probe <seconds>")
         exit(0)
     default: fail("unknown argument \(a)", code: 64)
     }
@@ -55,6 +61,7 @@ if listDevices {
     exit(0)
 }
 
+if tapMode != "apps" && tapMode != "global" { fail("--tap must be apps or global", code: 64) }
 if !useMic && !useSystem { fail("nothing to capture: both --no-mic and --no-system", code: 64) }
 
 // ---------- sinks ----------
@@ -124,10 +131,10 @@ if useMic {
     started["host"] = ["device": device.name, "uid": device.uid]
 }
 if useSystem, #available(macOS 14.2, *) {
-    let t = SystemTap(status: status)
+    let t = SystemTap(status: status, global: tapMode == "global")
     do { try t.start(clock: clock, stream: 1) } catch { fail("system audio: \(error)", code: 4) }
     stopTap = { t.stop() }
-    started["remote"] = ["outputDevice": t.outputName, "outputKind": t.outputKind, "sampleRate": t.sampleRate]
+    started["remote"] = ["outputDevice": t.outputName, "outputKind": t.outputKind, "sampleRate": t.sampleRate, "tap": tapMode]
 }
 startupDone.signal()
 clock.startWatchdog()
