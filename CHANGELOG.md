@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-27
+
+### Added
+- A setup screen on first run that asks for the OpenAI and OpenRouter API keys: two required fields, a short guide for each key (account, prepaid credit, creating the key), a check with each service before saving, and a clear note that keys stay on this Mac. Nothing else loads until both are set
+- An API keys window in the settings menu to replace a key; the next call uses it without a restart
+
+### Changed
+- The app is now called Conversation Assistant, and its capture helper conversation-capture; macOS may ask again for the Microphone and System Audio Recording permissions
+- Recordings export as .conversation-recording files; .podcast-recording files shared earlier still import
+- Keys are saved in ~/Library/Application Support/Conversation Assistant/credentials.json, readable only by you; a .env file is now optional, and still wins when present
+
 ## [0.3.0] - 2026-09-26
 
 ### Added
