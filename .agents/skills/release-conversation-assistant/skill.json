@@ -1,7 +1,7 @@
 {
 	"name": "release-conversation-assistant",
-	"version": "0.1.0",
-	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags and pushes, plus an [Unreleased] ledger mode.",
+	"version": "0.2.0",
+	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags, pushes, and publishes the Mac app as a GitHub Release, plus an [Unreleased] ledger mode.",
 	"type": "skill",
 	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "conversation-assistant"],
 	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],
@@ -23,6 +23,11 @@
 			"version": ">=18.0.0",
 			"check": "node --version",
 			"install": { "darwin": "brew install node", "linux": "apt install nodejs", "win32": "winget install OpenJS.NodeJS.LTS" }
+		},
+		"gh": {
+			"description": "GitHub CLI: creates the GitHub Release that publishes the Mac app (Step 9 only)",
+			"check": "gh --version",
+			"install": { "darwin": "brew install gh", "linux": "apt install gh", "win32": "winget install GitHub.cli" }
 		},
 		"npm": {
 			"description": "npm: bumps package.json and package-lock.json and runs the release gates",

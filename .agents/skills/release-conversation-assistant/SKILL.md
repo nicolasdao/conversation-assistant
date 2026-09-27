@@ -1,6 +1,6 @@
 ---
 name: release-conversation-assistant
-description: Release — cut a conversation-assistant version by bumping package.json, updating CHANGELOG.md, tagging and pushing. Use when asked to release, ship a version, bump the version, or record unreleased changes. Not for running or deploying the app.
+description: Release — cut a conversation-assistant version by bumping package.json, updating CHANGELOG.md, tagging, pushing, and publishing the Mac app. Use when asked to release, ship a version, bump the version, or record unreleased changes. Not for running the app.
 argument-hint: "[patch|minor|major|unreleased|auto] [description]"
 arguments: [action, note]
 allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
 
 # Release conversation-assistant
 
-Cuts a release of this project: bring the docs up to date and commit everything, then analyse what changed, write the changelog, bump the version, commit, tag, and push. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
+Cuts a release of this project: bring the docs up to date and commit everything, then analyse what changed, write the changelog, bump the version, commit, tag, push, and publish the Mac app. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
 
 **Project facts** (standalone repo, branch `master`, remote `origin`):
 
@@ -17,9 +17,9 @@ Cuts a release of this project: bring the docs up to date and commit everything,
 | Version | `version` in the root `package.json` — the **only** place it lives. The server reads it (`GET /api/about`) and the app shows it in the settings menu footer. Never write it anywhere else. `package-lock.json` follows via `npm version`. |
 | Tag | `v<version>`, annotated |
 | Changelog | `CHANGELOG.md` in the project root, Keep a Changelog — rules in [references/changelog.md](references/changelog.md) |
-| Gates | `npm run typecheck`, `npm test`, `npm run build:web` — offline, no API spend |
+| Gates | `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop` — offline, no API spend |
 | First release | No `v*` tag yet → release the current `0.1.0` as-is (no bump), analysing the whole history |
-| Not | Published to npm, or deployed: this is a private local app |
+| Published | The Mac app, as a GitHub Release `v<version>` with the DMG people download and the files the installed app updates from (Step 9, `docs/desktop.md`). Never to npm. |
 
 Run every script from the project root: `sh "${CLAUDE_SKILL_DIR}/scripts/<script>"`.
 
@@ -87,7 +87,18 @@ AskUserQuestion, presenting: current → new version, the bump and why, the full
 
 AskUserQuestion: push the release commit and tag `v<version>` to `origin`? On yes, `sh "${CLAUDE_SKILL_DIR}/scripts/push.sh" <version>`. On no, remind: `git push origin master && git push origin v<version>`.
 
-Finish with: the version, the tag, the changelog entry, and whether it was pushed. The new version shows in the app's settings menu after a page reload.
+Then Step 9.
+
+## Step 9 — Publish the Mac app (a third confirmation)
+
+Only after the push. Publishing is outward-facing: installed apps download what it publishes, so it is never automatic.
+
+1. Check the requirements without building: `security find-identity -v -p codesigning | grep "Developer ID Application"`, and whether `APPLE_API_KEY` or `APPLE_ID` is set. If either is missing, skip this step and say why: until the Developer ID and its notary credentials exist, the Mac app is not published (see `docs/desktop.md` § Signing). Never publish an ad-hoc build.
+2. AskUserQuestion: publish the Mac app for `v<version>` as a GitHub Release, which every installed copy will offer to update to? Options: **Publish**, **Not now**.
+3. On yes, write the version's changelog entry (its bullets, without the `## [x.y.z]` heading) to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/publish-app.sh" <version> <notes-file>`. It builds from the tag, checks the signature, notarization and Gatekeeper, and creates the release with the DMG, the zip, their blockmaps, and `latest-mac.yml`. If it fails, show its output and stop; nothing is published before its last line.
+4. On "Not now", remind: from the tag, `sh .claude/skills/release-conversation-assistant/scripts/publish-app.sh <version> <notes-file>`.
+
+Finish with: the version, the tag, the changelog entry, whether it was pushed, and whether the Mac app was published (with the release URL). Installed apps pick up a published version within a few hours, or at their next launch.
 
 ## Mode C — Record unreleased changes (the ledger)
 
@@ -106,7 +117,8 @@ For recording work between releases. **No version bump, no tag, `package.json` u
 - **Never** release with uncommitted changes (Modes A and B), and never offer to.
 - **Never** put anything but `package.json`, `package-lock.json` and `CHANGELOG.md` in the release commit itself (Mode C: only `CHANGELOG.md`); every other change goes in Step 2's commits.
 - **Never** write the version anywhere but `package.json` (via `npm version`).
-- **Always** confirm before the commit and tag, and separately before the push.
+- **Always** confirm before the commit and tag, separately before the push, and separately before publishing the Mac app.
+- **Never** publish a Mac app signed ad hoc or not notarized: `publish-app.sh` refuses, and nothing is to be done around it.
 - **Never** push `--tags` wholesale: push the release branch and the one new tag.
 - **Never** run the app, `npm run smoke`, `preflight`, or anything that calls paid APIs as a release gate.
 - Keep every path relative to the project root or `${CLAUDE_SKILL_DIR}`.
