@@ -669,7 +669,9 @@ dialog.ask form { display: contents; }
 .drop-zone .btn { margin-top: 6px; pointer-events: none; }
 .import-progress { display: grid; gap: 8px; font-size: 14px; color: var(--ink-2); }
 .import-progress .bar { height: 6px; background: var(--deck-3); }
-.import-progress .bar b { display: block; height: 100%; background: var(--accent); transition: width 0.2s; }
+.import-progress .bar b { display: block; width: 0; height: 100%; background: var(--accent); transition: width 0.2s; }
+.import-progress .bar.waiting b { width: 30%; animation: import-wait 1.1s ease-in-out infinite alternate; }
+@keyframes import-wait { from { margin-left: 0; } to { margin-left: 70%; } }
 .import-done { display: grid; gap: 4px; padding: 12px 14px; background: var(--deck-2); border-left: 3px solid var(--good); font-size: 13.5px; color: var(--ink-2); }
 .import-done b { font: 700 12px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--good); }
 .import-done .import-name { font: 700 20px/1.15 var(--cond); color: var(--ink); }

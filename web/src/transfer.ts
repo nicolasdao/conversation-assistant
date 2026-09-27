@@ -137,12 +137,16 @@ async function upload(file: File) {
     toast(`That is not a recording file: it should end in ${EXTENSION}.`);
     return openImport();
   }
-  const bar = h("b", { style: "width:0%" });
-  const label = h("span", {}, `Uploading ${file.name}…`);
-  replace(body, h("div", { class: "import-progress" }, label, h("span", { class: "bar" }, bar)));
+  // the bar moves back and forth until upload progress arrives, which it never does in the Mac app (the upload is
+  // in-process and instant, and its scheme reports no progress): there, the wait is the unpacking
+  const bar = h("b", {});
+  const track = h("span", { class: "bar waiting" }, bar);
+  const label = h("span", {}, `Importing ${file.name}…`);
+  replace(body, h("div", { class: "import-progress" }, label, track));
   let r: ImportResult;
   try {
     r = await api.importRecording(file, (done) => {
+      track.classList.remove("waiting");
       bar.style.width = `${Math.round(done * 100)}%`;
       if (done >= 1) replace(label, "Unpacking the recording…");
     });

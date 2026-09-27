@@ -1,11 +1,13 @@
 {
   "name": "conversation-assistant",
+  "productName": "Conversation Assistant",
   "version": "0.5.0",
-  "description": "Live podcast transcript, Jev timeline, and fact-checker",
+  "description": "Live conversation transcript, Jev timeline, and fact-checker, as a Mac app",
   "license": "BSD-3-Clause",
   "author": "Cloudless Consulting Pty Ltd <nic@cloudlesslabs.com>",
   "private": true,
   "type": "module",
+  "main": "dist/desktop/main.mjs",
   "engines": {
     "node": ">=24"
   },
@@ -22,14 +24,21 @@
     "calibrate:speakers": "node --env-file-if-exists=.env --import tsx src/cli/calibrateSpeakers.ts",
     "build:capture": "swift build -c release --package-path native/capture",
     "capture:test": "sh scripts/capture-test.sh",
-    "build:web": "tsc -p web/tsconfig.json"
+    "build:web": "tsc -p web/tsconfig.json",
+    "build:desktop": "esbuild desktop/main.ts --bundle --platform=node --format=esm --target=node24 --sourcemap --log-level=warning --external:electron --external:electron-updater --external:sherpa-onnx-node --outfile=dist/desktop/main.mjs",
+    "app": "npm run build:web && npm run build:desktop && electron .",
+    "dist:mac": "sh scripts/build-mac.sh"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "sherpa-onnx-node": "^1.13.8",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
