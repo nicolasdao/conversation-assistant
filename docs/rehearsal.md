@@ -12,7 +12,7 @@ Everything to check before going on air with Conversation Assistant, the lines t
 
 ## The day before
 
-1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys (from `.env` or saved from the page), the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk.
+1. **In development**, `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys (from `.env` or saved from the page), the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk. It runs from the terminal, so it checks the terminal's permissions, not the Mac app's. **With the Mac app**, the rehearsal session below is the check: both meters move, and a line is transcribed.
 2. Record a fallback: run a live rehearsal session (below), stop it, and name it in **Recordings** (the cog menu; for example "Fallback — Ep 12").
 3. Check that it works as a fallback: in Recordings, clicking it opens it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 
@@ -21,7 +21,7 @@ Everything to check before going on air with Conversation Assistant, the lines t
 - [ ] Everyone wears headphones, and the host wears **earbuds**. On the Mac's speakers the app switches to speaker mode (a **Speakers** chip next to the meters): the microphone is muted while the call plays, so anything the host says over a guest is lost.
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
-- [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10), and a credit limit on the OpenRouter key.
+- [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10; in the Mac app the config is built in, so changing it means building the app again), and a credit limit on the OpenRouter key.
 - [ ] **Tonight's stories** are typed in (cog → Labels → Save stories).
 - [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
@@ -30,9 +30,7 @@ Everything to check before going on air with Conversation Assistant, the lines t
 
 ## Starting the show
 
-```bash
-npm run serve        # builds the page, then serves http://127.0.0.1:4317
-```
+Open **Conversation Assistant**. (In development: `npm run serve`, which builds the page and serves http://127.0.0.1:4317, or `npm run app`.) The Mac app never checks for or downloads an update while a session is on air.
 
 Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream stays at or below −50 dBFS for more than 10 s, or no audio frame arrives for more than 3 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
 
@@ -60,6 +58,6 @@ Later in the show, repeat line 1 word for word. It should produce an instant **r
    `npm run replay -- --host host.wav --remote remote.wav --speed max --export boundary.jsonl`
    Set `human_boundary` to `true` or `false` on each row (true where a new point or topic starts), then
    `npm run calibrate:boundary -- boundary.jsonl`.
-4. Write the chosen values to `config/app.json` (`speakers.threshold`, `segmentation.boundaryThreshold`) and restart the server.
+4. Write the chosen values to `config/app.json` (`speakers.threshold`, `segmentation.boundaryThreshold`) and restart `npm run serve`; for the Mac app, build it again (`npm run dist:mac`), since its config is built in.
 
-Replays of old episodes count toward the $3 development cap; add `--allow-over-dev-cap` only when you mean to.
+Calibration runs from the terminal, in development. Replays of old episodes count toward the $3 development cap; add `--allow-over-dev-cap` only when you mean to. (Replays started in the Mac app never count toward it.)

@@ -39,8 +39,8 @@ Keys can be replaced later from the cog menu → **API keys** (`?panel=keys`). T
 
 In order, first match wins:
 
-1. **The environment**: a shell variable, or `.env` in the project folder (the npm scripts load it with `--env-file-if-exists`, so it is optional). A key set here cannot be changed from the page.
-2. **`~/Library/Application Support/Conversation Assistant/credentials.json`**, written by the page. This is the macOS location for per-user app data. It sits outside the project folder, so a key can never be committed, and it survives a re-clone or an upgrade.
+1. **The environment**: a shell variable, or `.env` in the project folder (the npm scripts load it with `--env-file-if-exists`, so it is optional). A key set here cannot be changed from the page. This is for development: the Mac app, opened from Finder, has no project folder and no shell environment, so it uses the file below.
+2. **`~/Library/Application Support/Conversation Assistant/credentials.json`**, written by the page. This is the macOS location for per-user app data. It sits outside the project folder, so a key can never be committed, and it survives a re-clone or an upgrade. `npm run serve` and the Mac app share it (`appSupportDir()` in `src/paths.ts`), and the Mac app keeps its recordings next to it (see [The Mac app](desktop.md)).
 
 `src/keys.ts` (`KeyStore`) writes the file:
 
@@ -76,7 +76,7 @@ An OpenAI account with no credit cannot be detected for free. It answers `429 in
 
 ## Routes and the gate
 
-When `createApiServer` is given `setup` (`npm run serve` always gives it):
+When `createApiServer` is given `setup` (`bootEngine()` always gives it, for `npm run serve` and the Mac app):
 
 | Method | Route | Does |
 | --- | --- | --- |
@@ -84,8 +84,8 @@ When `createApiServer` is given `setup` (`npm run serve` always gives it):
 | POST | `/api/setup/keys` | `{ openai?, openrouter? }`. Checks each key given, saves them all or none. Returns `{ saved, checks: { <name>: { ok, message, warning? } }, …status }`. 409 for a key set in the environment |
 
 - **Gate.** Until both keys are set, every other `/api/*` route answers `503 { error, setup: true }`, except `/api/about` and `/api/engine`.
-- **Only the page itself.** The setup routes answer only when the `Host` is `127.0.0.1` or `localhost` (no DNS rebinding) and any `Origin` matches it (no other website open in the browser). The POST also requires `Content-Type: application/json`, which a cross-site form cannot send.
-- The server prints which keys are missing when it starts. `serve --replay` refuses to start a replay until both are set.
+- **Only the page itself.** The setup routes answer only when the `Host` is `127.0.0.1` or `localhost` (no DNS rebinding) and any `Origin` matches it (no other website open in the browser). The POST also requires `Content-Type: application/json`, which a cross-site form cannot send. In the Mac app, only the app's own window can reach the router at all, so the in-process connection presents its requests as the page itself: `Host: 127.0.0.1` and no `Origin` (see [The Mac app](desktop.md#the-in-process-connection--srcserverinprocessts)).
+- `npm run serve` prints which keys are missing when it starts. `serve --replay` refuses to start a replay until both are set.
 
 ## Command-line tools
 

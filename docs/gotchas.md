@@ -1,6 +1,6 @@
 ---
-description: Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.
-tags: [gotchas, macos, openai, openrouter, jev, sherpa-onnx]
+description: Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.
+tags: [gotchas, macos, openai, openrouter, jev, sherpa-onnx, electron]
 source:
   - native/capture/**
   - src/audio/nativeSource.ts
@@ -9,13 +9,15 @@ source:
   - src/factcheck/s2.ts
   - scripts/make-fixtures.ts
   - src/store/transfer.ts
+  - desktop/**
+  - src/server/inProcess.ts
 ---
 
 # Gotchas
 
 ## Capture (macOS)
 
-- **Permissions go to the app that launched the terminal, not to Node or the helper.** A denied System Audio Recording permission delivers pure silence (−120 dBFS), not an error. If this project runs inside cmux, grant cmux; in Terminal, grant Terminal. Then quit and reopen that app. `npm run preflight` detects silence by level.
+- **Permissions go to the app that launched the helper, not to Node or the helper.** For `npm run serve` that is the terminal app: in cmux grant cmux, in Terminal grant Terminal, then quit and reopen it. For the Mac app it is **Conversation Assistant** itself (verified in the `tccd` log: `responsible=com.cloudlesslabs.conversation-assistant` for the helper's requests), so a Mac with both has two separate sets of grants. A denied System Audio Recording permission delivers pure silence (−120 dBFS), not an error. `npm run preflight` detects silence by level.
 - **The system tap takes about 0.9 s to start**, so a 3 s `--probe` returns about 2.1 s of audio. The first probe right after granting the permission came back silent once; later runs were reliable. ClockLock pads the start gap with silence, so the session clock stays aligned.
 - **A call app changes the audio setup under you.** Starting a WhatsApp (or any VoIP) call on a Bluetooth headset switches it to its call profile: the output drops from 48 kHz to 16 or 24 kHz, and macOS stops other apps' `AVAudioEngine`s. Before 25 September 2026 the helper read the tap's rate once and never restarted the mic, so during a call the mic went silent (0 samples) and the system audio came out sped up, which the VAD no longer recognised as speech — the page showed "Waiting for speech". The helper now converts at each buffer's own rate, re-reads the rate whenever the output device's rate changes, and restarts the mic after `AVAudioEngineConfigurationChange` (at most 5 times a minute, since a restart can itself post the notification). A `warning` status line reports each switch. **It can also leave the engine "running" with no buffers:** on 27 September 2026 a WhatsApp call on Bluetooth earbuds silenced the built-in mic for the rest of the session (ClockLock padded exact digital silence, −120 dBFS), with no warning, because the restart only ran when `isRunning` was false, and it stayed true. Reproduced by changing the mic's sample rate mid-capture: 0 buffers a second, `isRunning` true. The helper now restarts the mic when no buffer has arrived for 1.5 s, whatever `isRunning` says; in the same reproduction the mic came back within 1.5 s. A voice-processing call on the same mic (VPIO) also turns our input down about 15 dB while it runs, but it keeps flowing.
 - **A USB wireless mic can deliver exact digital silence** (−120 dBFS with frames arriving) when its transmitter is off, muted, or out of range; the built-in mic working in the same probe rules out permissions.
@@ -54,6 +56,15 @@ source:
 
 - **A stopped stream never reaches its `usage` chunk**, so a stopped reply's cost is unknown from the stream. OpenRouter's `GET /api/v1/generation?id=<gen id>` has it a second or two later: the chat asks up to 3 times before falling back to a price-list estimate (marked `estimated`). The id is the chunks' `id`.
 - **Headless Chrome never finishes loading the page** (`--virtual-time-budget` hangs), because `/api/events` keeps a server-sent event stream open. For a screenshot use `--timeout=6000` instead.
+
+## Mac app (Electron)
+
+- **sherpa-onnx throws "External buffers are not allowed" inside Electron** unless each call that returns audio asks for a copy. Electron's V8 memory cage refuses the ArrayBuffers the addon makes over native memory, which Node accepts, so the tests (which run in Node) cannot see it. Pass `false`: `vad.front(false)`, `extractor.compute(stream, false)`. `tests/desktop.test.ts` fails on a call without it. `LinearResampler.resample` returns a copy and is safe.
+- **A dialog without a parent window freezes the whole app, engine included.** `dialog.showMessageBox(opts)` with no window runs `NSAlert runModal`, a nested modal loop that stops Electron's main loop until it is answered: measured, a timer in the main process stopped ticking, and even the dialog's own abort signal never fired. The engine runs in that process, so a show on air would stop being captured. Every dialog goes through `ask()` in `desktop/main.ts`, which attaches it to the window as a sheet (the timer kept ticking).
+- **An in-memory stream pair does not pass a close across.** With `stream.duplexPair()`, a page closing its `/api/events` stream destroyed only its side: the router's side stayed open, subscribed to the event bus, and written to for good, once per reload. `src/server/inProcess.ts` destroys each side when the other closes (tested).
+- **An ad-hoc build with the hardened runtime does not launch** ("Library not loaded: … Electron Framework … different Team IDs"): library validation needs the same Team ID across the app and its frameworks, and an ad-hoc signature has none. Ad-hoc test builds add `com.apple.security.cs.disable-library-validation` (`desktop/entitlements.adhoc.plist`); a Developer ID build signs everything with one team and does not need it.
+- **XHR upload progress never fires on a custom protocol.** On `app://`, `xhr.upload.onprogress` is never called, even for 30 MB (which uploads in about 90 ms). The import bar moves back and forth until progress arrives, instead of waiting at 0 %.
+- **In development the permission status is the terminal's.** `systemPreferences.getMediaAccessStatus("microphone")` reports Electron's own status, while macOS asks on behalf of the terminal that started `npm run app`, so the first-launch sheet would show on every launch. It runs only in the packaged app.
 
 ## Jev questions
 

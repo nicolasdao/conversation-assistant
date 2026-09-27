@@ -3,7 +3,8 @@
 ## Table of Contents
 
 <!-- BEGIN toc -->
-- [Setup](#setup)
+- [Install](#install)
+- [Develop](#develop)
 - [Scripts](#scripts)
 - [Using it](#using-it)
 - [Documentation](#documentation)
@@ -15,22 +16,36 @@
 <!-- END toc -->
 
 
-A local app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio), transcribes it live, labels the conversation on a timeline with Jev, and fact-checks claims with a System 1 / System 2 loop.
+A Mac app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio), transcribes it live, labels the conversation on a timeline with Jev, and fact-checks claims with a System 1 / System 2 loop.
 
 It exists to demonstrate, live on air, that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 that improves it. Start with the [Mission](docs/mission.md), then [Architecture](docs/architecture.md), [Jev](docs/jev.md), and [System 1 and System 2](docs/system1-system2.md).
 
-## Setup
+## Install
 
-Requires Node 24 and macOS on Apple Silicon.
+For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2 or later, and two API accounts with prepaid credit (OpenAI and OpenRouter; the app walks through both).
+
+1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/podcast-ai-assistant/releases/latest). (The first downloadable release is the first one signed with the project's Apple Developer ID; until then, build it with `npm run dist:mac`, below.)
+2. Open it and drag **Conversation Assistant** into Applications.
+3. Open it from Applications. macOS asks once whether to open an app downloaded from the internet.
+4. Paste the two API keys: the app explains how to get each one (create the account, add prepaid credit, create the key) and checks each key before saving it.
+5. Click Allow when macOS asks for **Microphone** and **System Audio Recording**. The app asks for both on its first launch, so they never interrupt a show.
+
+It updates itself from GitHub Releases, never during a show. Recordings are kept in `~/Library/Application Support/Conversation Assistant/sessions` (**File → Show Recordings in Finder**), next to the saved keys. See [The Mac app](docs/desktop.md).
+
+## Develop
+
+Requires Node 24, macOS on Apple Silicon, and the Xcode command-line tools (for the Swift capture helper).
 
 ```bash
 npm install
 npm run models                           # Silero VAD + WeSpeaker speaker-embedding models into models/
 npm run fixtures                         # a scripted ~78 s test conversation into fixtures/conversation/
+npm run build:capture                    # the conversation-capture Swift helper
 npm run serve                            # then open http://127.0.0.1:4317
+npm run app                              # or: the same, in the Mac app's window
 ```
 
-The first time, the page asks for two API keys, one from OpenAI and one from OpenRouter, and walks through getting each: create the account, add prepaid credit, create the key, paste it. Each key is checked before it is saved. Keys are saved in `~/Library/Application Support/Conversation Assistant/credentials.json`, readable only by your macOS user and outside the project folder; the cog menu's **API keys** replaces them later. Developers can set `OPENAI_API_KEY` and `OPENROUTER_API_KEY` in `.env` (see `.env.example`) instead, which wins over the saved file. See [Setup and API keys](docs/setup.md).
+The first time, the page asks for two API keys, one from OpenAI and one from OpenRouter, and walks through getting each: create the account, add prepaid credit, create the key, paste it. Each key is checked before it is saved. Keys are saved in `~/Library/Application Support/Conversation Assistant/credentials.json`, readable only by your macOS user and outside the project folder, and shared with the Mac app; the cog menu's **API keys** replaces them later. Developers can set `OPENAI_API_KEY` and `OPENROUTER_API_KEY` in `.env` (see `.env.example`) instead, which wins over the saved file. See [Setup and API keys](docs/setup.md).
 
 ## Scripts
 
@@ -42,20 +57,23 @@ The first time, the page asks for two API keys, one from OpenAI and one from Ope
 | `npm run smoke` | Live checks of transcription, Jev, and System 2 (measured at about $0.05); streaming text is not checked |
 | `npm run replay -- --host <wav> --remote <wav> --speed max\|1 [--export <file>]` | Runs WAV files through the pipeline into `sessions/<id>/` |
 | `npm run serve [-- --replay <dir> --speed 1\|max]` | The web page and HTTP + SSE API on http://127.0.0.1:4317 |
+| `npm run app` | The Mac app from the project folder, in development (see [The Mac app](docs/desktop.md)) |
+| `npm run dist:mac` | Builds the Mac app into `out/`: the DMG, and the files updates download (signed with the Developer ID in the keychain, else ad hoc for this Mac only) |
 | `npm run build:capture` | Builds the `conversation-capture` Swift helper (microphone + system audio) |
 | `npm run capture:test` | Checks the helper and the macOS permissions on this Mac (interactive) |
-| `npm run build:web` | Compiles the web page (`npm run serve` does it first) |
+| `npm run build:web` | Compiles the web page (`npm run serve` and `npm run app` do it first) |
+| `npm run build:desktop` | Bundles the Mac app's main process and the engine into `dist/desktop/main.mjs` |
 | `npm run preflight` | Pre-show checks (see `docs/rehearsal.md`) |
 | `npm run calibrate:boundary -- <labelled.jsonl>` | Precision / recall / F1 of the boundary threshold (offline) |
 | `npm run calibrate:speakers -- --host <wav> --remote <wav>` | Speaker count per similarity threshold |
 
-Development runs stop at a $3 total spend (summed from `sessions/**/*.jsonl`); `--allow-over-dev-cap` lifts that cap.
+Development runs stop at a $3 total spend (summed from `sessions/**/*.jsonl`); `--allow-over-dev-cap` lifts that cap. The packaged Mac app never applies it.
 
-macOS asks once for **Microphone** and once for **System Audio Recording**; both are granted to the terminal app that starts the server (System Settings → Privacy & Security). A denied permission delivers silence, which `capture:test` and `preflight` detect.
+macOS asks once for **Microphone** and once for **System Audio Recording**. With `npm run serve` or `npm run app`, both are granted to the terminal app that starts it; the packaged Mac app gets its own (System Settings → Privacy & Security). A denied permission delivers silence, which `capture:test` and `preflight` detect.
 
 ## Using it
 
-`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/` (both audio streams included); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.conversation-recording` file (about 30 MB an hour) to send over WhatsApp or email, and **Import** (or dropping the file on the page) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a refresh or a bookmark lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
+Open Conversation Assistant (or, developing, `npm run serve` and http://127.0.0.1:4317) and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The window shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved as a folder (both audio streams included: in the app's Application Support folder, or `sessions/` in development); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.conversation-recording` file (about 30 MB an hour, into Downloads) to send over WhatsApp or email, and **Import** (or dropping the file on the window) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a reload, or a bookmark in a browser, lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
 
 Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($10) in `config/app.json`. Chat is extra, pay-as-you-ask (a question about a two-hour episode is about $0.004 on GPT-6 Luna, more on larger models), with its own cap of $2 per recording (`chat.capUsd`). OpenRouter calls send `provider: { data_collection: "deny" }`.
 
@@ -64,7 +82,8 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 <!-- BEGIN doc-index -->
 - [Architecture](docs/architecture.md) — The end-to-end architecture — native capture, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.
 - [Chat](docs/chat.md) — The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.
-- [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.
+- [The Mac app](docs/desktop.md) — The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.
+- [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.
 - [Jev](docs/jev.md) — What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.
 - [Mission](docs/mission.md) — Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 - [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, exports, imports, and deletes past sessions.
@@ -76,6 +95,16 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 <!-- END doc-index -->
 
 ## Design decisions
+
+**The Mac app — decided 27 September 2026.** For people who never open a terminal, the project ships as a Mac app: a DMG downloaded from GitHub Releases, signed with a Developer ID and notarized, which updates itself. It is **Electron**, with the engine running in Electron's main process and the window loading the same web page from a private `app://` scheme, answered in-process: no server and no port (see [The Mac app](docs/desktop.md)).
+
+**Why:**
+- A server on a fixed port can find the port taken (4317 is also OpenTelemetry's default), and any program or website on the Mac can reach it. In-process there is nothing to collide with or reach.
+- The engine is written for Node, and Electron is the only shell where it runs in-process unchanged. A Swift or Tauri shell would keep Node as a separate process behind a bridge; a Swift rewrite of the engine (about 7,900 lines) was not worth it.
+- Chromium is the browser the page was built and tested in. A system web view (WebKit) would have needed a compatibility pass on the page's dialogs, popovers, and downloads.
+- A real app gets macOS's Microphone and System Audio Recording permissions under its own name, instead of the terminal's.
+- Not the Mac App Store: its sandbox would constrain the system-audio tap, the capture helper, and `afconvert`, for little gain over a notarized download.
+- The cost: an app of about 300 MB (a 144 MB DMG), mostly Electron's Chromium, and an Electron upgrade a few times a year.
 
 **Tier 2 capture and front end — decided 24 September 2026.**
 
@@ -95,7 +124,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - AudioTee captures system audio only, not the microphone. One helper that captures both streams gives them a single clock.
 - A tap of every app playing sound, rather than one app's output, is independent of the output device and of which Riverside client is used. Notification sounds are handled by the show checklist (Focus mode).
 - Chrome's system audio and BlackHole had other risks (see the spec's background notes).
-- A local web page needs nothing installed, runs in any browser, and can be shared as a window in Riverside.
+- A local web page needs nothing installed, runs in any browser, and can be shared as a window in Riverside. (Since 27 September 2026 the Mac app shows the same page in its own window, which Riverside shares the same way.)
 
 ## Built with Claude Code
 
@@ -120,7 +149,7 @@ Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.
 
 ## Releasing
 
-A release bumps the version in `package.json` (the only place it lives; see [Versioning](#versioning)), adds an entry to [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com) format, [Semantic Versioning](https://semver.org/)), commits, tags `v<version>`, and pushes. The project is not published to npm or deployed anywhere: a release is a tagged, documented point in the history.
+A release bumps the version in `package.json` (the only place it lives; see [Versioning](#versioning)), adds an entry to [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com) format, [Semantic Versioning](https://semver.org/)), commits, tags `v<version>`, pushes, and publishes the Mac app as the GitHub Release `v<version>` (the DMG people download, and the files installed copies update from). Nothing is published to npm or deployed to a server.
 
 **With Claude Code**, run:
 
@@ -134,25 +163,27 @@ It does, in order:
 
 1. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
 2. Refuses to continue if anything is still uncommitted.
-3. Runs the gates, all offline and free: `npm run typecheck`, `npm test`, `npm run build:web`. A failure stops the release.
+3. Runs the gates, all offline and free: `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`. A failure stops the release.
 4. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
 5. Shows you the version, the bump, and the entry, and waits for your go.
 6. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): conversation-assistant v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and creates the annotated tag.
 7. Asks again before pushing `master` and that one tag.
+8. Asks a third time before publishing the Mac app: it builds it from the tag, checks that it is signed with the Developer ID and notarized, and creates the GitHub Release. It refuses an ad-hoc or unnotarized build, and skips this step while the Developer ID and notary credentials are missing (see [The Mac app](docs/desktop.md#signing-and-notarization)).
 
 **Without Claude Code**, the same steps are plain shell scripts, run from the project root:
 
 ```bash
 S=.claude/skills/release-conversation-assistant/scripts
 sh $S/preflight.sh release          # the working tree must be clean
-sh $S/checks.sh                     # typecheck, tests, web build
+sh $S/checks.sh                     # typecheck, tests, web build, Mac app bundle
 sh $S/release-info.sh               # current version, last tag, commits since it
 # edit CHANGELOG.md: move [Unreleased] into "## [x.y.z] - YYYY-MM-DD", leave [Unreleased] empty
 sh $S/apply-release.sh x.y.z        # npm version, release commit, tag vx.y.z
 sh $S/push.sh x.y.z                 # push master and the tag
+sh $S/publish-app.sh x.y.z notes.md # the Mac app, as the GitHub Release (needs the Developer ID, notary credentials, and gh)
 ```
 
-After a release, reload the page: the settings menu (the cog) shows the new version.
+After a release, installed apps offer the new version within a few hours, or at their next launch; the settings menu (the cog) shows the version. In development, reload the page.
 
 ## License
 
@@ -160,4 +191,4 @@ BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See 
 
 ## Versioning
 
-The project's version lives in one place: `version` in the root `package.json`. The server reads it from there (`GET /api/about`) and the page shows it at the bottom of the settings menu; nothing else holds a copy. It changes only through a release (see [Releasing](#releasing)).
+The project's version lives in one place: `version` in the root `package.json`. The engine reads it from there (`GET /api/about`; in the Mac app, from the copy inside the app), and the page shows it at the bottom of the settings menu; nothing else in the repository holds a copy (the Mac app build derives its own from it: the copy inside the app, the app's `Info.plist`, and the file names in `out/`). It changes only through a release (see [Releasing](#releasing)).

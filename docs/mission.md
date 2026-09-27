@@ -32,7 +32,7 @@ The project will be open-sourced under the BSD 3-Clause license (Cloudless Consu
 - **Reliability matters as much as features on air.** Short timeouts with fallbacks on every live call, spend caps, every session recorded so it can be reopened exactly as it was (or its audio replayed), and a rehearsal kit with a recorded fallback (see [Rehearsal kit](rehearsal.md)).
 - **Plain files, no database.** One folder per session, append-only and readable (see [Recordings](recordings.md)).
 - **Keys stay on the Mac.** They live in `.env` or in a credentials file only the user can read, outside the project folder ([Setup](setup.md)); they never appear in logs, session files, events, or exports, and the API returns only their last 4 characters. OpenRouter calls deny provider data collection.
-- **Plug and play for anyone.** A first run needs no terminal editing: the page asks for the two keys, explains how to get and fund them, and checks them before saving.
+- **Plug and play for anyone.** No terminal at all: the Mac app installs from a signed, notarized DMG and updates itself (since 27 September 2026, see [The Mac app](desktop.md)). A first run asks for the two keys, explains how to get and fund them, and checks them before saving, then asks for the two macOS permissions before any show.
 
 ## Non-goals
 
@@ -41,7 +41,8 @@ The project will be open-sourced under the BSD 3-Clause license (Cloudless Consu
 - Fixed-interval chunking of audio.
 - Using Jev for anything code does exactly.
 - OpenAI diarization: its speaker labels are scoped to one request.
-- Multi-language support, video, clip export, social posting, cloud deployment, or authentication (the server binds to 127.0.0.1).
+- Multi-language support, video, clip export, social posting, cloud deployment, or authentication (the engine is reachable only on this Mac: `npm run serve` binds to 127.0.0.1, and the Mac app listens on no port).
+- The Mac App Store: its sandbox would constrain the capture helper and the system-audio tap. The app is a notarized direct download.
 - Integration with Riverside beyond reading exported tracks for calibration.
 - Echo cancellation. The host wears earbuds. If the call plays through the Mac's speakers instead, **speaker mode** mutes the microphone while the call plays rather than trying to subtract the echo (added 27 September 2026, see [Architecture](architecture.md#speaker-mode-the-echo-gate)). Earbuds remain the recommended setup.
 - Per-app audio filtering: the tap captures all system output.

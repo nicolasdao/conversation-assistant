@@ -14,7 +14,9 @@ source:
 
 # Architecture
 
-Conversation Assistant has two parts. The **engine** — a Node server plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+Conversation Assistant has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+
+The engine runs in one of two hosts, with the same start-up (`bootEngine()` in `src/server/main.ts`) and the same router: **`npm run serve`**, a server on http://127.0.0.1:4317 for development and the command-line tools, or **the Mac app**, where it runs inside Electron's main process and the app's window reaches the router in-process, with no port (see [The Mac app](desktop.md)). Where the engine finds its files — the page, config, models, recordings, the helper — comes from `src/paths.ts`: the project folder by default, the app bundle and Application Support in the Mac app.
 
 ```mermaid
 flowchart TB
@@ -33,7 +35,7 @@ flowchart TB
   SEG --> FC[Fact-checker<br/>System 1 flags → System 2 research]
   TL & FC & SEG & LIVE --> BUS[Event bus]
   BUS --> STORE[(Session folder files)]
-  BUS --> SSE[HTTP + SSE API<br/>127.0.0.1:4317]
+  BUS --> SSE[HTTP + SSE API<br/>npm run serve: 127.0.0.1:4317<br/>Mac app: app:// in-process, no port]
   SSE --> WEB[Web page]
 ```
 
@@ -51,7 +53,7 @@ flowchart TB
 - **Stdout** carries binary frames only: `PCAP`, a stream byte (0 host, 1 remote), 3 reserved bytes, `sessionMs` (float64 LE), a sample count (uint32 LE), and that many PCM16 LE samples at 16 kHz (1,600 per frame, about every 100 ms). **Stderr** carries JSON status lines (`started` with `epochMs`, `device_changed`, `warning`, `error`).
 - `--list-devices` prints input devices; `--probe <s>` prints peak and RMS levels (used by `capture:test` and `preflight`).
 
-The Info.plist is embedded in the binary (`-sectcreate __TEXT __info_plist`), without which macOS refuses the permissions. macOS attributes both permissions to the app that launched the terminal; a denied permission delivers silence, not an error (see [Gotchas](gotchas.md)).
+The Info.plist is embedded in the binary (`-sectcreate __TEXT __info_plist`), without which macOS refuses the permissions. macOS attributes both permissions to the app that launched the helper — the terminal app for `npm run serve`, Conversation Assistant itself for the Mac app, which declares the same two usage descriptions in its own `Info.plist` (see [The Mac app](desktop.md#macos-permissions)); a denied permission delivers silence, not an error (see [Gotchas](gotchas.md)).
 
 The Node adapter spawns the helper, parses frames across partial reads, maps helper time onto the session clock (`started.epochMs − session start`), and re-chunks into 512-sample Float32 frames, filling gaps with silence. A malformed frame kills the helper; an unexpected exit is restarted up to 3 times per session, 1 s apart, with an `error` event each time, then the live sources end cleanly. Stopping closes stdin, then sends SIGTERM after 2 s and SIGKILL after 5 s.
 
@@ -71,7 +73,7 @@ A `Session` wires everything together and runs until input ends or it is stopped
 8. **Fact-checker.** System 1 answers from step 6 flag claims; System 2 researches, audits, and rewrites (see [System 1 and System 2](system1-system2.md)).
 9. **Stats** every 60 s and at the end (`src/pipeline/stats.ts`): the Rogan index (share of labelled time on `personal_life` and `other_topics`), talk time, disagreements and duration-weighted hype per speaker, predictions, recommendations, clip-worthy segments, fact-check totals, and cost.
 
-At end of input, in order: flush every VAD; wait for transcriptions and the segmenter; close the open segment (`final: true`) and label it; drain research, audits, and rewrites for at most 180 s; emit `stats`; write `speakers.json`; emit `session.ended`.
+At end of input, in order: close the WAVs (their final headers are written at once, so the audio is complete however long the rest takes, or if the Mac app quits during it); flush every VAD; wait for transcriptions and the segmenter; close the open segment (`final: true`) and label it; drain research, audits, and rewrites for at most 180 s; emit `stats`; write `speakers.json`; emit `session.ended`.
 
 ## Event bus and API — `src/store/events.ts`, `src/server/main.ts`
 
@@ -86,7 +88,7 @@ Every result is an event with a payload checked against a zod schema (a failed c
 | Accounting | `cost`, `budget.exhausted`, `stats`, `error` |
 | Calls (transient) | `call.started` (`system`: `s1` or `s2`, `purpose`) when a Jev or System 2 call is sent; `call` with the logged row when it completes (a Jev row also carries the question definitions, for display) |
 
-The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one session at a time (an `Engine` owns it):
+The router (`createApiServer`) uses Node's `http` module and serves one session at a time (an `Engine` owns it). `npm run serve` listens on 127.0.0.1 only; the Mac app never listens: each request from its window reaches the same router over an in-memory stream pair (`src/server/inProcess.ts`, see [The Mac app](desktop.md#the-in-process-connection--srcserverinprocessts)).
 
 | Method | Route | Does |
 | --- | --- | --- |
@@ -105,16 +107,16 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | GET | `/api/calls?system=s1\|s2&limit=` | The session on screen's most recent Jev (`s1`) or System 2 (`s2`) call rows, oldest first, and the models its config named |
 | POST | `/api/sessions/close` | Leaves an opened recording's view (back to no session); a session on air is not affected |
 | GET | `/api/about` | The project's name, version (the root `package.json`'s `version`, the only place it lives), and license (`id`, `holder`, and the `LICENSE` text); the page shows them in the settings menu's footer, the license opening in a window |
-| GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
+| GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the engine started; the page then shows a banner asking for a restart. Never in the packaged Mac app, which has no sources |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
 | GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.conversation-recording` file (see [Recordings](recordings.md#export-and-import)) |
 | GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
 
-It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/`.
+It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/` (inside the app bundle in the Mac app).
 
 ## Web front end — `web/`
 
-Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`) — no bundler, no framework, no chart library. `main.ts` first asks `GET /api/setup`: with a key missing it shows only the setup screen ([Setup](setup.md)); otherwise it imports `app.ts`, which loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
+Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`, `npm run app`, and `npm run dist:mac`) — no bundler, no framework, no chart library. `main.ts` first asks `GET /api/setup`: with a key missing it shows only the setup screen ([Setup](setup.md)); otherwise it imports `app.ts`, which loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
 
 The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
@@ -190,23 +192,23 @@ With earbuds, the microphone never hears the call. When the call plays through t
 
 ## Budgets — `src/budget.ts`
 
-One ledger per session, plus the development total read from `sessions/**/*.jsonl` when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in four buckets (`transcription` — final and live, `jev`, `s2`, `chat`), which drive the `cost` event. `chat` is in the session's total but not in the session cap's count: it has its own cap per recording, `chat.capUsd` ($2), so a chat never stops the pipeline (see [Chat](chat.md)).
+One ledger per session, plus the development total read from the recordings folder's `**/*.jsonl` (`sessions/` in development) when the session starts. Every external call runs `assertCanSpend` before and `record` after — live text checks when it opens a connection and at every committed turn — in four buckets (`transcription` — final and live, `jev`, `s2`, `chat`), which drive the `cost` event. `chat` is in the session's total but not in the session cap's count: it has its own cap per recording, `chat.capUsd` ($2), so a chat never stops the pipeline (see [Chat](chat.md)).
 
 - **Session cap** (`budget.sessionCapUsd`, $10) — always enforced. It was $5 until 25 September 2026; raised so a long or busy show never stops mid-air.
-- **Development cap** (`budget.devCapUsd`, $3) — the total of `cost_usd` over call rows in `sessions/**/*.jsonl` (including `sessions/deleted-spend.jsonl`, which keeps the spend of deleted recordings), enforced by replays (including `serve --replay`) and `smoke`, not by live sessions or `preflight`. `--allow-over-dev-cap` lifts it.
+- **Development cap** (`budget.devCapUsd`, $3) — the total of `cost_usd` over call rows in `sessions/**/*.jsonl` (including `sessions/deleted-spend.jsonl`, which keeps the spend of deleted recordings), enforced by replays (including `serve --replay`) and `smoke`, not by live sessions or `preflight`. `--allow-over-dev-cap` lifts it. The packaged Mac app never enforces it: it guards a developer's replays, and the app's users have the session cap.
 - When a cap is reached, or OpenRouter returns a non-transient 402, `budget.exhausted` is emitted and further calls are refused.
 
 ## Configuration — `config/`
 
-`src/config.ts` validates all three files with zod at startup; code never writes to them at runtime.
+`src/config.ts` validates all three files with zod at startup; code never writes to them at runtime. The Mac app ships them inside the app, read-only: changing them means building the app again (see [The Mac app](desktop.md)).
 
 | File | Holds |
 | --- | --- |
-| `config/app.json` | Server port, budgets, VAD, echo gate (speaker mode), speakers, transcription (final and live), Jev client, segmentation (including `pauseBoundaryMs`, used only without Jev), timeline, System 2, fact-check loop, chat |
+| `config/app.json` | Server port (`npm run serve` only), budgets, VAD, echo gate (speaker mode), speakers, transcription (final and live), Jev client, segmentation (including `pauseBoundaryMs`, used only without Jev), timeline, System 2, fact-check loop, chat |
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 
-The API keys are not in `config/`: they come from the environment (`.env`) or `~/Library/Application Support/Conversation Assistant/credentials.json` (see [Setup](setup.md)).
+The API keys are not in `config/`: they come from the environment (`.env`, in development) or `~/Library/Application Support/Conversation Assistant/credentials.json` (see [Setup](setup.md)).
 
 Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a `choice` without criteria or without a `none` / `other…` option, a `score` with fewer than 2 levels, non-snake_case ids, and a System 1 set whose `claim_type` does not have exactly its 7 keys.
 

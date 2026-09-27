@@ -16,7 +16,8 @@
       "headings": [
         "Conversation Assistant",
         "Table of Contents",
-        "Setup",
+        "Install",
+        "Develop",
         "Scripts",
         "Using it",
         "Documentation",
@@ -26,11 +27,12 @@
         "License",
         "Versioning"
       ],
-      "line_count": 163,
+      "line_count": 194,
       "links_to": [
         "CHANGELOG.md",
         "docs/architecture.md",
         "docs/chat.md",
+        "docs/desktop.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
@@ -69,9 +71,10 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 217,
+      "line_count": 219,
       "links_to": [
         "docs/chat.md",
+        "docs/desktop.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
@@ -155,7 +158,62 @@
     },
     {
       "dangling": false,
-      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.",
+      "description": "The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.",
+      "has_frontmatter": true,
+      "headings": [
+        "The Mac app",
+        "How it runs: one process, no port",
+        "The in-process connection — `src/server/inProcess.ts`",
+        "Where the app keeps its files — `src/paths.ts`",
+        "The window — `desktop/main.ts`",
+        "macOS permissions",
+        "A show in progress",
+        "Updates",
+        "Building",
+        "Signing and notarization",
+        "Publishing"
+      ],
+      "line_count": 137,
+      "links_to": [
+        "README.md",
+        "docs/architecture.md",
+        "docs/gotchas.md",
+        "docs/mission.md",
+        "docs/recordings.md",
+        "docs/setup.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/desktop.md",
+      "source": [
+        "desktop/**",
+        "src/server/inProcess.ts",
+        "src/paths.ts",
+        "electron-builder.yml",
+        "scripts/build-mac.sh",
+        "scripts/make-icon.mjs"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "desktop",
+        "electron",
+        "mac-app",
+        "packaging",
+        "signing",
+        "notarization",
+        "auto-update",
+        "permissions",
+        "install"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.",
       "has_frontmatter": true,
       "headings": [
         "Gotchas",
@@ -166,10 +224,11 @@
         "Web page",
         "Export and import",
         "Chat",
+        "Mac app (Electron)",
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 66,
+      "line_count": 77,
       "links_to": [
         "docs/architecture.md",
         "docs/recordings.md"
@@ -184,7 +243,9 @@
         "src/factcheck/s1.ts",
         "src/factcheck/s2.ts",
         "scripts/make-fixtures.ts",
-        "src/store/transfer.ts"
+        "src/store/transfer.ts",
+        "desktop/**",
+        "src/server/inProcess.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -193,7 +254,8 @@
         "openai",
         "openrouter",
         "jev",
-        "sherpa-onnx"
+        "sherpa-onnx",
+        "electron"
       ],
       "toc": {
         "linked": false,
@@ -263,10 +325,11 @@
         "Principles",
         "Non-goals"
       ],
-      "line_count": 50,
+      "line_count": 51,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
+        "docs/desktop.md",
         "docs/jev.md",
         "docs/recordings.md",
         "docs/rehearsal.md",
@@ -302,10 +365,11 @@
         "Export and import",
         "API"
       ],
-      "line_count": 133,
+      "line_count": 134,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
+        "docs/desktop.md",
         "docs/rehearsal.md",
         "docs/transcription.md"
       ],
@@ -314,6 +378,7 @@
       "path": "docs/recordings.md",
       "source": [
         "src/store/sessionStore.ts",
+        "src/paths.ts",
         "src/store/library.ts",
         "src/store/events.ts",
         "src/server/main.ts",
@@ -351,7 +416,7 @@
         "Planted lines to say on air",
         "Calibration on an old episode"
       ],
-      "line_count": 65,
+      "line_count": 63,
       "links_to": [
         "docs/recordings.md",
         "docs/speakers.md",
@@ -394,6 +459,7 @@
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
+        "docs/desktop.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",

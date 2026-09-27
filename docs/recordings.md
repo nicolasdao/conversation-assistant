@@ -3,6 +3,7 @@ description: Where every session is stored, what each file holds, and how the re
 tags: [sessions, storage, library, replay, playback, export, import, api]
 source:
   - src/store/sessionStore.ts
+  - src/paths.ts
   - src/store/library.ts
   - src/store/events.ts
   - src/server/main.ts
@@ -18,11 +19,11 @@ Every session — live or replay — is kept as one folder of plain files. There
 
 ## Session folders
 
-`src/store/sessionStore.ts` creates `sessions/<YYYYMMDD-HHMMSS>/` at session start. `npm run smoke` and `npm run preflight` write only their call logs, to `smoke-…` and `preflight-…` folders; those have no `session.json`, so the library never lists them. Every JSONL file is append-only and flushed on every write, so a crash loses at most the last line.
+`src/store/sessionStore.ts` creates `<YYYYMMDD-HHMMSS>/` in the recordings folder at session start. The recordings folder (`sessions` in `src/paths.ts`) is the project's `sessions/` for `npm run serve` and the CLI tools, and `~/Library/Application Support/Conversation Assistant/sessions` in the Mac app (see [The Mac app](desktop.md#where-the-app-keeps-its-files--srcpathsts)); `sessions/` below means that folder. The two are separate libraries: to see recordings made in development in the app, move their folders across, or export and import them. `npm run smoke` and `npm run preflight` write only their call logs, to `smoke-…` and `preflight-…` folders; those have no `session.json`, so the library never lists them. Every JSONL file is append-only and flushed on every write, so a crash loses at most the last line.
 
 | File | Holds |
 | --- | --- |
-| `host.wav`, `remote.wav` | The streams as received, 16 kHz mono PCM16 — enough to replay the session exactly |
+| `host.wav`, `remote.wav` | The streams as received, 16 kHz mono PCM16 — enough to replay the session exactly. Their headers get the final sizes as soon as the input ends, before the rest of the session's ending (see [Architecture](architecture.md#the-session-pipeline--srcpipelinesessionts)), so the audio is complete even if the app quits while fact-checks drain |
 | `session.json` | Mode, start time, `app` (the name and version that recorded it; absent before 0.3.0), streams, config snapshot, `features` (fact-check and labels on or off; see [Architecture](architecture.md#features-transcript-only-sessions)), label set, System 1 set |
 | `events.jsonl` | Every event the page received (except transient live text) |
 | `utterances.jsonl` | VAD utterances with times, speaker id, and the `loud` tag (`overlap` is computed later and appears only in Jev states) |
@@ -89,11 +90,11 @@ Inside:
 
 **Export**, from the header (a recording on screen) or a row of the Recordings window:
 1. `POST /api/sessions/:id/export { audio: "compressed" | "original" | "none", chats }` writes the file to the system's temporary folder and returns `{ token, fileName, bytes }`. Errors show in the window.
-2. The page then downloads `GET /api/exports/:token` (`Content-Disposition: attachment`), usually to Downloads. The file is deleted once sent, or after 15 minutes.
+2. The page then downloads `GET /api/exports/:token` (`Content-Disposition: attachment`), usually to Downloads; the Mac app always saves it there, as `<name> (2).conversation-recording` and so on when the name is taken. The file is deleted once sent, or after 15 minutes.
 3. A session still on air cannot be exported (409).
 
 **Import**, from the header (anything but a session on air), the Recordings window, or by dropping the file anywhere on the page:
-1. `POST /api/sessions/import` takes the raw file (up to 4 GB) with its name in `X-File-Name`, and the page shows upload progress.
+1. `POST /api/sessions/import` takes the raw file (up to 4 GB) with its name in `X-File-Name`, and the page shows upload progress when the browser reports it. The Mac app's window reports none (the upload is in-process and instant), so there the bar moves back and forth until the recording is unpacked.
 2. The engine checks the manifest. A file from a newer `formatVersion` is refused with the version that made it ("update the app to import it").
 3. It writes only the files it knows, to a hidden `sessions/.import-…` folder, then moves that into place in one step. Any other entry in the archive is ignored, so an archive cannot write outside the recording's folder.
 4. Compressed audio is decoded back to the app's own WAVs. The WAV that `afconvert` writes has extra chunks, with the audio starting at byte 4088, so the engine rewrites it with the 44-byte header the rest of the app expects and trims or pads it to the manifest's sample count.
