@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-27
+
+### Added
+- Conversation Assistant is now a Mac app: download the DMG from the latest GitHub Release, drag the app into Applications, and open it. No terminal, Node, or server is needed; the app is signed with a Developer ID and notarized by Apple
+- On its first launch the app asks for Microphone and System Audio Recording in its own name, so the questions never interrupt a show; if the microphone was refused, it offers to open System Settings
+- The app updates itself from GitHub Releases, and only while nothing is on air; a downloaded update installs when you quit, or at once with Restart Now
+- Quitting during a show asks first, then stops the session and keeps the recording; the Mac stays awake while a session runs, and closing the window keeps a show on air
+- File → Show Recordings in Finder: the app keeps recordings in ~/Library/Application Support/Conversation Assistant/sessions, next to the saved keys, and saves exports to Downloads
+
+### Changed
+- The project now lives in the public repository github.com/nicolasdao/conversation-assistant
+- A recording's audio is complete as soon as the session's input ends, instead of after its fact-checks finish (up to 3 minutes later)
+- In the Mac app, the import progress bar moves back and forth until the recording is unpacked, since the upload there reports no progress
+- For developers: `npm run app` opens the app from the project folder, and `npm run dist:mac` builds the DMG; `npm run serve` is unchanged and keeps its recordings in the project's sessions/
+
+### Security
+- The signed app cannot be relaunched as plain Node, with NODE_OPTIONS or --inspect, or with a remote debugging port, so no other program can use its Microphone and System Audio Recording permissions; its window loads only the app's own content
+
 ## [0.5.0] - 2026-09-27
 
 ### Added
