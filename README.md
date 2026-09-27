@@ -1,4 +1,4 @@
-# Podcast Assistant
+# Conversation Assistant
 
 ## Table of Contents
 
@@ -23,12 +23,12 @@ Requires Node 24 and macOS on Apple Silicon.
 
 ```bash
 npm install
-cp .env.example .env && chmod 600 .env   # fill OPENROUTER_API_KEY and OPENAI_API_KEY; never commit it
 npm run models                           # Silero VAD + WeSpeaker speaker-embedding models into models/
 npm run fixtures                         # a scripted ~78 s test conversation into fixtures/conversation/
+npm run serve                            # then open http://127.0.0.1:4317
 ```
 
-Use a dedicated OpenRouter key for this project with a credit limit (for example $10).
+The first time, the page asks for two API keys, one from OpenAI and one from OpenRouter, and walks through getting each: create the account, add prepaid credit, create the key, paste it. Each key is checked before it is saved. Keys are saved in `~/Library/Application Support/Conversation Assistant/credentials.json`, readable only by your macOS user and outside the project folder; the cog menu's **API keys** replaces them later. Developers can set `OPENAI_API_KEY` and `OPENROUTER_API_KEY` in `.env` (see `.env.example`) instead, which wins over the saved file. See [Setup and API keys](docs/setup.md).
 
 ## Scripts
 
@@ -40,7 +40,7 @@ Use a dedicated OpenRouter key for this project with a credit limit (for example
 | `npm run smoke` | Live checks of transcription, Jev, and System 2 (measured at about $0.05); streaming text is not checked |
 | `npm run replay -- --host <wav> --remote <wav> --speed max\|1 [--export <file>]` | Runs WAV files through the pipeline into `sessions/<id>/` |
 | `npm run serve [-- --replay <dir> --speed 1\|max]` | The web page and HTTP + SSE API on http://127.0.0.1:4317 |
-| `npm run build:capture` | Builds the `podcast-capture` Swift helper (microphone + system audio) |
+| `npm run build:capture` | Builds the `conversation-capture` Swift helper (microphone + system audio) |
 | `npm run capture:test` | Checks the helper and the macOS permissions on this Mac (interactive) |
 | `npm run build:web` | Compiles the web page (`npm run serve` does it first) |
 | `npm run preflight` | Pre-show checks (see `docs/rehearsal.md`) |
@@ -53,7 +53,7 @@ macOS asks once for **Microphone** and once for **System Audio Recording**; both
 
 ## Using it
 
-`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/` (both audio streams included); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.podcast-recording` file (about 30 MB an hour) to send over WhatsApp or email, and **Import** (or dropping the file on the page) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a refresh or a bookmark lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
+`npm run serve`, then open http://127.0.0.1:4317 and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The page shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, System 1, Speakers, Labels, Stats, and Log. Every session is saved under `sessions/` (both audio streams included); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.conversation-recording` file (about 30 MB an hour) to send over WhatsApp or email, and **Import** (or dropping the file on the page) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a refresh or a bookmark lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
 
 Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($10) in `config/app.json`. Chat is extra, pay-as-you-ask (a question about a two-hour episode is about $0.004 on GPT-6 Luna, more on larger models), with its own cap of $2 per recording (`chat.capUsd`). OpenRouter calls send `provider: { data_collection: "deny" }`.
 
@@ -64,9 +64,10 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - [Chat](docs/chat.md) — The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.
 - [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, Jev question wording, and test-fixture voices — each with its fix.
 - [Jev](docs/jev.md) — What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.
-- [Mission](docs/mission.md) — Why Podcast Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
+- [Mission](docs/mission.md) — Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 - [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, exports, imports, and deletes past sessions.
 - [Rehearsal kit](docs/rehearsal.md) — The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.
+- [Setup and API keys](docs/setup.md) — The two API keys (OpenAI and OpenRouter) — the first-run setup screen that replaces the app until both are set, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.
 - [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, voices tied to a stream with a per-stream limit, the 0.65 threshold, merge suggestions with confidence, and how to rename, merge, and calibrate.
 - [System 1 and System 2](docs/system1-system2.md) — The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.
 - [Transcription](docs/transcription.md) — How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.
@@ -78,7 +79,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 
 **Architecture.** The engine owns everything smart: capture, VAD, speakers, transcription, System 1 and System 2, storage, and the HTTP and SSE API. It is the Node server plus a native capture helper that the server starts as a child process. The front end is a thin client: it only reads `GET /api/state` and `GET /api/events` and posts commands. It could be replaced later, for example by a SwiftUI app, without touching the engine.
 
-**Capture: a native Swift helper, `podcast-capture`.**
+**Capture: a native Swift helper, `conversation-capture`.**
 - `host`: the MacBook's built-in microphone, chosen explicitly whatever the system default input is.
 - `remote`: a global Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session.
 - It works whether Riverside runs in Chrome or as the Mac app.

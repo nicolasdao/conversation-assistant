@@ -3,16 +3,16 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.cloudlesslabs.podcast-capture</string>
+    <string>com.cloudlesslabs.conversation-capture</string>
     <key>CFBundleName</key>
-    <string>podcast-capture</string>
+    <string>conversation-capture</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
     <string>0.1.0</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Podcast Assistant transcribes the host's microphone during a recording.</string>
+    <string>Conversation Assistant transcribes the host's microphone during a recording.</string>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Podcast Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.</string>
+    <string>Conversation Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.</string>
 </dict>
 </plist>

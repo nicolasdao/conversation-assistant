@@ -556,7 +556,7 @@ export class ChatService {
     try {
       res = await this.deps.fetch(CHAT_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Podcast Assistant" },
+        headers: { Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Conversation Assistant" },
         body,
         signal: AbortSignal.any([stop, AbortSignal.timeout(this.cfg.timeoutMs)]),
       });

@@ -11,11 +11,13 @@ import { S2Client } from "../factcheck/s2.ts";
 import { timelineQuestions } from "../pipeline/timeline.ts";
 import { processSecrets } from "../store/events.ts";
 import { SessionStore } from "../store/sessionStore.ts";
+import { loadKeys } from "../keys.ts";
 
 const { values } = parseArgs({ options: { checks: { type: "string" }, "allow-over-dev-cap": { type: "boolean", default: false } } });
 const only = values.checks ? new Set(values.checks.split(",").map((s) => Number(s.trim()))) : null;
 const run = (n: number) => !only || only.has(n);
 
+loadKeys();
 const cfg = loadConfig();
 const openrouter = process.env.OPENROUTER_API_KEY ?? "";
 const openai = process.env.OPENAI_API_KEY ?? "";

@@ -1,4 +1,4 @@
-// Export and import of recordings: one `.podcast-recording` file to send over WhatsApp or email, and back.
+// Export and import of recordings: one `.conversation-recording` file to send over WhatsApp or email, and back.
 // The engine builds and reads the file (see docs/recordings.md § Export and import); this module is the two windows,
 // the header buttons, and dropping a file on the page.
 import { api, type ExportInfo, type ImportResult } from "./api.js";
@@ -6,7 +6,9 @@ import { $, clock, h, replace } from "./dom.js";
 import { toast } from "./panels.js";
 import type { State } from "./state.js";
 
-const EXTENSION = ".podcast-recording";
+const EXTENSION = ".conversation-recording";
+/** Exports made before the app was renamed from Podcast Assistant (27 September 2026) still import. */
+const IMPORTABLE = [EXTENSION, ".podcast-recording"];
 type Audio = "compressed" | "original" | "none";
 
 let getState: () => State = () => { throw new Error("bindTransfer first"); };
@@ -94,7 +96,7 @@ export async function openExport(id: string) {
   drawChoices();
   drawFoot();
   replace(body, opts, chatSwitch, foot,
-    h("p", { class: "note" }, `Whoever you send it to imports it with Podcast Assistant: Import in the header, or drop the file on the page.`),
+    h("p", { class: "note" }, `Whoever you send it to imports it with Conversation Assistant: Import in the header, or drop the file on the page.`),
     status,
     h("div", { class: "row end" }, h("button", { class: "btn", onclick: () => d.close() }, "Cancel"), go));
   go.focus();
@@ -105,7 +107,7 @@ export async function openExport(id: string) {
 export function openImport(file?: File) {
   const d = $<HTMLDialogElement>("#dlg-import")!;
   if (!d.open) { document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach((x) => x.close()); d.showModal(); }
-  const picker = h("input", { type: "file", accept: EXTENSION, hidden: true });
+  const picker = h("input", { type: "file", accept: IMPORTABLE.join(","), hidden: true });
   picker.addEventListener("change", () => { const f = picker.files?.[0]; if (f) void upload(f); });
   const zone = h("div", { class: "drop-zone", tabindex: 0, role: "button", "aria-label": "Choose a recording file to import" },
     h("b", {}, "Drop a recording here"),
@@ -131,7 +133,7 @@ export function openImport(file?: File) {
 async function upload(file: File) {
   const body = $("#import-body")!;
   const d = $<HTMLDialogElement>("#dlg-import")!;
-  if (!file.name.toLowerCase().endsWith(EXTENSION)) {
+  if (!IMPORTABLE.some((x) => file.name.toLowerCase().endsWith(x))) {
     toast(`That is not a recording file: it should end in ${EXTENSION}.`);
     return openImport();
   }

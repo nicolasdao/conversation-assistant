@@ -8,7 +8,7 @@ import Foundation
 /// taps" sample and AudioCap). The aggregate is rebuilt when the default output device changes.
 @available(macOS 14.2, *)
 final class SystemTap {
-    private let queue = DispatchQueue(label: "podcast-capture.tap", qos: .userInteractive)
+    private let queue = DispatchQueue(label: "conversation-capture.tap", qos: .userInteractive)
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var tapUID = ""
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
@@ -35,7 +35,7 @@ final class SystemTap {
         let desc = CATapDescription(monoGlobalTapButExcludeProcesses: [])
         desc.isPrivate = true
         desc.muteBehavior = .unmuted
-        desc.name = "podcast-capture"
+        desc.name = "conversation-capture"
         var id = AudioObjectID(kAudioObjectUnknown)
         let st = AudioHardwareCreateProcessTap(desc, &id)
         guard st == noErr, id != kAudioObjectUnknown else { throw CaptureError.message("AudioHardwareCreateProcessTap failed (OSStatus \(st))") }
@@ -49,8 +49,8 @@ final class SystemTap {
         guard let out = Devices.defaultOutput(), let outUID = Devices.uid(out) else { throw CaptureError.message("no default output device") }
         outputName = Devices.name(out)
         let dict: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "podcast-capture tap",
-            kAudioAggregateDeviceUIDKey: "com.cloudlesslabs.podcast-capture.\(UUID().uuidString)",
+            kAudioAggregateDeviceNameKey: "conversation-capture tap",
+            kAudioAggregateDeviceUIDKey: "com.cloudlesslabs.conversation-capture.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outUID,
             kAudioAggregateDeviceIsPrivateKey: true,
             kAudioAggregateDeviceIsStackedKey: false,

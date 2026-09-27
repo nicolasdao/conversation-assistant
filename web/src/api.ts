@@ -84,6 +84,12 @@ async function streamChat(id: string, body: { content?: string; mode?: string },
   }
 }
 
+export type KeyName = "openai" | "openrouter";
+export interface KeyStatus { name: KeyName; env: string; set: boolean; source: "environment" | "file" | null; hint: string | null }
+export interface SetupStatus { configured: boolean; keys: KeyStatus[]; path: string }
+export interface KeyCheck { ok: boolean; message: string; warning?: string }
+export interface SaveKeysResult extends SetupStatus { saved: boolean; checks: Partial<Record<KeyName, KeyCheck>> }
+
 export interface ExportInfo {
   id: string; name: string | null; fileName: string; recordedWith: string | null; app: { name: string; version: string };
   bytes: Record<"compressed" | "original" | "none", number>; chats: number; hasAudio: boolean;
@@ -112,6 +118,8 @@ function importRecording(file: File, onProgress: (done: number) => void): Promis
 
 export const api = {
   state: () => call<any>("GET", "/api/state"),
+  setup: () => call<SetupStatus>("GET", "/api/setup"),
+  saveKeys: (keys: Partial<Record<KeyName, string>>) => call<SaveKeysResult>("POST", "/api/setup/keys", keys),
   about: () => call<{ name: string; version: string; license: { id: string | null; holder: string | null; text: string } }>("GET", "/api/about"),
   closeView: () => call<{ closed: string | null }>("POST", "/api/sessions/close"),
   calls: (system: "s1" | "s2", limit = 300) =>

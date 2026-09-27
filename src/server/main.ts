@@ -20,8 +20,9 @@ import {
   discard, exportEstimate, exportFileName, exportRecording, importRecording, MAX_UPLOAD_BYTES, saveUpload, TransferError, type AudioChoice,
 } from "../store/transfer.ts";
 import { appInfo } from "../version.ts";
+import { KeyError, KeySetup, KeyStore } from "../keys.ts";
 
-/** Export and import of recordings as one `.podcast-recording` file (see docs/recordings.md § Export and import). */
+/** Export and import of recordings as one `.conversation-recording` file (see docs/recordings.md § Export and import). */
 export interface TransferApi {
   /** What an export would contain and weigh. */
   info(id: string): unknown;
@@ -151,7 +152,8 @@ export class Engine implements EngineApi {
     this.library = new SessionLibrary(opts.sessionsDir ?? "sessions");
     this.chat = new ChatService(this.config.app.chat, {
       fetch: (...a) => (opts.fetch ?? fetch)(...a),
-      apiKey: opts.openrouterKey ?? process.env.OPENROUTER_API_KEY ?? "",
+      // read on each call: a key saved from the setup page applies at once
+      get apiKey() { return opts.openrouterKey ?? process.env.OPENROUTER_API_KEY ?? ""; },
       source: () => this.chatSource(),
       onSpend: (src) => this.chatSpent(src),
     });
@@ -616,13 +618,46 @@ function serveStatic(webRoot: string, path: string, res: ServerResponse): boolea
   return true;
 }
 
-export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = {}): Server {
+/** What the setup routes need (see docs/setup.md); `KeySetup` in src/keys.ts. */
+export interface SetupApi {
+  status(): { configured: boolean };
+  save(body: unknown): Promise<unknown>;
+}
+
+/**
+ * The setup routes accept only the page itself: the Host must be this machine (no DNS rebinding) and a browser's
+ * Origin must match it, so another website open in the browser can neither read the hints nor replace the keys.
+ */
+function fromThisPage(req: IncomingMessage): boolean {
+  const host = req.headers.host ?? "";
+  if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host)) return false;
+  const origin = req.headers.origin;
+  return !origin || origin === `http://${host}`;
+}
+
+/** Routes that work before the keys are set: the setup page's own, and the page's footer. */
+const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/about", "/api/engine"]);
+
+export function createApiServer(engine: EngineApi, opts: { webRoot?: string; setup?: SetupApi } = {}): Server {
   const webRoot = opts.webRoot ?? "web";
+  const setup = opts.setup;
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     const path = url.pathname;
     const m = req.method ?? "GET";
     try {
+      if (setup && path.startsWith("/api/setup")) {
+        if (!fromThisPage(req)) throw new ApiError(403, "the setup routes answer only the page at 127.0.0.1");
+        if (m === "GET" && path === "/api/setup") return send(res, 200, setup.status());
+        if (m === "POST" && path === "/api/setup/keys") {
+          if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) throw new ApiError(415, "expected JSON");
+          return send(res, 200, await setup.save(await readJson(req)));
+        }
+      }
+      // until both keys are set, the engine's routes wait: the page shows only the setup screen
+      if (setup && path.startsWith("/api/") && !OPEN_ROUTES.has(path) && !setup.status().configured) {
+        return send(res, 503, { error: "API keys are missing: open the page to add them", setup: true });
+      }
       if (m === "GET" && path === "/api/events") {
         res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
         res.write(": connected\n\n");
@@ -720,7 +755,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string } = 
       if (m === "GET" && serveStatic(webRoot, path, res)) return;
       return send(res, 404, { error: "not found" });
     } catch (e) {
-      const status = e instanceof ApiError || e instanceof ChatError ? e.status : 400;
+      const status = e instanceof ApiError || e instanceof ChatError || e instanceof KeyError ? e.status : 400;
       return send(res, status, { error: e instanceof Error ? e.message : String(e) });
     }
   });
@@ -735,16 +770,28 @@ async function main() {
       "allow-over-dev-cap": { type: "boolean", default: false },
     },
   });
+  // before anything reads a key: the environment (.env) first, then the keys saved from the setup page
+  const keys = new KeyStore().load();
   const config = loadConfig();
+  const setup = new KeySetup(keys, {
+    fetch: (...a) => fetch(...a),
+    models: [config.app.transcription.model, ...(config.app.transcription.live?.enabled ? [config.app.transcription.live.model] : [])],
+  });
   const engine = new Engine({
     config, allowOverDevCap: values["allow-over-dev-cap"],
     live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
     devices: () => listDevices(),
   });
   const port = Number(values.port ?? config.app.server.port);
-  const server = createApiServer(engine);
-  server.listen(port, "127.0.0.1", () => console.log(`Podcast Assistant on http://127.0.0.1:${port}`));
-  if (values.replay) {
+  const server = createApiServer(engine, { setup });
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Conversation Assistant on http://127.0.0.1:${port}`);
+    const missing = keys.missing();
+    if (missing.length) console.log(`API keys missing (${missing.join(", ")}): open the page above to add them`);
+  });
+  if (values.replay && keys.missing().length) {
+    console.error("--replay needs both API keys: open the page to add them, then start the replay from there");
+  } else if (values.replay) {
     const { sessionId } = await engine.start({ mode: "replay", dir: values.replay, speed: values.speed === "max" ? "max" : 1 });
     console.log(`replaying ${values.replay} at speed ${values.speed} as session ${sessionId}`);
   }

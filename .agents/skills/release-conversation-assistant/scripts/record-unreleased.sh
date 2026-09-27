@@ -6,6 +6,6 @@ summary="$1"
 attribution="$2"
 [ -n "$summary" ] || { echo "usage: record-unreleased.sh <summary> [attribution]"; exit 1; }
 git add CHANGELOG.md
-msg="docs(changelog): record unreleased podcast-assistant change(s) — $summary"
+msg="docs(changelog): record unreleased conversation-assistant change(s) — $summary"
 if [ -n "$attribution" ]; then git commit -q -m "$msg" -m "$attribution"; else git commit -q -m "$msg"; fi
 echo "ok: recorded in [Unreleased] ($(git rev-parse --short HEAD))"

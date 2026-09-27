@@ -1,12 +1,12 @@
 ---
-name: release-podcast-assistant
-description: Release — cut a podcast-assistant version by bumping package.json, updating CHANGELOG.md, tagging and pushing. Use when asked to release, ship a version, bump the version, or record unreleased changes. Not for running or deploying the app.
+name: release-conversation-assistant
+description: Release — cut a conversation-assistant version by bumping package.json, updating CHANGELOG.md, tagging and pushing. Use when asked to release, ship a version, bump the version, or record unreleased changes. Not for running or deploying the app.
 argument-hint: "[patch|minor|major|unreleased|auto] [description]"
 arguments: [action, note]
 allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
 ---
 
-# Release podcast-assistant
+# Release conversation-assistant
 
 Cuts a release of this project: bring the docs up to date and commit everything, then analyse what changed, write the changelog, bump the version, commit, tag, and push. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
 
@@ -81,7 +81,7 @@ AskUserQuestion, presenting: current → new version, the bump and why, the full
 ## Step 7 — Write, commit, tag
 
 1. Create `CHANGELOG.md` if missing, then stamp the release ([references/changelog.md § Stamping](references/changelog.md)): the entries go under `## [<version>] - <today>`, and `## [Unreleased]` stays, empty.
-2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): podcast-assistant v<version>`, and tags `v<version>`.
+2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): conversation-assistant v<version>`, and tags `v<version>`.
 
 ## Step 8 — Push (a second confirmation)
 

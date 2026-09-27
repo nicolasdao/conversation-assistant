@@ -218,7 +218,7 @@ export class JevClient {
       res = await this.deps.fetch(DECISIONS_URL, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Podcast Assistant",
+          Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Conversation Assistant",
         },
         body: JSON.stringify({ model: this.cfg.model, state, questions, ...(this.cfg.provider ? { provider: this.cfg.provider } : {}) }),
         signal: AbortSignal.timeout(timeoutMs),

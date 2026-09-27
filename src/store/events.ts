@@ -54,8 +54,9 @@ export function redactor(secrets: (string | undefined)[]): (s: string) => string
   return (s) => list.reduce((acc, k) => acc.split(k).join("[redacted]"), s);
 }
 
+/** Redacts the keys current when each string is written: keys saved from the setup page apply without a restart. */
 export function processSecrets(): (s: string) => string {
-  return redactor([process.env.OPENROUTER_API_KEY, process.env.OPENAI_API_KEY]);
+  return (s) => redactor([process.env.OPENROUTER_API_KEY, process.env.OPENAI_API_KEY])(s);
 }
 
 /** A typed event bus with zod-validated payloads, a replayable history, and subscribers. */

@@ -14,7 +14,7 @@
       "description": null,
       "has_frontmatter": false,
       "headings": [
-        "Podcast Assistant",
+        "Conversation Assistant",
         "Table of Contents",
         "Setup",
         "Scripts",
@@ -24,7 +24,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 103,
+      "line_count": 104,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
@@ -33,6 +33,7 @@
         "docs/mission.md",
         "docs/recordings.md",
         "docs/rehearsal.md",
+        "docs/setup.md",
         "docs/speakers.md",
         "docs/system1-system2.md",
         "docs/transcription.md"
@@ -64,13 +65,14 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 195,
+      "line_count": 198,
       "links_to": [
         "docs/chat.md",
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
         "docs/recordings.md",
+        "docs/setup.md",
         "docs/speakers.md",
         "docs/system1-system2.md",
         "docs/transcription.md"
@@ -245,7 +247,7 @@
     },
     {
       "dangling": false,
-      "description": "Why Podcast Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.",
+      "description": "Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.",
       "has_frontmatter": true,
       "headings": [
         "Mission",
@@ -254,13 +256,14 @@
         "Principles",
         "Non-goals"
       ],
-      "line_count": 49,
+      "line_count": 50,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
         "docs/jev.md",
         "docs/recordings.md",
         "docs/rehearsal.md",
+        "docs/setup.md",
         "docs/system1-system2.md"
       ],
       "over_size": false,
@@ -361,6 +364,53 @@
         "rehearsal",
         "calibration",
         "preflight"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "The two API keys (OpenAI and OpenRouter) — the first-run setup screen that replaces the app until both are set, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.",
+      "has_frontmatter": true,
+      "headings": [
+        "Setup and API keys",
+        "First run: the setup screen",
+        "Where keys are stored",
+        "Checking a key before saving",
+        "Routes and the gate",
+        "Command-line tools"
+      ],
+      "line_count": 94,
+      "links_to": [
+        "docs/architecture.md",
+        "docs/chat.md",
+        "docs/gotchas.md",
+        "docs/jev.md",
+        "docs/mission.md",
+        "docs/transcription.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/setup.md",
+      "source": [
+        "src/keys.ts",
+        "web/src/keys.ts",
+        "web/src/main.ts",
+        "src/cli/smoke.ts",
+        "src/cli/replay.ts"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "setup",
+        "api-keys",
+        "onboarding",
+        "credentials",
+        "security",
+        "openai",
+        "openrouter"
       ],
       "toc": {
         "linked": false,

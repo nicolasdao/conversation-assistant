@@ -4,7 +4,7 @@
 //   /recordings/<id>           that recording, opened read-only
 //   ?t=1:23:45                 the playback position in a recording
 //   ?tab=thinking | jev-log    the right column's tab (fact-check is the default)
-//   ?panel=recordings | speakers | system-1 | labels | stats | log | chat     the window that is open
+//   ?panel=recordings | speakers | system-1 | labels | stats | log | chat | keys     the window that is open
 //   ?panel=chat&chat=chat_2    a chat of the session on screen
 //
 // The URL follows what is on screen (history entries for a change of recording, silent updates for the rest), and
@@ -15,7 +15,7 @@ export interface Route { recording: string | null; t: number | null; tab: string
 export const TABS: Record<string, string> = { "fact-check": "pane-fc", thinking: "pane-think", "jev-log": "pane-jev" };
 export const PANELS: Record<string, string> = {
   recordings: "dlg-recordings", "system-1": "dlg-s1", speakers: "dlg-speakers", labels: "dlg-labels", stats: "dlg-stats", log: "dlg-log",
-  chat: "dlg-chat",
+  chat: "dlg-chat", keys: "dlg-keys",
 };
 const nameOf = (map: Record<string, string>, value: string) => Object.keys(map).find((k) => map[k] === value) ?? null;
 export const tabName = (paneId: string) => nameOf(TABS, paneId);

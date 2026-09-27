@@ -1,10 +1,10 @@
-# SPEC — Podcast Assistant v1: live transcript, Jev timeline, and fact-checker
+# SPEC — Conversation Assistant v1: live transcript, Jev timeline, and fact-checker
 
 Created 24 September 2026 from a design session held in the private jev-xp research repository. Stack: TypeScript on Node 24, macOS 26.2 on Apple Silicon. Status: Tier 1 is ready to implement. The Tier 2 capture and front-end decision was made with the user on 24 September 2026 (§4.13).
 
 ## §0 How to use this spec (read first)
 
-**What this is.** Everything needed to build Podcast Assistant v1 in this repository. It is a local app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio, which carries the Riverside call) and transcribes it live. It labels the conversation on a timeline with Jev and fact-checks claims with a System 1 / System 2 loop. The host will demonstrate it live, on air, during the hosts' AI podcast.
+**What this is.** Everything needed to build Conversation Assistant v1 in this repository. It is a local app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio, which carries the Riverside call) and transcribes it live. It labels the conversation on a timeline with Jev and fact-checks claims with a System 1 / System 2 loop. The host will demonstrate it live, on air, during the hosts' AI podcast.
 
 **Who you are.** A fresh session with no memory of the design discussion. Every decision is recorded here. `BACKGROUND.md` explains why; you do not need it to build.
 
@@ -154,7 +154,7 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
 
 **OpenRouter in brief.** OpenRouter is an API gateway.
 - One key (`OPENROUTER_API_KEY`, created by the user at openrouter.ai with a credit limit on the key) reaches many models through an OpenAI-compatible chat endpoint (`https://openrouter.ai/api/v1/chat/completions`). Jev has its own alpha endpoint beside it (`https://openrouter.ai/api/alpha/decisions`).
-- Authenticate with `Authorization: Bearer <key>`. The optional header `X-OpenRouter-Title: Podcast Assistant` labels calls in the OpenRouter dashboard.
+- Authenticate with `Authorization: Bearer <key>`. The optional header `X-OpenRouter-Title: Conversation Assistant` labels calls in the OpenRouter dashboard.
 - Every response reports its price in USD in `usage.cost`.
 - `GET https://openrouter.ai/api/v1/key` returns the key's `limit`, `limit_remaining`, and usage.
 - Per-model rate limits exist but are unpublished. From this Mac, 10,120 Jev calls at concurrency 8 needed one retry and none failed.
@@ -165,7 +165,7 @@ The demo runs live, so reliability, latency, and a recorded fallback matter as m
 const res = await fetch("https://openrouter.ai/api/alpha/decisions", {
   method: "POST",
   headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json",
-             "X-OpenRouter-Title": "Podcast Assistant" },
+             "X-OpenRouter-Title": "Conversation Assistant" },
   body: JSON.stringify({ model: "typesafe/jev-1.13", state, questions }),
   signal: AbortSignal.timeout(timeoutMs),
 });
@@ -979,7 +979,7 @@ The user and a design session chose the following. Copy this record (date, choic
 
 **Architecture.** The engine owns everything smart: capture, VAD, speakers, transcription, System 1 and System 2, storage, and the HTTP and SSE API. It is the Node server from Tier 1 plus a native capture helper that the server starts as a child process. The front end is a thin client: it only reads `GET /api/state` and `GET /api/events` and posts the commands in §4.10. It could be replaced later, for example by a SwiftUI app, without touching the engine.
 
-**Capture: a native Swift helper, `podcast-capture` (§4.14).**
+**Capture: a native Swift helper, `conversation-capture` (§4.14).**
 - `host`: the MacBook's built-in microphone, chosen explicitly whatever the system default input is.
 - `remote`: a global Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session.
 - It works whether Riverside runs in Chrome or as the Mac app.
@@ -999,22 +999,22 @@ The user and a design session chose the following. Copy this record (date, choic
 
 #### §4.14 Live capture: the Swift helper and its Node adapter
 
-##### §4.14a `native/capture/`: the `podcast-capture` helper
+##### §4.14a `native/capture/`: the `conversation-capture` helper
 
-**Package.** A Swift package (Swift 6, `platforms: [.macOS(.v14)]`) with one executable target, `podcast-capture`. It uses Apple frameworks only (CoreAudio, AudioToolbox, AVFoundation) and no package dependencies. Files:
+**Package.** A Swift package (Swift 6, `platforms: [.macOS(.v14)]`) with one executable target, `conversation-capture`. It uses Apple frameworks only (CoreAudio, AudioToolbox, AVFoundation) and no package dependencies. Files:
 - `native/capture/Package.swift`
-- `native/capture/Info.plist`: `CFBundleIdentifier` `com.cloudlesslabs.podcast-capture`, `NSMicrophoneUsageDescription`, and `NSAudioCaptureUsageDescription`. Embed it in the binary with `linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Info.plist"])]`, as AudioTee does. Without it, macOS refuses the capture permissions.
-- `native/capture/Sources/podcast-capture/`: `main.swift` (arguments, stdout writer, stderr status), `Mic.swift`, `SystemTap.swift`, `Devices.swift`, and `ClockLock.swift`.
+- `native/capture/Info.plist`: `CFBundleIdentifier` `com.cloudlesslabs.conversation-capture`, `NSMicrophoneUsageDescription`, and `NSAudioCaptureUsageDescription`. Embed it in the binary with `linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Info.plist"])]`, as AudioTee does. Without it, macOS refuses the capture permissions.
+- `native/capture/Sources/conversation-capture/`: `main.swift` (arguments, stdout writer, stderr status), `Mic.swift`, `SystemTap.swift`, `Devices.swift`, and `ClockLock.swift`.
 
-`npm run build:capture` runs `swift build -c release --package-path native/capture`. The binary is `native/capture/.build/release/podcast-capture`.
+`npm run build:capture` runs `swift build -c release --package-path native/capture`. The binary is `native/capture/.build/release/conversation-capture`.
 
 **Command line.**
 
 | Invocation | Does |
 | --- | --- |
-| `podcast-capture --list-devices` | Prints input devices as JSON lines `{ uid, name, transport, isDefault }` and exits. |
-| `podcast-capture [--mic builtin\|<uid>] [--no-mic] [--no-system]` | Captures until stdin closes or SIGTERM. Default `--mic builtin`. |
-| `podcast-capture --probe <seconds>` | Captures without writing frames, then prints one JSON line `{ host: { peakDbfs, rmsDbfs }, remote: { peakDbfs, rmsDbfs } }` and exits. Used by `capture:test` and preflight. |
+| `conversation-capture --list-devices` | Prints input devices as JSON lines `{ uid, name, transport, isDefault }` and exits. |
+| `conversation-capture [--mic builtin\|<uid>] [--no-mic] [--no-system]` | Captures until stdin closes or SIGTERM. Default `--mic builtin`. |
+| `conversation-capture --probe <seconds>` | Captures without writing frames, then prints one JSON line `{ host: { peakDbfs, rmsDbfs }, remote: { peakDbfs, rmsDbfs } }` and exits. Used by `capture:test` and preflight. |
 
 **Microphone (`Mic.swift`).**
 - Resolve the device: `builtin` is the input device whose `kAudioDevicePropertyTransportType` is `kAudioDeviceTransportTypeBuiltIn`; otherwise match by UID. If it is missing, exit with code 2 and a status line.
@@ -1127,7 +1127,7 @@ Emit a frame about every 100 ms per stream (1,600 samples).
 
 **`npm run preflight`** checks, printing PASS or FAIL for each:
 - the models are present;
-- the capture helper is built, and `podcast-capture --probe 3` during an `afplay` ping shows system audio and a non-silent mic (the permissions are granted);
+- the capture helper is built, and `conversation-capture --probe 3` during an `afplay` ping shows system audio and a non-silent mic (the permissions are granted);
 - the keys are set;
 - the config is valid;
 - the OpenRouter key's limit and remaining credit (`GET https://openrouter.ai/api/v1/key`);
@@ -1239,7 +1239,7 @@ curl localhost:4317/api/stats
 
 # Live capture (Tier 2; earbuds in)
 npm run build:capture && npm run capture:test
-native/capture/.build/release/podcast-capture --list-devices
+native/capture/.build/release/conversation-capture --list-devices
 npm run serve   # then open http://127.0.0.1:4317 and start a live session
 
 # Calibration
@@ -1255,7 +1255,7 @@ npm run calibrate:boundary -- boundary.jsonl
 | Jev | TypeSafe AI's decision model. It answers typed questions (`noul`, `choice`, `score`) about a state, with probabilities. It cannot generate text or invent options. |
 | System 1 / System 2 | Fast, cheap, always-on judgment (Jev plus its question set and thresholds) / slow, deliberate research and rewriting (GPT-6 Luna). |
 | `host` / `remote` stream | The host's microphone (the MacBook's built-in mic) / the Mac's system audio, all output on any device, which carries the Riverside call (co-hosts and guests). |
-| Capture helper | `podcast-capture`, the native Swift tool that captures both streams and pipes framed PCM to the engine (§4.14a). |
+| Capture helper | `conversation-capture`, the native Swift tool that captures both streams and pipes framed PCM to the engine (§4.14a). |
 | Core Audio tap | A macOS 14.2+ API that captures audio that processes play, before it reaches an output device, without a driver. |
 | ClockLock | The helper's rule that keeps each stream's sample count aligned with the host clock (§4.14a). |
 | Engine | The Node server plus the capture helper: everything except the front end. |
@@ -1318,7 +1318,7 @@ Tier 2 adds:
 
 ```
 native/capture/Package.swift, Info.plist         capture helper (§4.14a)
-native/capture/Sources/podcast-capture/{main,Mic,SystemTap,Devices,ClockLock}.swift
+native/capture/Sources/conversation-capture/{main,Mic,SystemTap,Devices,ClockLock}.swift
 scripts/capture-test.sh                          capture checks (§4.14a)
 src/audio/nativeSource.ts                        helper adapter (§4.14b)
 web/{index.html,styles.css,tsconfig.json}, web/src/*.ts   front end (§4.15)

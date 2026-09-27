@@ -8,11 +8,11 @@ source:
 
 # Rehearsal kit
 
-Everything to check before going on air with Podcast Assistant, the lines to plant, and how to calibrate on an old episode.
+Everything to check before going on air with Conversation Assistant, the lines to plant, and how to calibrate on an old episode.
 
 ## The day before
 
-1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys, the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk.
+1. `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys (from `.env` or saved from the page), the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk.
 2. Record a fallback: run a live rehearsal session (below), stop it, and name it in **Recordings** (the cog menu; for example "Fallback — Ep 12").
 3. Check that it works as a fallback: in Recordings, clicking it opens it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 

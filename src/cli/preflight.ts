@@ -12,6 +12,7 @@ import { JevClient } from "../jev/client.ts";
 import { S2Client } from "../factcheck/s2.ts";
 import { SPEAKER_MODEL } from "../speakers/registry.ts";
 import { processSecrets } from "../store/events.ts";
+import { KeyStore } from "../keys.ts";
 import { SessionStore } from "../store/sessionStore.ts";
 
 const run = promisify(execFile);
@@ -48,9 +49,10 @@ await check("capture helper is built and has both permissions", async () => {
 });
 
 await check("keys are set", async () => {
-  const missing = ["OPENROUTER_API_KEY", "OPENAI_API_KEY"].filter((k) => !process.env[k]);
-  if (missing.length) throw new Error(`missing in .env: ${missing.join(", ")}`);
-  return "OPENROUTER_API_KEY and OPENAI_API_KEY";
+  const keys = new KeyStore().load();
+  const missing = keys.status().filter((k) => !k.set).map((k) => k.env);
+  if (missing.length) throw new Error(`missing: ${missing.join(", ")} (run npm run serve and add them on the page, or set them in .env)`);
+  return keys.status().map((k) => `${k.env} (${k.source === "file" ? "saved from the page" : ".env or shell"})`).join(", ");
 });
 
 let cfg: Config | null = null;

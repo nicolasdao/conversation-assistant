@@ -6,12 +6,12 @@ import PackageDescription
 let infoPlist = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Info.plist").path
 
 let package = Package(
-    name: "podcast-capture",
+    name: "conversation-capture",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "podcast-capture",
-            path: "Sources/podcast-capture",
+            name: "conversation-capture",
+            path: "Sources/conversation-capture",
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", infoPlist]),

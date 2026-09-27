@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import type { Readable, Writable } from "node:stream";
 import { FRAME_SAMPLES, type AudioFrame, type AudioSource, type StreamName } from "./source.ts";
 
-export const HELPER_PATH = "native/capture/.build/release/podcast-capture";
+export const HELPER_PATH = "native/capture/.build/release/conversation-capture";
 const HEADER = 20;
 const MAX_SAMPLES = 16_000 * 10; // a frame longer than 10 s is impossible: the helper sends 1,600
 
@@ -121,7 +121,7 @@ export interface NativeCapture {
   done: Promise<void>;
 }
 
-/** Spawns podcast-capture and exposes its two streams as AudioSources (§4.14b). */
+/** Spawns conversation-capture and exposes its two streams as AudioSources (§4.14b). */
 export function startNativeCapture(opts: NativeCaptureOptions = {}): Promise<NativeCapture> {
   const bin = opts.bin ?? HELPER_PATH;
   const spawn = opts.spawn ?? ((b: string, a: string[]) => nodeSpawn(b, a, { stdio: ["pipe", "pipe", "pipe"] }) as unknown as HelperProcess);
@@ -242,7 +242,7 @@ export function listDevices(bin = HELPER_PATH): Promise<unknown[]> {
     p.stdout!.on("data", (c) => (out += c));
     p.on("error", reject);
     p.on("exit", (code) => {
-      if (code !== 0) return reject(new Error(`podcast-capture --list-devices exited with ${code}`));
+      if (code !== 0) return reject(new Error(`conversation-capture --list-devices exited with ${code}`));
       resolve(out.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)));
     });
   });

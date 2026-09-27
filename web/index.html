@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Podcast Assistant</title>
+  <title>Conversation Assistant</title>
   <link rel="preload" href="/fonts/BarlowCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/Barlow-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23e8263b'/><circle cx='8' cy='8' r='3.5' fill='%23fff'/></svg>">
 </head>
-<body>
+<body class="booting">
   <!-- Drawn glyphs for markers and controls: no emoji. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
@@ -35,7 +35,7 @@
   <header id="top" class="top no-onair">
     <div id="onair" class="onair" hidden><i></i><span id="onair-label">On air</span></div>
     <div class="strap">
-      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Podcast Assistant<span id="features-chip" class="features-chip" hidden></span></div>
+      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Conversation Assistant<span id="features-chip" class="features-chip" hidden></span></div>
       <button id="session-name" class="name" title="Click to rename this session" disabled>No session</button>
     </div>
     <div class="clock"><span class="k">Elapsed</span><span id="clock" class="t">00:00</span></div>
@@ -73,6 +73,7 @@
           <button role="menuitem" data-open="dlg-labels"><b>Labels</b><span id="m-labels"></span></button>
           <button role="menuitem" data-open="dlg-stats"><b>Stats</b><span id="m-stats"></span></button>
           <button role="menuitem" data-open="dlg-log"><b>Log</b><span id="m-log"></span></button>
+          <button role="menuitem" data-open="dlg-keys"><b>API keys</b><span>OpenAI, OpenRouter</span></button>
           <div class="menu-foot"><span id="app-version"></span><button id="license-link" class="linkbtn">BSD 3-Clause license</button></div>
         </div>
       </div>
@@ -183,6 +184,11 @@
     <div id="errors" class="dlg-body"></div>
   </dialog>
 
+  <dialog id="dlg-keys" class="keys-dlg" aria-labelledby="h-keys">
+    <div class="dlg-head"><h2 id="h-keys">API keys</h2><span class="sub">Checked before they are saved; used from the next call</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="keys" class="dlg-body"></div>
+  </dialog>
+
   <dialog id="dlg-chat" class="chat-dlg" aria-labelledby="h-chat">
     <div class="dlg-head"><h2 id="h-chat">Chat</h2><span id="chat-sub" class="sub">Ask about the transcript</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="chat" class="chat"></div>
@@ -218,7 +224,7 @@
     </div>
   </dialog>
 
-  <!-- Export and import: one .podcast-recording file -->
+  <!-- Export and import: one .conversation-recording file -->
   <dialog id="dlg-export" class="start-dlg" aria-labelledby="h-export">
     <div class="dlg-head"><h2 id="h-export">Export</h2><span id="export-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="export-body" class="dlg-body"></div>
@@ -227,7 +233,7 @@
     <div class="dlg-head"><h2 id="h-import">Import</h2><span class="sub">A recording someone shared with you</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="import-body" class="dlg-body"></div>
   </dialog>
-  <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .podcast-recording file</span></div></div>
+  <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .conversation-recording file</span></div></div>
 
   <dialog id="dlg-license" aria-labelledby="h-license">
     <div class="dlg-head"><h2 id="h-license">License</h2><span id="license-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>

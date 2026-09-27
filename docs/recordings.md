@@ -61,7 +61,7 @@ While a recording is open, `GET /api/state` returns an archived snapshot (`sessi
 
 ## Export and import
 
-A recording can be shared as **one file**, `<name>.podcast-recording`, typically over WhatsApp or email, with someone who has Podcast Assistant too (`src/store/transfer.ts`, `src/store/zip.ts`).
+A recording can be shared as **one file**, `<name>.conversation-recording` (files named `.podcast-recording`, exported before the app was renamed, still import), typically over WhatsApp or email, with someone who has Conversation Assistant too (`src/store/transfer.ts`, `src/store/zip.ts`).
 
 **The format** is a ZIP with its own extension:
 - A ZIP is the standard way to bundle files, and Node's zlib is enough to write and read it (a minimal writer and reader, no dependency). The system's own `unzip` opens it too.
@@ -71,7 +71,7 @@ Inside:
 
 | Entry | Holds |
 | --- | --- |
-| `manifest.json` (first) | `format: "podcast-assistant-recording"`, `formatVersion` (1), `app` (name and version that **exported** it), `exportedAt`; `recording` (`id`, `name`, `startedAt`, `durationMs`, `mode`, `recordedWith`: the version that **recorded** it, from `session.json`, or null before 0.3.0); `audio` (`choice`, `format`, `bitrate`, and each stream's sample count); `chats`; `files` |
+| `manifest.json` (first) | `format: "conversation-assistant-recording"` (`"podcast-assistant-recording"`, from before the app was renamed, still imports), `formatVersion` (1), `app` (name and version that **exported** it), `exportedAt`; `recording` (`id`, `name`, `startedAt`, `durationMs`, `mode`, `recordedWith`: the version that **recorded** it, from `session.json`, or null before 0.3.0); `audio` (`choice`, `format`, `bitrate`, and each stream's sample count); `chats`; `files` |
 | `data/*` | The session's files, deflated: `session.json`, `meta.json`, `speakers.json`, every JSONL file; `chats.jsonl` only when chosen |
 | `audio/host.m4a`, `audio/remote.m4a` | Compressed audio (the default), stored |
 | `audio/host.wav`, `audio/remote.wav` | Or the original WAVs, stored |
@@ -124,7 +124,7 @@ A two-hour show imports in about 4 s.
 | POST | `/api/session/start` | `{ mode: "replay", sessionId, speed }` replays a recording; `name` names the new session |
 | GET | `/api/sessions/:id/export` | What an export would weigh: `{ fileName, recordedWith, app, bytes: { compressed, original, none }, chats, hasAudio }` |
 | POST | `/api/sessions/:id/export` | `{ audio, chats }` → `{ token, fileName, bytes }`; 409 for a session on air |
-| GET | `/api/exports/:token` | The `.podcast-recording` file, as a download |
+| GET | `/api/exports/:token` | The `.conversation-recording` file, as a download |
 | POST | `/api/sessions/import` | The file's bytes (`X-File-Name` header) → `{ summary, already }`, plus `copyToken` when the library already had it |
 | POST | `/api/sessions/import/:copyToken` | `{ name }` → imports that kept upload again as a named copy → `{ summary, already: false }`; 404 once used or after 15 minutes |
 

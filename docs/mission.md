@@ -1,5 +1,5 @@
 ---
-description: Why Podcast Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
+description: Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 tags: [mission, purpose, principles, non-goals]
 ---
 
@@ -7,7 +7,7 @@ tags: [mission, purpose, principles, non-goals]
 
 ## Why this exists
 
-The host co-presents an AI podcast with two friends, who join remotely through Riverside. Podcast Assistant listens to a live recording — the host's microphone and the Mac's system audio, which carries the call — and, while the show is on air:
+The host co-presents an AI podcast with two friends, who join remotely through Riverside. Conversation Assistant listens to a live recording — the host's microphone and the Mac's system audio, which carries the call — and, while the show is on air:
 
 - transcribes it, with every voice identified as a speaker the host can name;
 - lays the conversation out on a timeline of topics, modes, heat, hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments;
@@ -31,7 +31,8 @@ The project will be open-sourced under the BSD 3-Clause license (Cloudless Consu
 - **The engine owns capture and intelligence; the front end is only an interface.** Capture must not depend on a browser tab.
 - **Reliability matters as much as features on air.** Short timeouts with fallbacks on every live call, spend caps, every session recorded so it can be reopened exactly as it was (or its audio replayed), and a rehearsal kit with a recorded fallback (see [Rehearsal kit](rehearsal.md)).
 - **Plain files, no database.** One folder per session, append-only and readable (see [Recordings](recordings.md)).
-- **Keys never leave `.env`.** They never appear in logs, session files, or events; OpenRouter calls deny provider data collection.
+- **Keys stay on the Mac.** They live in `.env` or in a credentials file only the user can read, outside the project folder ([Setup](setup.md)); they never appear in logs, session files, events, or exports, and the API returns only their last 4 characters. OpenRouter calls deny provider data collection.
+- **Plug and play for anyone.** A first run needs no terminal editing: the page asks for the two keys, explains how to get and fund them, and checks them before saving.
 
 ## Non-goals
 

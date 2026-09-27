@@ -39,7 +39,7 @@ source:
 
 ## Export and import
 
-- **Safari unzips a downloaded `.zip` into a folder** ("Open safe files after downloading"), which would break import. That is why exports use their own extension, `.podcast-recording`, and are served as `application/octet-stream`.
+- **Safari unzips a downloaded `.zip` into a folder** ("Open safe files after downloading"), which would break import. That is why exports use their own extension, `.conversation-recording`, and are served as `application/octet-stream`.
 - **`afconvert`'s WAV output has extra chunks**: decoding AAC to WAVE puts the audio at byte 4088, not 44. The app assumes a 44-byte header everywhere (durations from file size, the playback mixer), so import rewrites the header (`canonicalWav` in `src/store/transfer.ts`). The AAC round trip itself is exact: the same sample count and no time shift, measured on a two-minute stream.
 
 - **A recording's session events must carry its own folder id.** The page switches to a newly opened recording only when the `session.started` it receives names a different session from the one on screen. A copy imported as `<id>-2` whose events still said `<id>` opened in the engine, but the page kept showing the original. Import now rewrites the ids, and `SessionLibrary.events` corrects mismatches on open (see [Recordings](recordings.md#export-and-import)).

@@ -8,12 +8,15 @@ import { JSONL_FILES, timestampId } from "./sessionStore.ts";
 import { extractStoredEntry, readZipEntries, readZipEntry, writeZip, ZipError, type ZipInput } from "./zip.ts";
 import { wavHeader } from "../audio/wav.ts";
 
-// Recordings leave and arrive as one file: `<name>.podcast-recording`, a ZIP (see docs/recordings.md § Export and
+// Recordings leave and arrive as one file: `<name>.conversation-recording`, a ZIP (see docs/recordings.md § Export and
 // import). A custom extension rather than .zip, so a browser never unzips it on download and a chat app sends it as a
 // document. Inside: manifest.json, the session's data files, and its audio (compressed AAC, the original WAVs, or none).
 
-export const EXTENSION = ".podcast-recording";
-export const FORMAT = "podcast-assistant-recording";
+export const EXTENSION = ".conversation-recording";
+// the server never checks the extension; the page also accepts ".podcast-recording", from before the rename
+export const FORMAT = "conversation-assistant-recording";
+/** The id exports carried before the app was renamed from Podcast Assistant (27 September 2026): still imported. */
+const LEGACY_FORMATS = new Set(["podcast-assistant-recording"]);
 export const FORMAT_VERSION = 1;
 
 export type AudioChoice = "compressed" | "original" | "none";
@@ -81,7 +84,7 @@ export function exportEstimate(dir: string): { bytes: Record<AudioChoice, number
   };
 }
 
-/** Writes a recording to one `.podcast-recording` file in `outDir`; returns its path. */
+/** Writes a recording to one `.conversation-recording` file in `outDir`; returns its path. */
 export async function exportRecording(
   dir: string, id: string, opts: { audio: AudioChoice; chats: boolean; app: { name: string; version: string }; outDir?: string },
 ): Promise<{ path: string; fileName: string; bytes: number }> {
@@ -180,7 +183,7 @@ async function canonicalWav(src: string, dest: string, samples: number | null) {
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
 /**
- * Adds a `.podcast-recording` file to the library as a new recording folder. Only known files are written; anything
+ * Adds a `.conversation-recording` file to the library as a new recording folder. Only known files are written; anything
  * else in the archive is ignored. Returns the new id, or throws 409 with the existing id when the same recording (same
  * id and start time) is already in the library — unless `copy` is set, which imports it again under a new id.
  */
@@ -195,16 +198,16 @@ export async function importRecording(
   }
   const byName = new Map(entries.map((e) => [e.name, e]));
   const mEntry = byName.get("manifest.json");
-  if (!mEntry) throw new TransferError(400, `not a Podcast Assistant recording (no manifest.json). Is it a ${EXTENSION} file?`);
+  if (!mEntry) throw new TransferError(400, `not a Conversation Assistant recording (no manifest.json). Is it a ${EXTENSION} file?`);
   let manifest: Manifest;
   try {
     manifest = JSON.parse((await readZipEntry(file, mEntry, 1 << 20)).toString("utf8"));
   } catch {
     throw new TransferError(400, "the recording's manifest is damaged");
   }
-  if (manifest?.format !== FORMAT) throw new TransferError(400, "not a Podcast Assistant recording");
+  if (manifest?.format !== FORMAT && !LEGACY_FORMATS.has(manifest?.format)) throw new TransferError(400, "not a Conversation Assistant recording");
   if (!(manifest.formatVersion >= 1) || manifest.formatVersion > FORMAT_VERSION) {
-    throw new TransferError(400, `this recording was exported by a newer Podcast Assistant (v${manifest.app?.version ?? "?"}): update the app to import it`);
+    throw new TransferError(400, `this recording was exported by a newer Conversation Assistant (v${manifest.app?.version ?? "?"}): update the app to import it`);
   }
   if (!byName.has("data/session.json") || !byName.has("data/events.jsonl")) throw new TransferError(400, "the recording is incomplete (no session.json or events.jsonl)");
 

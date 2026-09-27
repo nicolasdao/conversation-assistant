@@ -12,7 +12,7 @@ final class Mic {
     private var stream: UInt8 = 0
     private var stopped = false
     private var restarts: [Date] = []
-    private let restartQueue = DispatchQueue(label: "podcast-capture.mic-restart")
+    private let restartQueue = DispatchQueue(label: "conversation-capture.mic-restart")
     let device: Devices.Input
 
     init(device: Devices.Input) {

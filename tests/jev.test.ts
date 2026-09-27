@@ -49,7 +49,7 @@ describe("Jev client", () => {
     expect(r.model).toBe("typesafe/jev-1.13-20260917");
     const headers = calls[0].headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer sk-or-test");
-    expect(headers["X-OpenRouter-Title"]).toBe("Podcast Assistant");
+    expect(headers["X-OpenRouter-Title"]).toBe("Conversation Assistant");
     expect(JSON.parse(calls[0].body as string)).toEqual({
       model: "typesafe/jev-1.13", state: { text: "hello" }, questions: QUESTIONS, provider: { data_collection: "deny" },
     });

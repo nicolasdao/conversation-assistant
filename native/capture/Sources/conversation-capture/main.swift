@@ -1,9 +1,9 @@
-// podcast-capture: captures the built-in microphone (host) and a global Core Audio tap of all system output (remote),
+// conversation-capture: captures the built-in microphone (host) and a global Core Audio tap of all system output (remote),
 // and writes framed 16 kHz PCM16 to stdout. Status goes to stderr as JSON lines.
 //
-//   podcast-capture --list-devices
-//   podcast-capture [--mic builtin|<uid>] [--no-mic] [--no-system]
-//   podcast-capture --probe <seconds>
+//   conversation-capture --list-devices
+//   conversation-capture [--mic builtin|<uid>] [--no-mic] [--no-system]
+//   conversation-capture --probe <seconds>
 import Darwin
 import Foundation
 
@@ -39,7 +39,7 @@ while let a = args.popFirst() {
         guard let v = args.popFirst().flatMap(Double.init), v > 0 else { fail("--probe needs a number of seconds", code: 64) }
         probeSeconds = v
     case "-h", "--help":
-        print("usage: podcast-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] | --probe <seconds>")
+        print("usage: conversation-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] | --probe <seconds>")
         exit(0)
     default: fail("unknown argument \(a)", code: 64)
     }

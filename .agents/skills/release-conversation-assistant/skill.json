@@ -1,9 +1,9 @@
 {
-	"name": "release-podcast-assistant",
+	"name": "release-conversation-assistant",
 	"version": "0.1.0",
-	"description": "Release workflow for podcast-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags and pushes, plus an [Unreleased] ledger mode.",
+	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags and pushes, plus an [Unreleased] ledger mode.",
 	"type": "skill",
-	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "podcast-assistant"],
+	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "conversation-assistant"],
 	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],
 	"license": "BSD-3-Clause",
 	"repository": "https://github.com/nicolasdao/podcast-ai-assistant",

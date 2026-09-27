@@ -14,14 +14,14 @@ source:
 
 # Architecture
 
-Podcast Assistant has two parts. The **engine** — a Node server plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+Conversation Assistant has two parts. The **engine** — a Node server plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
 
 ```mermaid
 flowchart TB
   subgraph Mac
     MIC[Built-in microphone] --> HELPER
     OUT[Everything the Mac plays<br/>Riverside call, any output device] --> HELPER
-    HELPER["podcast-capture (Swift)<br/>16 kHz PCM16 frames on stdout"]
+    HELPER["conversation-capture (Swift)<br/>16 kHz PCM16 frames on stdout"]
   end
   HELPER --> SRC[Audio sources: host, remote]
   FILES[WAV files] --> SRC
@@ -39,7 +39,7 @@ flowchart TB
 
 ## Capture — `native/capture/` and `src/audio/nativeSource.ts`
 
-`podcast-capture` is a Swift command-line helper (swift-tools 6.0, Swift 5 language mode) that uses Apple frameworks only:
+`conversation-capture` is a Swift command-line helper (swift-tools 6.0, Swift 5 language mode) that uses Apple frameworks only:
 
 - **`host`** — the MacBook's built-in microphone, chosen explicitly whatever the default input is, captured with `AVAudioEngine` (voice processing off, channel 0).
 - **`remote`** — a private, global Core Audio tap (`CATapDescription(monoGlobalTapButExcludeProcesses: [])`, macOS 14.2+) of everything the Mac plays, read through a private aggregate device whose main sub-device is the current default output. When the default output changes (AirPods connect), the aggregate is rebuilt.
@@ -86,6 +86,7 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 
 | Method | Route | Does |
 | --- | --- | --- |
+| GET, POST | `/api/setup`, `/api/setup/keys` | The API keys: what is set, and saving checked keys. Until both are set, every other route but `/api/about` and `/api/engine` answers 503 and the page shows only the setup screen (see [Setup](setup.md)) |
 | GET | `/api/events` | SSE: the session's events so far, then live |
 | GET | `/api/state` | Full current state (or a recorded session's snapshot) |
 | POST | `/api/session/start` | `{ mode: "live", mic?, name?, features? }` or `{ mode: "replay", dir \| sessionId, speed, name?, features? }`; `features: { factcheck?, labels? }` (booleans, both on by default; see [Features](#features-transcript-only-sessions)) |
@@ -102,14 +103,14 @@ The server uses Node's `http` module, binds to 127.0.0.1 only, and serves one se
 | GET | `/api/about` | The project's name, version (the root `package.json`'s `version`, the only place it lives), and license (`id`, `holder`, and the `LICENSE` text); the page shows them in the settings menu's footer, the license opening in a window |
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the server started; the page then shows a banner asking for a restart |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
-| GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.podcast-recording` file (see [Recordings](recordings.md#export-and-import)) |
+| GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.conversation-recording` file (see [Recordings](recordings.md#export-and-import)) |
 | GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
 
 It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/`.
 
 ## Web front end — `web/`
 
-Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`) — no bundler, no framework, no chart library. It loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
+Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`) — no bundler, no framework, no chart library. `main.ts` first asks `GET /api/setup`: with a key missing it shows only the setup screen ([Setup](setup.md)); otherwise it imports `app.ts`, which loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
 
 The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
@@ -127,13 +128,13 @@ The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Ba
   | `/recordings/<id>` | That recording, opened read-only |
   | `?t=1:23:45` | The playback position in a recording (kept current on seeks, on pause, and every 5 s while playing) |
   | `?tab=thinking` · `?tab=jev-log` | The right column's tab (Fact-check is the default) |
-  | `?panel=recordings` · `speakers` · `system-1` · `labels` · `stats` · `log` · `chat` | The window that is open |
+  | `?panel=recordings` · `speakers` · `system-1` · `labels` · `stats` · `log` · `chat` · `keys` | The window that is open |
   | `?panel=chat&chat=chat_2` | A chat of the session on screen ([Chat](chat.md)) |
 
   The URL follows the screen: opening or leaving a recording, or a session ending as one, adds a history entry; tabs, windows, and the position update it silently. Opening a URL makes the screen match: on load it opens the recording it names (unless a session is on air, which is shown instead, with a message), and Back to `/` leaves the recording (`POST /api/sessions/close`). Loading `/` while the engine shows a recording puts that recording in the URL rather than closing it. Transcript filters, timeline zoom, and column and timeline sizes are browser preferences, not part of the URL.
 - **Playback (recordings only, never on air):** a play/pause button, a speed picker (1×, 1.25×, 1.5×, 2×, 3×, 4×; voices keep their pitch), a volume boost (100–300 %, remembered in the browser), and the position, in the timeline's header (`web/src/player.ts`). The timeline is the progress bar: a yellow playhead moves with the audio and stays in view when zoomed; clicking the timeline outside segments and markers seeks there, and clicking a segment or marker seeks to its start. Every transcript timestamp becomes a button that plays from that line. Every jump, from either side, moves both at once, playing or paused: the transcript scrolls to the line at that time and the timeline brings the playhead into view. While playing, the line being heard is highlighted and kept centred, unless the reader scrolled in the last 4 s. Space plays and pauses. The audio is the recording's two streams mixed by the server (see [Recordings](recordings.md)).
 - **Timeline (bottom, full width):** HTML lanes positioned in percent of the session length, with an inline-SVG heat and hype chart: section brackets, the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines on 0–4, marker pins (disagreement, hot take, prediction, recommendation, clip-worthy, humour), a dashed "in progress" block for the open segment, hatched paused stretches, the axis, and a now line. Faded labels are dimmed; clicking a segment or marker jumps to the transcript. A dotted line follows the pointer with the exact time. Zoom with − / + / Fit or ⌘/Ctrl + scroll (a trackpad pinch), from the whole session down to about 30 s across; zoomed in, the strip scrolls sideways (the wheel scrolls through time), segment labels stay in view, axis ticks adapt to the zoom, and a live session stays pinned to the newest moment while scrolled to the end. Dragging the strip's top edge (or its arrow keys) makes the heat · hype chart taller or shorter; double-click resets it, and the height is remembered in the browser.
-- **Settings (the cog menu), each in a modal:** Recordings, System 1 (active version, counters, last promotion or rejection with its gate, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log.
+- **Settings (the cog menu), each in a modal:** Recordings, System 1 (active version, counters, last promotion or rejection with its gate, rollback), Speakers (rename, merge), Labels (question editor, stories, relabel), Stats, Log, API keys (replace a key; see [Setup](setup.md)).
 - **Chat**, a large modal from the header: questions about the transcript to any curated OpenRouter model, like ChatGPT with the transcript as its only attachment (see [Chat](chat.md)).
 
 **Every control is bespoke; none is the browser's own.**
@@ -186,10 +187,12 @@ One ledger per session, plus the development total read from `sessions/**/*.json
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 
+The API keys are not in `config/`: they come from the environment (`.env`) or `~/Library/Application Support/Conversation Assistant/credentials.json` (see [Setup](setup.md)).
+
 Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a `choice` without criteria or without a `none` / `other…` option, a `score` with fewer than 2 levels, non-snake_case ids, and a System 1 set whose `claim_type` does not have exactly its 7 keys.
 
 ## Tests
 
 `npm test` runs offline: `tests/setup.ts` replaces `fetch` with a function that throws, and every client takes its `fetch` (or WebSocket) through its constructor so tests pass fakes. The suite covers audio and VAD on the fixture, speakers, transcription, live text, the Jev client's retry rules, the segmenter, the fact-checker loop and gate, the timeline, stats, the capture adapter (with a fake helper process), the HTTP API, the library, and an end-to-end session with fake services that also checks no API key reaches any file or event. `npm run smoke` and `npm run preflight` are the live checks.
 
-Related: [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md), [Chat](chat.md).
+Related: [Setup](setup.md), [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md), [Chat](chat.md).

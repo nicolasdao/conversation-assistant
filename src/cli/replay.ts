@@ -4,6 +4,7 @@ import { loadConfig } from "../config.ts";
 import { FileSource, type AudioSource } from "../audio/source.ts";
 import { Session } from "../pipeline/session.ts";
 import { EventBus, processSecrets } from "../store/events.ts";
+import { loadKeys } from "../keys.ts";
 
 const { values } = parseArgs({
   options: {
@@ -15,6 +16,7 @@ if (!values.host && !values.remote) {
   console.error("usage: npm run replay -- --host <host.wav> --remote <remote.wav> --speed max|1 [--export <file>]");
   process.exit(1);
 }
+loadKeys();
 const speed = values.speed === "1" ? 1 : "max";
 const sources: AudioSource[] = [];
 if (values.host) sources.push(new FileSource(values.host, "host", speed));
