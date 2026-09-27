@@ -15,8 +15,12 @@ git ls-remote --exit-code --tags origin "v$version" >/dev/null || { echo "v$vers
 command -v gh >/dev/null || { echo "the GitHub CLI (gh) is required: brew install gh"; exit 1; }
 security find-identity -v -p codesigning | grep -q "Developer ID Application" \
   || { echo "no Developer ID Application certificate in the keychain: an ad-hoc build must never be published"; exit 1; }
-[ -n "$APPLE_API_KEY$APPLE_ID" ] \
-  || { echo "no notary credentials (APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER, or APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID): Gatekeeper blocks an app that is not notarized"; exit 1; }
+if [ -z "$APPLE_API_KEY$APPLE_ID$APPLE_KEYCHAIN_PROFILE" ] \
+  && xcrun notarytool history --keychain-profile conversation-assistant >/dev/null 2>&1; then
+  export APPLE_KEYCHAIN_PROFILE=conversation-assistant
+fi
+[ -n "$APPLE_API_KEY$APPLE_ID$APPLE_KEYCHAIN_PROFILE" ] \
+  || { echo "no notary credentials (the keychain profile conversation-assistant, APPLE_KEYCHAIN_PROFILE, APPLE_API_KEY…, or APPLE_ID…): Gatekeeper blocks an app that is not notarized"; exit 1; }
 
 npm run dist:mac
 app="out/mac-arm64/Conversation Assistant.app"

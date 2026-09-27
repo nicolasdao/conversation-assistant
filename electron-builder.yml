@@ -11,6 +11,16 @@ files:
   - package.json
   - LICENSE
   - "!**/*.map"
+# A signed app holds the user's Microphone and System Audio Recording grants. These fuses stop anyone relaunching it as
+# plain Node (ELECTRON_RUN_AS_NODE), with NODE_OPTIONS, or with --inspect to use those grants, and check that the app's
+# code is the one that was signed. Chromium's debugging port has no fuse: desktop/main.ts refuses it.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 # the page is in English only: drop Electron's other interface languages
 electronLanguages: [en]
 # sherpa-onnx's addon and its dylibs cannot load from inside the asar archive
@@ -40,7 +50,7 @@ mac:
   hardenedRuntime: true
   entitlements: desktop/entitlements.mac.plist
   entitlementsInherit: desktop/entitlements.mac.plist
-  notarize: true # needs APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER (or APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID)
+  notarize: true # with APPLE_KEYCHAIN_PROFILE, which scripts/build-mac.sh sets (or APPLE_API_KEY…, or APPLE_ID…)
   extendInfo:
     NSMicrophoneUsageDescription: Conversation Assistant transcribes the host's microphone during a recording.
     NSAudioCaptureUsageDescription: Conversation Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.
@@ -50,5 +60,5 @@ dmg:
 publish:
   provider: github
   owner: nicolasdao
-  repo: podcast-ai-assistant
+  repo: conversation-assistant
   releaseType: release

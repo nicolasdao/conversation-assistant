@@ -93,7 +93,7 @@ Then Step 9.
 
 Only after the push. Publishing is outward-facing: installed apps download what it publishes, so it is never automatic.
 
-1. Check the requirements without building: `security find-identity -v -p codesigning | grep "Developer ID Application"`, and whether `APPLE_API_KEY` or `APPLE_ID` is set. If either is missing, skip this step and say why: until the Developer ID and its notary credentials exist, the Mac app is not published (see `docs/desktop.md` § Signing). Never publish an ad-hoc build.
+1. Check the requirements without building: `security find-identity -v -p codesigning | grep "Developer ID Application"`, and notary credentials: `xcrun notarytool history --keychain-profile conversation-assistant` succeeds, or `APPLE_KEYCHAIN_PROFILE`, `APPLE_API_KEY` or `APPLE_ID` is set. If either is missing, skip this step and say why: until the Developer ID and its notary credentials exist, the Mac app is not published (see `docs/desktop.md` § Signing). Never publish an ad-hoc build.
 2. AskUserQuestion: publish the Mac app for `v<version>` as a GitHub Release, which every installed copy will offer to update to? Options: **Publish**, **Not now**.
 3. On yes, write the version's changelog entry (its bullets, without the `## [x.y.z]` heading) to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/publish-app.sh" <version> <notes-file>`. It builds from the tag, checks the signature, notarization and Gatekeeper, and creates the release with the DMG, the zip, their blockmaps, and `latest-mac.yml`. If it fails, show its output and stop; nothing is published before its last line.
 4. On "Not now", remind: from the tag, `sh .claude/skills/release-conversation-assistant/scripts/publish-app.sh <version> <notes-file>`.

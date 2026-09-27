@@ -10,13 +10,21 @@ import { bootEngine } from "../src/server/main.ts";
 import { inProcessHandler } from "../src/server/inProcess.ts";
 
 const ORIGIN = "app://conversation-assistant";
-const REPO = "https://github.com/nicolasdao/podcast-ai-assistant";
+const REPO = "https://github.com/nicolasdao/conversation-assistant";
 /** How long quitting waits for a session on air to end; its audio is complete within seconds (src/pipeline/session.ts). */
 const QUIT_WAIT_MS = 30_000;
 const UPDATE_EVERY_MS = 4 * 60 * 60 * 1000;
 // The page may load only from the app itself; styles stay inline-able because the page sets them from code.
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
   + "media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+// A packaged app refuses Chromium's remote debugging: it would let any program on this Mac drive the window, and through
+// it the engine, with the app's Microphone and System Audio Recording grants. The fuses in electron-builder.yml close
+// the other ways in (running the app as plain Node, NODE_OPTIONS, --inspect).
+if (app.isPackaged && ["remote-debugging-port", "remote-debugging-pipe"].some((s) => app.commandLine.hasSwitch(s))) {
+  app.exit(1);
+  process.exit(1);
+}
 
 // ---------- where things are: the bundle's Resources, and Application Support ----------
 
