@@ -24,7 +24,7 @@ It exists to demonstrate, live on air, that software should call a decision mode
 
 For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2 or later, and two API accounts with prepaid credit (OpenAI and OpenRouter; the app walks through both).
 
-1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/podcast-ai-assistant/releases/latest). (The first downloadable release is the first one signed with the project's Apple Developer ID; until then, build it with `npm run dist:mac`, below.)
+1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/conversation-assistant/releases/latest). (The first downloadable release is the first one signed with the project's Apple Developer ID; until then, build it with `npm run dist:mac`, below.)
 2. Open it and drag **Conversation Assistant** into Applications.
 3. Open it from Applications. macOS asks once whether to open an app downloaded from the internet.
 4. Paste the two API keys: the app explains how to get each one (create the account, add prepaid credit, create the key) and checks each key before saving it.
