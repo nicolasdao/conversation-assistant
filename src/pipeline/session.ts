@@ -71,6 +71,8 @@ export interface SessionOptions {
   voices?: VoiceLimits;
   /** Both on unless set to false. */
   features?: Partial<Features>;
+  /** How often failed lines are retried while the session runs (tests set it). */
+  retryEveryMs?: number;
 }
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
@@ -276,7 +278,7 @@ export class Session {
     if (this.echoGate.active) this.emitEchoGate();
     this.timers.push(setInterval(() => this.emitHealth(), 1000));
     this.timers.push(setInterval(() => this.emitStats(), this.opts.statsIntervalMs ?? 60_000));
-    this.timers.push(setInterval(() => void this.retryPending(), RETRY_EVERY_MS));
+    this.timers.push(setInterval(() => void this.retryPending(), this.opts.retryEveryMs ?? RETRY_EVERY_MS));
     for (const t of this.timers) t.unref?.();
 
     let reason = "end_of_input";

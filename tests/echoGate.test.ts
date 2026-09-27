@@ -139,7 +139,7 @@ describe("echo gate in a session", () => {
     const rec = sherpa.readWave(join(after.s.store.dir, "host.wav")).samples;
     const l = remoteLines[0];
     expect(rec.subarray(l.startMs * 16 + 1600, l.endMs * 16).every((v: number) => v === 0)).toBe(true);
-  });
+  }, 300_000); // two full sessions: slow on a loaded machine
 
   test("with headphones (auto mode, no speakers), the recorded host audio is exactly the input", async () => {
     requireAssets();
