@@ -21,7 +21,8 @@ export interface TranscriptionRow {
 
 export type TranscriptionResult =
   | { ok: true; text: string; filler: boolean }
-  | { ok: false; error: string };
+  /** `retryable`: the failure looked transient (network, timeout, 429 other than no credits, 5xx), so trying later may work. */
+  | { ok: false; error: string; retryable?: boolean };
 
 export interface TranscriberDeps {
   fetch: typeof fetch;
@@ -120,6 +121,7 @@ export class Transcriber {
     try {
       const wav = encodeWav(samples);
       let lastError: unknown;
+      let lastRetryable = false;
       let styleRetried = false;
       while (attempts < 2 || (styleRetried && attempts < 3)) {
         attempts++;
@@ -140,12 +142,13 @@ export class Transcriber {
           // A 429 for exhausted credits (insufficient_quota) is not transient.
           const noCredits = e instanceof HttpFailure && e.status === 429 && /insufficient_quota|credit_balance_exhausted/.test(e.body);
           const retryable = e instanceof HttpFailure && !noCredits && (e.status === null || e.status === 429 || e.status >= 500);
+          lastRetryable = retryable;
           if (!retryable) break;
         }
       }
       const error = lastError instanceof Error ? lastError.message : String(lastError);
       this.log(utteranceId, { ok: false, attempts, started, audioSeconds, cost: 0, error });
-      return { ok: false, error };
+      return { ok: false, error, retryable: lastRetryable };
     } finally {
       this.release();
     }

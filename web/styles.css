@@ -162,6 +162,8 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 .meter.paused { opacity: 0.45; }
 .meter.paused .meta { color: var(--warn); }
 .meter.muted .meta { color: var(--warn); }
+/* a line whose transcript failed (a network drop): kept in its place, retried while the session runs */
+.utt.missing .text { color: var(--mute); font-style: italic; }
 
 /* speaker mode: a chip next to the meters, with its explanation on hover or focus */
 .speaker-mode { position: relative; flex: none; outline: none; cursor: default; }

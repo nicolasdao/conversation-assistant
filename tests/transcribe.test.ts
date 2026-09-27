@@ -106,6 +106,17 @@ describe("transcription", () => {
     expect((calls[2].init.body as FormData).getAll("keywords[]")).toEqual([]);
   });
 
+  test("says whether a failure is worth retrying later: a network drop or 5xx is, a 400 or no credits is not", async () => {
+    const fail = async (reply: Parameters<typeof fakeFetch>[0][number]) => {
+      const { f } = fakeFetch([reply, reply]);
+      return new Transcriber(cfg.transcription, { fetch: f, apiKey: "k", budget: budget(), log: () => {} }).transcribe("u_1", oneSecond);
+    };
+    expect(await fail(() => { throw new TypeError("fetch failed"); })).toMatchObject({ ok: false, retryable: true });
+    expect(await fail(json(503, {}))).toMatchObject({ ok: false, retryable: true });
+    expect(await fail(json(400, { error: { message: "bad file" } }))).toMatchObject({ ok: false, retryable: false });
+    expect(await fail(json(429, { error: { code: "insufficient_quota" } }))).toMatchObject({ ok: false, retryable: false });
+  });
+
   test("retries a timeout", async () => {
     const { f, calls } = fakeFetch([
       () => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); },

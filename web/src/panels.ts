@@ -2,7 +2,7 @@ import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.
 import { openExport, openImport } from "./transfer.js";
 import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
-import { featuresOf, resolveSpeaker, s1Counters, speakerName, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
+import { featuresOf, resolveSpeaker, s1Counters, speakerName, type MissingLine, type Utterance, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
 
 export interface Filters { markers: Set<string>; speaker: string; subject: string }
 export const filters: Filters = { markers: new Set(), speaker: "", subject: "" };
@@ -62,16 +62,23 @@ export function ask(title: string, opts: { message?: string; input?: boolean; va
 
 // ---------- header: session, controls, menu ----------
 
-let devicesLoaded = false;
+const MIC_KEY = "pa.mic";
+
+/**
+ * Lists the Mac's microphones. Called each time Start live opens, because earbuds or a USB mic connected after the page
+ * loaded must show up. Keeps the current choice, else the one used last time, if that microphone is still there.
+ */
 export async function loadDevices() {
-  if (devicesLoaded) return;
-  devicesLoaded = true;
   const sel = $<HTMLSelectElement>("#mic");
   if (!sel) return;
+  let want = sel.value;
+  try { want = localStorage.getItem(MIC_KEY) ?? want; } catch { /* storage may be unavailable */ }
   try {
     const devices = await api.devices();
     replace(sel, h("option", { value: "builtin" }, "Built-in microphone"),
       devices.filter((d) => d.transport !== "builtin").map((d) => h("option", { value: d.uid }, `${d.name} (${d.transport})`)));
+    sel.title = "";
+    if ([...sel.options].some((o) => o.value === want)) sel.value = want;
   } catch (e) {
     replace(sel, h("option", { value: "" }, "Capture helper unavailable"));
     sel.title = e instanceof Error ? e.message : String(e);
@@ -83,7 +90,7 @@ let replaySpeed: 1 | "max" = 1;
 let onViewGone: () => void = () => {};
 
 /** How many people are on the call, from the header picker (0 = any number). */
-const voicesOnCall = () => Number($<HTMLSelectElement>("#voices")?.value ?? 2);
+const voicesOnCall = () => Number($<HTMLSelectElement>("#voices")?.value ?? 0);
 
 /** The menu footer: the version from package.json, and the license, which opens in full in a window. */
 async function bindAbout() {
@@ -116,9 +123,6 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
   });
   $("#start-live")?.addEventListener("click", () => openStartLive());
   bindStartLive();
-  const voices = $<HTMLSelectElement>("#voices");
-  try { const saved = localStorage.getItem("pa.voices"); if (voices && saved !== null) voices.value = saved; } catch { /* storage may be unavailable */ }
-  voices?.addEventListener("change", () => { try { localStorage.setItem("pa.voices", voices.value); } catch { /* storage may be unavailable */ } });
   $("#start-replay")?.addEventListener("click", () => {
     const dir = $<HTMLInputElement>("#replay-dir")!.value.trim();
     closePops();
@@ -177,6 +181,10 @@ function renderStartSummary() {
 
 /** Start live asks first: every feature is on unless the host turns it off, for this session only. */
 function openStartLive() {
+  void loadDevices();
+  // each show starts at "Any number": who is on the call changes from show to show
+  const voices = $<HTMLSelectElement>("#voices");
+  if (voices) voices.value = "0";
   for (const id of ["factcheck", "labels"] as const) feature(id).setAttribute("aria-checked", "true");
   renderStartSummary();
   const d = $<HTMLDialogElement>("#dlg-start")!;
@@ -193,6 +201,8 @@ function bindStartLive() {
   }
   $("#start-go")?.addEventListener("click", () => {
     const features = { factcheck: isOn("factcheck"), labels: isOn("labels") };
+    const mic = $<HTMLSelectElement>("#mic")?.value;
+    if (mic) try { localStorage.setItem(MIC_KEY, mic); } catch { /* storage may be unavailable */ }
     $<HTMLDialogElement>("#dlg-start")!.close();
     void run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined, voicesOnCall(), features));
   });
@@ -492,7 +502,10 @@ export function renderTranscript(st: State) {
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   const bySeg = segmentOf(st);
   const labelFilter = filters.markers.size > 0 || !!filters.subject;
-  const utts = [...st.utterances.values()].sort((a, b) => a.startMs - b.startMs);
+  // lines not transcribed (yet) keep their place, so a network drop does not look like a dead microphone
+  const missing = [...st.missing.values()].filter((m) => !st.utterances.has(m.id))
+    .map((m): Utterance & { missing?: MissingLine["status"] } => ({ ...m, text: "", tags: [], missing: m.status }));
+  const utts: (Utterance & { missing?: MissingLine["status"] })[] = [...st.utterances.values(), ...missing].sort((a, b) => a.startMs - b.startMs);
   const rows: HTMLElement[] = [];
   let lastSeg: string | undefined;
   let lastSpeaker: string | undefined;
@@ -523,13 +536,17 @@ export function renderTranscript(st: State) {
         ? h("span", {})
         : h("button", { class: `who-tab ${u.stream}`, title: "Click to rename or merge", onclick: () => openSpeaker(st, u.speakerId) }, name);
     lastSpeaker = u.speakerInferred ? undefined : sp?.id;
-    rows.push(h("div", { class: `utt${u.filler ? " filler" : ""}${flagged.has(u.id) ? " flagged" : ""}`, id: `utt-${u.id}`, "data-seg": seg?.id ?? "", "data-start": Math.round(u.startMs) },
+    rows.push(h("div", { class: `utt${u.filler ? " filler" : ""}${flagged.has(u.id) ? " flagged" : ""}${u.missing ? " missing" : ""}`, id: `utt-${u.id}`, "data-seg": seg?.id ?? "", "data-start": Math.round(u.startMs) },
       // in a recording, a timestamp plays from that line
       recording
         ? h("button", { class: "time seek", title: "Play from here", onclick: () => onTimeClick?.(u.startMs) }, clock(u.startMs))
         : h("span", { class: "time" }, clock(u.startMs)),
       who,
-      h("span", { class: "text" }, u.text,
+      u.missing
+        ? h("span", { class: "text", title: "The transcription request failed. The audio is kept in the recording." },
+          u.missing === "retrying" ? "Not transcribed yet: the connection dropped. Retrying…"
+            : recording ? "Not transcribed. Play from here to hear it." : "Not transcribed.")
+        : h("span", { class: "text" }, u.text,
         u.tags.map((t) => h("span", { class: "tag-loud" }, t)),
         flagged.has(u.id) ? h("span", { class: "flag", title: "Flagged for fact-checking" }, glyph("flag")) : null)));
   }

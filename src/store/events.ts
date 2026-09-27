@@ -14,6 +14,8 @@ export const EVENT_SCHEMAS = {
   "echo.gate": obj({ active: z.boolean(), device: str.nullable(), atMs: num }),
   health: obj({ stream: z.enum(["host", "remote"]), rmsDbfs: num, msSinceLastFrame: num, utterancesLastMinute: num }),
   "utterance.partial": obj({ stream: z.enum(["host", "remote"]), itemId: str, text: str, utteranceId: str.nullable(), final: z.boolean() }),
+  // a line whose final transcript failed: "retrying" (its audio is kept and retried), "failed" (given up), "empty" (the retry heard nothing)
+  "utterance.failed": obj({ id: str, stream: str, startMs: num, endMs: num, speakerId: str, status: z.enum(["retrying", "failed", "empty"]) }),
   utterance: obj({ id: str, stream: str, startMs: num, endMs: num, speakerId: str, speakerName: str, text: str, tags: z.array(str) }),
   "speaker.created": obj({ id: str, displayName: str, stream: str }),
   "speaker.updated": obj({ id: str, displayName: str }),

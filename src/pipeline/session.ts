@@ -3,7 +3,7 @@ import type { Config } from "../config.ts";
 import { Budget, sumDevSpend } from "../budget.ts";
 import { mergeSources, type AudioSource, type StreamName } from "../audio/source.ts";
 import { EchoGate, type OutputKind } from "../audio/echoGate.ts";
-import { LoudTagger, rmsDbfs } from "../audio/tags.ts";
+import { LoudTagger, rmsDbfs, type Tag } from "../audio/tags.ts";
 import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
 import { Embedder, SpeakerRegistry, type VoiceLimits } from "../speakers/registry.ts";
@@ -75,6 +75,16 @@ export interface SessionOptions {
 
 interface StreamHealth { lastFrameAt: number; recent: Float32Array[]; utteranceTimes: number[] }
 
+/** A line whose final transcript failed on a transient error (a network drop): its audio is kept and retried. */
+interface PendingTranscript {
+  u: Utterance; speakerId: string; inferred: boolean; tags: Tag[]; context: TranscriptionContext;
+}
+
+/** How often failed lines are retried while the session runs. */
+const RETRY_EVERY_MS = 15_000;
+/** The most failed lines kept for a retry (about 20 minutes of speech); older ones are given up. */
+const MAX_PENDING = 200;
+
 /** Wires sources → VAD → tags → speakers → transcription → segmenter → timeline and fact-checker → store and events (§4.10). */
 export class Session {
   readonly store: SessionStore;
@@ -98,6 +108,9 @@ export class Session {
   private readonly loud = new LoudTagger();
   private readonly states = new Map<string, unknown>();
   private readonly transcriptions = new Set<Promise<void>>();
+  /** Failed lines waiting for a retry, oldest first. */
+  private readonly pending = new Map<string, PendingTranscript>();
+  private retrying: Promise<void> | null = null;
   private readonly utterances: PipelineUtterance[] = [];
   private readonly processed = new Map<string, PipelineUtterance>();
   private readonly health = new Map<StreamName, StreamHealth>();
@@ -263,6 +276,7 @@ export class Session {
     if (this.echoGate.active) this.emitEchoGate();
     this.timers.push(setInterval(() => this.emitHealth(), 1000));
     this.timers.push(setInterval(() => this.emitStats(), this.opts.statsIntervalMs ?? 60_000));
+    this.timers.push(setInterval(() => void this.retryPending(), RETRY_EVERY_MS));
     for (const t of this.timers) t.unref?.();
 
     let reason = "end_of_input";
@@ -310,10 +324,16 @@ export class Session {
     });
     this.segmenter.emitted(u);
     this.live?.commit(u.stream, u.id);
-    const p = this.services.transcribe(u.id, u.samples, this.transcriptionContext())
+    const context = this.transcriptionContext();
+    const p = this.services.transcribe(u.id, u.samples, context)
       .catch((e): TranscriptionResult => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       .then((r) => {
-        if (!r.ok) this.emit("error", { component: "transcription", message: r.error, utterance_id: u.id });
+        if (!r.ok) {
+          this.emit("error", { component: "transcription", message: r.error, utterance_id: u.id });
+          // the line keeps its place in the transcript; a transient failure is retried with the same audio and context
+          if (r.retryable) this.keepForRetry({ u, speakerId: a.speakerId, inferred: a.inferred, tags: [...tags], context });
+          this.emitFailed(u, a.speakerId, r.retryable ? "retrying" : "failed");
+        }
         const text = r.ok ? r.text : "";
         const pu: PipelineUtterance = {
           id: u.id, stream: u.stream, startMs: u.startMs, endMs: u.endMs, speakerId: a.speakerId, speakerInferred: a.inferred,
@@ -331,6 +351,61 @@ export class Session {
       });
     this.transcriptions.add(p);
     p.finally(() => this.transcriptions.delete(p));
+  }
+
+  private emitFailed(u: { id: string; stream: StreamName; startMs: number; endMs: number }, speakerId: string, status: "retrying" | "failed" | "empty") {
+    this.emit("utterance.failed", { id: u.id, stream: u.stream, startMs: u.startMs, endMs: u.endMs, speakerId: this.speakers.resolve(speakerId), status });
+  }
+
+  private keepForRetry(t: PendingTranscript) {
+    this.pending.set(t.u.id, t);
+    if (this.pending.size <= MAX_PENDING) return;
+    const [oldest] = this.pending.values();
+    this.pending.delete(oldest.u.id);
+    this.emitFailed(oldest.u, oldest.speakerId, "failed");
+  }
+
+  /**
+   * Retries failed lines, oldest first, and stops at the first failure: the connection is probably still down, and
+   * one attempt per pass does not pile requests onto it. A recovered line joins the transcript (and the chat) in its
+   * place; it does not go back through Jev, segments, or fact-checking, which have moved on. One pass at a time.
+   */
+  private retryPending(): Promise<void> {
+    if (this.retrying || this.pending.size === 0) return this.retrying ?? Promise.resolve();
+    const run = async () => {
+      for (const t of [...this.pending.values()]) {
+        const r = await this.services.transcribe(t.u.id, t.u.samples, t.context)
+          .catch((e): TranscriptionResult => ({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+        if (!r.ok) {
+          if (r.retryable) return; // still down: try again on the next pass
+          this.pending.delete(t.u.id);
+          this.emitFailed(t.u, t.speakerId, "failed");
+          continue;
+        }
+        this.pending.delete(t.u.id);
+        if (!r.text) {
+          this.emitFailed(t.u, t.speakerId, "empty");
+          continue;
+        }
+        const pu: PipelineUtterance = {
+          id: t.u.id, stream: t.u.stream, startMs: t.u.startMs, endMs: t.u.endMs, speakerId: t.speakerId, speakerInferred: t.inferred,
+          text: r.text, filler: r.filler, failed: false, tags: t.tags,
+        };
+        // in time order, so the chat and the transcription context read the conversation as it happened
+        const at = this.utterances.findIndex((x) => x.startMs > pu.startMs);
+        if (at < 0) this.utterances.push(pu);
+        else this.utterances.splice(at, 0, pu);
+        this.emit("utterance", {
+          id: pu.id, stream: pu.stream, startMs: pu.startMs, endMs: pu.endMs, speakerId: this.speakers.resolve(pu.speakerId),
+          speakerName: this.speakers.displayName(pu.speakerId), speakerInferred: pu.speakerInferred, text: pu.text, filler: pu.filler,
+          tags: pu.tags, recovered: true,
+        });
+      }
+    };
+    this.retrying = run()
+      .catch((e) => this.emit("error", { component: "transcription", message: `retrying failed lines: ${e instanceof Error ? e.message : String(e)}` }))
+      .finally(() => { this.retrying = null; });
+    return this.retrying;
   }
 
   /**
@@ -405,6 +480,11 @@ export class Session {
     this.status = "ending";
     for (const s of this.vads.keys()) if (!this.vads.get(s)!.ended) this.endStream(s); // 1. flush every VAD
     while (this.transcriptions.size > 0) await Promise.all([...this.transcriptions]); // 2. transcription and segmenter
+    // a last try for lines lost to a network drop; whatever still fails is given up
+    await this.retrying;
+    await this.retryPending();
+    for (const t of this.pending.values()) this.emitFailed(t.u, t.speakerId, "failed");
+    this.pending.clear();
     this.segmenter.poll();
     await this.segmenter.idle();
     this.segmenter.closeFinal(); // 3. close and label the open segment

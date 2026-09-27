@@ -92,7 +92,9 @@ function upgradeSelect(sel: HTMLSelectElement) {
         onclick: () => { if (!o.disabled) choose(o); },
         onpointermove: () => highlight(k),
       }, o.textContent ?? "")));
-    document.body.append(list);
+    // Inside an open modal dialog the list must live in the dialog: a modal makes everything outside it inert, so a list
+    // appended to <body> shows on top but ignores every click (27 September 2026: the microphone could not be chosen).
+    (wrap.closest("dialog[open]") ?? document.body).append(list);
     list.showPopover();
     place(list, wrap);
     btn.setAttribute("aria-expanded", "true");

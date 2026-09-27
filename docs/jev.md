@@ -116,7 +116,7 @@ boundary (noul): The new_utterance moves on to a different point or subject than
 
 It is a **comparison**, not "is this a complete idea?", because Jev reads questions literally. Code turns it into segments (`src/pipeline/segmenter.ts`):
 
-1. A filler skips Jev and joins the open segment. A failed transcription skips Jev and adds no text.
+1. A filler skips Jev and joins the open segment. A failed transcription skips Jev and adds no text; if a later retry recovers it, the text reaches the transcript and the chat only, never Jev (see [Transcription](transcription.md#final-layer--srctranscribeopenaits)).
 2. If adding the utterance would make the segment longer than `maxSegmentMs` (75 s), the segment closes first, marked `forced`.
 3. Otherwise the segment closes before the utterance when `boundary ≥ boundaryThreshold` (0.6) **and** the segment is already at least `minSegmentMs` (12 s) long. The threshold drops by `speakerChangeBonus` (0.1) when the speaker changes after a gap of at least `speakerChangeGapMs` (1.5 s).
 4. If the Jev call fails, `boundary` counts as 0 (the segment stays open) and fact-checking is skipped for that utterance.

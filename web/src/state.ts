@@ -8,6 +8,8 @@ export interface Utterance {
   id: string; stream: Stream; startMs: number; endMs: number; speakerId: string; text: string; tags: string[];
   filler?: boolean; speakerInferred?: boolean;
 }
+/** A line whose final transcript failed: retried while the session runs, else given up (see `utterance.failed`). */
+export interface MissingLine { id: string; stream: Stream; startMs: number; endMs: number; speakerId: string; status: "retrying" | "failed" }
 export interface ChoiceLabel { choice: string; confidence: number; faded: boolean }
 export interface Labels {
   segmentId: string; labelSetVersion: string; unlabeled: boolean; choices: Record<string, ChoiceLabel>;
@@ -79,6 +81,8 @@ export interface State {
   pauses: { startMs: number; endMs: number | null }[];
   speakers: Map<string, Speaker>;
   utterances: Map<string, Utterance>;
+  /** Lines not transcribed (yet): shown in their place until a retry brings their text. */
+  missing: Map<string, MissingLine>;
   /** Streaming text not yet replaced by its final utterance, by realtime item id. */
   partials: Map<string, LivePartial>;
   segments: Map<string, Segment>;
@@ -114,7 +118,7 @@ export function addCall(s: State, row: CallRow) {
 
 export function emptyState(): State {
   return {
-    session: null, pauses: [], speakers: new Map(), utterances: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
+    session: null, pauses: [], speakers: new Map(), utterances: new Map(), missing: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
     cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 10 },
@@ -210,8 +214,14 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       s.partials.set(d.itemId, { ...d, receivedAt: Date.now() });
       dirty.add("transcript");
       break;
+    case "utterance.failed":
+      if (d.status === "empty" || s.utterances.has(d.id)) s.missing.delete(d.id);
+      else s.missing.set(d.id, d);
+      dirty.add("transcript");
+      break;
     case "utterance":
       s.utterances.set(d.id, d);
+      s.missing.delete(d.id); // a retry recovered it
       for (const [k, p] of s.partials) if (p.utteranceId === d.id) s.partials.delete(k);
       dirty.add("transcript");
       break;

@@ -66,7 +66,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 216,
+      "line_count": 217,
       "links_to": [
         "docs/chat.md",
         "docs/gotchas.md",
@@ -160,12 +160,13 @@
         "sherpa-onnx",
         "OpenAI",
         "OpenRouter and GPT-6 Luna",
+        "Web page",
         "Export and import",
         "Chat",
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 62,
+      "line_count": 66,
       "links_to": [
         "docs/architecture.md",
         "docs/recordings.md"
@@ -218,7 +219,8 @@
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
-        "docs/system1-system2.md"
+        "docs/system1-system2.md",
+        "docs/transcription.md"
       ],
       "over_size": false,
       "parse_error": null,
@@ -526,7 +528,7 @@
         "Cost",
         "Configuration (`config/app.json` → `transcription`)"
       ],
-      "line_count": 74,
+      "line_count": 75,
       "links_to": [
         "docs/gotchas.md",
         "docs/recordings.md",
