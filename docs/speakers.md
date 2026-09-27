@@ -27,7 +27,7 @@ The placeholder rule fixes a real failure: in a ChatGPT voice-mode test, the fir
 
 ## Voices belong to a stream, and each stream has a limit
 
-- **A voice is matched only within its own stream.** Each speaker belongs to the stream it was first heard on (a merge joins the streams of both), so a line on the host's mic is never matched to a voice from the call: the host wears earbuds, so the mic never hears the call.
+- **A voice is matched only within its own stream.** Each speaker belongs to the stream it was first heard on (a merge joins the streams of both), so a line on the host's mic is never matched to a voice from the call: the host wears earbuds, so the mic never hears the call (and on speakers, speaker mode mutes the mic while the call plays; see [Architecture](architecture.md#speaker-mode-the-echo-gate)).
 - **Each stream has a voice limit**, `speakers.voicesPerStream` in `config/app.json` (`host` 1, `remote` 2; 0 means no limit). The page's "on call" picker next to the microphone sets the `remote` limit for the session (1–4, or Any), and `session.json` records it as `voices`. Once a stream has that many speakers, a line that matches no one at the threshold goes to the **closest** speaker on that stream, without adding to their voiceprint, instead of creating a new speaker.
 - **Matching** is cosine similarity between the line's embedding and each speaker's centroid (the normalised mean of their last 20 unit embeddings).
 

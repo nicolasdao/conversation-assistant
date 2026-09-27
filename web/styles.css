@@ -161,6 +161,21 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 .meter.absent { opacity: 0.4; }
 .meter.paused { opacity: 0.45; }
 .meter.paused .meta { color: var(--warn); }
+.meter.muted .meta { color: var(--warn); }
+
+/* speaker mode: a chip next to the meters, with its explanation on hover or focus */
+.speaker-mode { position: relative; flex: none; outline: none; cursor: default; }
+.speaker-mode .chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; color: var(--warn);
+  font: 700 11.5px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; box-shadow: inset 0 0 0 1px rgba(242, 148, 34, 0.55);
+}
+.speaker-mode .chip svg.info { width: 12px; height: 12px; opacity: 0.8; }
+.speaker-mode:hover .chip, .speaker-mode:focus-visible .chip { background: rgba(242, 148, 34, 0.12); }
+.speaker-mode .pop { display: none; width: 320px; border-top-color: var(--warn); }
+.speaker-mode:hover .pop, .speaker-mode:focus-within .pop { display: block; }
+.speaker-mode .pop p { margin: 0 0 8px; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+.speaker-mode .pop p b { color: var(--ink); font-weight: 600; }
+.speaker-mode .pop p.tip { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); color: var(--ink); }
 
 .cost { position: relative; display: grid; gap: 3px; width: 108px; cursor: default; }
 .cost .v { font: 700 21px/1 var(--cond); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -940,6 +955,7 @@ dialog.chat-dlg { width: min(1240px, calc(100vw - 32px)); height: min(92vh, 1000
 /* narrower screens */
 @media (max-width: 1180px) {
   .meter .dev { display: none; }
+  .speaker-mode .chip { font-size: 0; gap: 3px; }
   .meter { width: 118px; }
   .meter .bar b { background-size: 118px 100%; }
   .controls .select { width: 124px; }

@@ -19,11 +19,15 @@ final class SystemTap {
     private var rateListener: AudioObjectPropertyListenerBlock?
     private var watchedOutput = AudioObjectID(kAudioObjectUnknown)
     private var watchedRate: Double = 0
+    /// Watches the output's data source: on older Macs, plugging headphones in switches it rather than the device.
+    private var sourceListener: AudioObjectPropertyListenerBlock?
     private(set) var sampleRate: Double = 0
     private weak var clock: ClockLock?
     private var stream: UInt8 = 1
     private let status: ([String: Any]) -> Void
     private(set) var outputName = ""
+    /// `speakers`, `headphones`, or `virtual` (Devices.outputKind): the engine mutes the microphone while speakers play the call.
+    private(set) var outputKind = "speakers"
 
     init(status: @escaping ([String: Any]) -> Void) {
         self.status = status
@@ -48,6 +52,7 @@ final class SystemTap {
     private func buildAggregate() throws {
         guard let out = Devices.defaultOutput(), let outUID = Devices.uid(out) else { throw CaptureError.message("no default output device") }
         outputName = Devices.name(out)
+        outputKind = Devices.outputKind(out)
         let dict: [String: Any] = [
             kAudioAggregateDeviceNameKey: "conversation-capture tap",
             kAudioAggregateDeviceUIDKey: "com.cloudlesslabs.conversation-capture.\(UUID().uuidString)",
@@ -126,6 +131,18 @@ final class SystemTap {
         rateListener = block
         watchedOutput = device
         AudioObjectAddPropertyListenerBlock(device, &addr, queue, block)
+
+        var srcAddr = Devices.address(kAudioDevicePropertyDataSource, kAudioObjectPropertyScopeOutput)
+        guard AudioObjectHasProperty(device, &srcAddr) else { return }
+        let srcBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            guard let self else { return }
+            let kind = Devices.outputKind(device)
+            if kind == self.outputKind { return }
+            self.outputKind = kind
+            self.status(["type": "device_changed", "remote": ["outputDevice": self.outputName, "outputKind": kind]])
+        }
+        sourceListener = srcBlock
+        AudioObjectAddPropertyListenerBlock(device, &srcAddr, queue, srcBlock)
     }
 
     private func unwatchRate() {
@@ -133,6 +150,11 @@ final class SystemTap {
             var addr = Devices.address(kAudioDevicePropertyNominalSampleRate)
             AudioObjectRemovePropertyListenerBlock(watchedOutput, &addr, queue, block)
         }
+        if let block = sourceListener, watchedOutput != kAudioObjectUnknown {
+            var addr = Devices.address(kAudioDevicePropertyDataSource, kAudioObjectPropertyScopeOutput)
+            AudioObjectRemovePropertyListenerBlock(watchedOutput, &addr, queue, block)
+        }
+        sourceListener = nil
         rateListener = nil
         watchedOutput = AudioObjectID(kAudioObjectUnknown)
     }
@@ -144,9 +166,15 @@ final class SystemTap {
             self.destroyAggregate()
             do {
                 try self.buildAggregate()
-                self.status(["type": "device_changed", "remote": ["outputDevice": self.outputName]])
+                self.status(["type": "device_changed", "remote": ["outputDevice": self.outputName, "outputKind": self.outputKind]])
             } catch {
                 self.status(["type": "error", "message": "rebuilding the system tap failed: \(error)"])
+                // still say where sound now goes, so the engine's speaker mode follows the new device (earbuds: mic open)
+                if let out = Devices.defaultOutput() {
+                    self.outputName = Devices.name(out)
+                    self.outputKind = Devices.outputKind(out)
+                    self.status(["type": "device_changed", "remote": ["outputDevice": self.outputName, "outputKind": self.outputKind]])
+                }
             }
         }
         listener = block

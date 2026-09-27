@@ -2,6 +2,7 @@
   "server": { "port": 4317 },
   "budget": { "sessionCapUsd": 10, "devCapUsd": 3 },
   "vad": { "threshold": 0.5, "minSpeechDuration": 0.25, "minSilenceDuration": 0.5, "maxSpeechDuration": 30 },
+  "echoGate": { "mode": "auto", "thresholdDbfs": -45, "holdMs": 250 },
   "speakers": { "threshold": 0.65, "minEmbedSeconds": 1.5, "maxEmbeddingsPerSpeaker": 20, "voicesPerStream": { "host": 1, "remote": 2 } },
   "transcription": {
     "model": "gpt-transcribe", "languages": ["en"], "concurrency": 4, "timeoutMs": 20000,

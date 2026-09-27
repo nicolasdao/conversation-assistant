@@ -14,6 +14,12 @@ export const AppConfigSchema = z.object({
   vad: z.object({
     threshold: probability, minSpeechDuration: positive, minSilenceDuration: positive, maxSpeechDuration: positive,
   }).strict(),
+  /** Speaker mode: mutes the microphone while the call plays through the Mac's speakers (see src/audio/echoGate.ts). */
+  echoGate: z.object({
+    mode: z.enum(["auto", "always", "never"]),
+    thresholdDbfs: z.number().max(0),
+    holdMs: nonNegative,
+  }).strict(),
   speakers: z.object({
     threshold: probability, minEmbedSeconds: positive, maxEmbeddingsPerSpeaker: int,
     /** The most voices each stream carries (0 = no limit); a session can override the remote count. */

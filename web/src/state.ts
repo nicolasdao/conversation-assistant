@@ -26,7 +26,11 @@ export interface Claim {
   /** When the claim was last flagged or said again: cards sort by it, so a repeat surfaces instantly. */
   activity?: string;
 }
-export interface Health { rmsDbfs: number; msSinceLastFrame: number; utterancesLastMinute: number; receivedAt: number; lastSoundAt: number; detail?: any }
+export interface Health {
+  rmsDbfs: number; msSinceLastFrame: number; utterancesLastMinute: number; receivedAt: number; lastSoundAt: number; detail?: any;
+  /** Host only, in speaker mode: how much of the last second the microphone was muted because the call was playing. */
+  echoMutedMs?: number;
+}
 export interface S1Version { id: string; parent: string | null; status: string; kind: string; rationale: string; gate: any; errors: string[] | null }
 export interface S1Outcome { active: string; candidate: string | null; outcome: string; rationale: string; gate: any; errors: string[] | null; at: string }
 export interface Cost { transcription: number; jev: number; s2: number; chat?: number; session: number; sessionCapUsd: number }
@@ -66,6 +70,8 @@ export interface State {
   session: {
     id: string; mode: string; status: string; paused?: boolean; dir?: string; startedAt?: string; streams?: Stream[]; name?: string | null;
     features?: Features;
+    /** Speaker mode: the call plays through the Mac's speakers, so the microphone is muted while it plays. */
+    echoGate?: { active: boolean; device: string | null };
     /** Recordings only: false when imported without audio; the version that recorded it; where it was imported from. */
     hasAudio?: boolean; appVersion?: string | null; imported?: { at: string; exportedWith: string | null; fileName: string | null } | null;
   } | null;
@@ -186,14 +192,19 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
     case "health": {
       const prev = s.health[d.stream as Stream];
       const now = Date.now();
-      const loud = d.rmsDbfs > -50;
+      // a microphone muted by speaker mode is silent on purpose, not failing
+      const loud = d.rmsDbfs > -50 || (d.echoMutedMs ?? 0) > 0;
       s.health[d.stream as Stream] = {
         rmsDbfs: d.rmsDbfs, msSinceLastFrame: d.msSinceLastFrame, utterancesLastMinute: d.utterancesLastMinute, receivedAt: now,
-        lastSoundAt: loud ? now : prev?.lastSoundAt ?? now, detail: d.detail,
+        lastSoundAt: loud ? now : prev?.lastSoundAt ?? now, detail: d.detail, echoMutedMs: d.echoMutedMs,
       };
       dirty.add("health");
       break;
     }
+    case "echo.gate":
+      if (s.session) s.session.echoGate = { active: !!d.active, device: d.device ?? null };
+      dirty.add("health");
+      break;
     case "utterance.partial":
       if (d.utteranceId && s.utterances.has(d.utteranceId)) break; // the final line already landed
       s.partials.set(d.itemId, { ...d, receivedAt: Date.now() });

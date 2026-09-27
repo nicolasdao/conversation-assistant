@@ -43,7 +43,7 @@ The project will be open-sourced under the BSD 3-Clause license (Cloudless Consu
 - OpenAI diarization: its speaker labels are scoped to one request.
 - Multi-language support, video, clip export, social posting, cloud deployment, or authentication (the server binds to 127.0.0.1).
 - Integration with Riverside beyond reading exported tracks for calibration.
-- Echo cancellation: the host wears earbuds.
+- Echo cancellation. The host wears earbuds. If the call plays through the Mac's speakers instead, **speaker mode** mutes the microphone while the call plays rather than trying to subtract the echo (added 27 September 2026, see [Architecture](architecture.md#speaker-mode-the-echo-gate)). Earbuds remain the recommended setup.
 - Per-app audio filtering: the tap captures all system output.
 - Model training, beyond speaker enrolment.
 

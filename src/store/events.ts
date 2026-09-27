@@ -10,6 +10,8 @@ export const EVENT_SCHEMAS = {
   "session.ended": obj({ sessionId: str, reason: str }),
   "session.paused": obj({ sessionId: str, atMs: num }),
   "session.resumed": obj({ sessionId: str, atMs: num }),
+  // speaker mode switched on or off: the microphone is muted while the call plays through the speakers
+  "echo.gate": obj({ active: z.boolean(), device: str.nullable(), atMs: num }),
   health: obj({ stream: z.enum(["host", "remote"]), rmsDbfs: num, msSinceLastFrame: num, utterancesLastMinute: num }),
   "utterance.partial": obj({ stream: z.enum(["host", "remote"]), itemId: str, text: str, utteranceId: str.nullable(), final: z.boolean() }),
   utterance: obj({ id: str, stream: str, startMs: num, endMs: num, speakerId: str, speakerName: str, text: str, tags: z.array(str) }),

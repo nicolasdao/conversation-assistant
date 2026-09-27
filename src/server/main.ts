@@ -401,7 +401,10 @@ export class Engine implements EngineApi {
       this.captureDetail = null;
       this.capture = await this.opts.live(req.mic, (type, data) => {
         if (type === "error") this.session?.emit("error", data);
-        else this.captureDetail = (data.capture as Record<string, unknown>) ?? data;
+        else {
+          this.captureDetail = (data.capture as Record<string, unknown>) ?? data;
+          this.followOutput();
+        }
       });
       sources = this.capture.sources;
       mode = "live";
@@ -423,9 +426,18 @@ export class Engine implements EngineApi {
     s.run()
       .then(() => { if (this.session === s) { this.session = null; this.archived = s.id; } })
       .catch((e) => console.error("session failed:", e));
+    if (mode === "live") this.followOutput(); // after session.started: the helper may already have said where the call plays
     // after run() has written session.json, which makes the folder a recording the library can name
     if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
     return { sessionId: s.id };
+  }
+
+  /** Tells a live session where the call plays (the helper's `remote.outputKind`), which drives its echo gate. */
+  private followOutput() {
+    const remote = this.captureDetail?.remote as { outputKind?: unknown; outputDevice?: unknown } | undefined;
+    if (!remote || this.session?.mode !== "live") return;
+    const kind = remote.outputKind === "speakers" || remote.outputKind === "headphones" || remote.outputKind === "virtual" ? remote.outputKind : null;
+    this.session.setOutput(kind, typeof remote.outputDevice === "string" ? remote.outputDevice : null);
   }
 
   async stop(): Promise<{ sessionId: string }> {

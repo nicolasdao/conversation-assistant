@@ -86,7 +86,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 
 **Front end: a local web page served by the engine**, in plain TypeScript compiled with `tsc` to browser ES modules. No bundler, no UI framework, no new dependencies.
 
-**Show setup assumption.** The host wears earbuds, so the microphone never hears the call. Echo cancellation is out of scope. Riverside's own microphone is also set to the MacBook's built-in mic.
+**Show setup assumption.** The host wears earbuds, so the microphone never hears the call. Echo cancellation is out of scope. Riverside's own microphone is also set to the MacBook's built-in mic. Since 27 September 2026, when the call plays through the Mac's speakers anyway, **speaker mode** mutes the microphone while the call plays, so the guests are not transcribed twice (see [Architecture](docs/architecture.md#speaker-mode-the-echo-gate)).
 
 **Why:**
 - Browser capture tied the engine to a Chrome tab that had to be re-picked every session and could be closed or throttled.

@@ -329,7 +329,22 @@ export function renderMenu(st: State) {
 
 const minus = (n: number) => n.toFixed(0).replace("-", "−");
 
+/**
+ * Speaker mode's chip next to the meters. It is static markup, only shown, hidden, and given the device name here, because
+ * the meters are rebuilt every second and would close its info box under the pointer.
+ */
+function renderSpeakerMode(st: State) {
+  const gate = st.session?.echoGate;
+  const on = st.session?.status === "running" && !!gate?.active;
+  const box = $("#speaker-mode")!;
+  box.hidden = !on;
+  const device = gate?.device ?? "the Mac's speakers";
+  const el = $("#speaker-mode-device")!;
+  if (on && el.textContent !== device) el.textContent = device;
+}
+
 export function renderHealth(st: State) {
+  renderSpeakerMode(st);
   if (st.session?.status === "archived") {
     return replace($("#health")); // an opened recording has no live streams
   }
@@ -346,10 +361,12 @@ export function renderHealth(st: State) {
     const pct = hl ? Math.max(0, Math.min(100, ((hl.rmsDbfs + 60) / 60) * 100)) : 0;
     const device: string | undefined = stream === "host" ? hl?.detail?.host?.device : hl?.detail?.remote?.outputDevice;
     const ageText = age < 0 ? "–" : age < 1000 ? `${age} ms` : `${(age / 1000).toFixed(1)} s`;
-    const meta = !present ? "absent" : paused ? "paused" : !hl ? "waiting…"
+    // speaker mode: the microphone is muted while the call plays (most of the last second)
+    const muted = running && present && (hl?.echoMutedMs ?? 0) >= 500 && age <= 3000;
+    const meta = !present ? "absent" : paused ? "paused" : !hl ? "waiting…" : muted ? "muted · call playing"
       : `${minus(hl.rmsDbfs)} dBFS · ${red && silentFor > 10_000 ? `silent ${(silentFor / 1000).toFixed(0)} s` : ageText}`;
     return h("div", {
-      class: `meter${red ? " alert" : ""}${present ? "" : " absent"}${paused ? " paused" : ""}`,
+      class: `meter${red ? " alert" : ""}${present ? "" : " absent"}${paused ? " paused" : ""}${muted ? " muted" : ""}`,
       title: `${stream === "host" ? "Host" : "Remote"}${device ? ` · ${device}` : ""} · last frame ${ageText}`,
     },
       h("div", { class: "row1" }, h("span", { class: `who ${stream}` }, stream === "host" ? "Host" : "Remote"), device ? h("span", { class: "dev" }, device) : null),

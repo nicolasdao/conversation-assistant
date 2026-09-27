@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import type { Config } from "../config.ts";
 import { Budget, sumDevSpend } from "../budget.ts";
 import { mergeSources, type AudioSource, type StreamName } from "../audio/source.ts";
+import { EchoGate, type OutputKind } from "../audio/echoGate.ts";
 import { LoudTagger, rmsDbfs } from "../audio/tags.ts";
 import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
@@ -86,6 +87,9 @@ export class Session {
   status: "running" | "ending" | "ended" = "running";
   /** While paused, incoming audio is replaced by silence: nothing is heard, transcribed, or spent, and times stay aligned. */
   paused = false;
+  /** Speaker mode: the microphone is muted while the call plays through the speakers. */
+  readonly echoGate: EchoGate;
+  private outputDevice: string | null = null;
   private lastMs = 0;
   private readonly bus: EventBus;
   private readonly services: Services;
@@ -140,6 +144,7 @@ export class Session {
       for (const s of streams) this.live.warm(s);
     }
 
+    this.echoGate = new EchoGate(cfg.app.echoGate);
     this.speakers = new SpeakerRegistry(cfg.app.speakers, opts.embedder ?? new Embedder(), this.voices);
     for (const s of streams) {
       this.vads.set(s, new StreamVad(s, cfg.app.vad, this.ids));
@@ -255,6 +260,7 @@ export class Session {
       labelSetVersion: this.timeline.version, streams: this.opts.sources.map((s) => s.stream), startedAt: this.startedAt.toISOString(),
       features: this.features,
     });
+    if (this.echoGate.active) this.emitEchoGate();
     this.timers.push(setInterval(() => this.emitHealth(), 1000));
     this.timers.push(setInterval(() => this.emitStats(), this.opts.statsIntervalMs ?? 60_000));
     for (const t of this.timers) t.unref?.();
@@ -266,6 +272,9 @@ export class Session {
         if (this.stopRequested) { reason = "stopped"; break; }
         this.lastMs = Math.max(this.lastMs, f.sessionMs);
         if (this.paused) f = { ...f, samples: new Float32Array(f.samples.length) };
+        // speaker mode: the stored host audio is what the pipeline heard, silence included
+        if (f.stream === "remote") this.echoGate.remote(f.samples, f.sessionMs);
+        else if (this.echoGate.active) f = { ...f, samples: this.echoGate.host(f.samples, f.sessionMs) };
         this.store.writeAudio(f.stream, f.samples);
         const h = this.health.get(f.stream)!;
         h.lastFrameAt = Date.now();
@@ -370,9 +379,10 @@ export class Session {
       h.recent = [];
       h.utteranceTimes = h.utteranceTimes.filter((t) => now - t < 60_000);
       const db = rmsDbfs(all);
+      const muted = stream === "host" && this.echoGate.active ? { echoMutedMs: this.echoGate.takeMutedMs() } : {};
       this.emit("health", {
         stream, rmsDbfs: Number.isFinite(db) ? Math.round(db * 10) / 10 : -120,
-        msSinceLastFrame: h.lastFrameAt ? now - h.lastFrameAt : -1, utterancesLastMinute: h.utteranceTimes.length,
+        msSinceLastFrame: h.lastFrameAt ? now - h.lastFrameAt : -1, utterancesLastMinute: h.utteranceTimes.length, ...muted,
         ...(this.opts.healthDetail?.() ? { detail: this.opts.healthDetail() } : {}),
       });
     }
@@ -412,6 +422,21 @@ export class Session {
     this.status = "ended";
     this.emit("session.ended", { sessionId: this.id, reason, dir: this.store.dir });
     this.store.close();
+  }
+
+  /**
+   * Where the Mac plays the call, from the capture helper (live sessions): speakers turn the echo gate on, headphones or
+   * earbuds turn it off. Emits `echo.gate` when that changes, and when the device changes while the gate is on.
+   */
+  setOutput(kind: OutputKind | null, device: string | null): void {
+    const changed = this.echoGate.setOutput(kind);
+    const renamed = this.echoGate.active && device !== this.outputDevice;
+    this.outputDevice = device;
+    if ((changed || renamed) && this.status === "running") this.emitEchoGate();
+  }
+
+  private emitEchoGate() {
+    this.emit("echo.gate", { active: this.echoGate.active, device: this.outputDevice, atMs: this.lastMs });
   }
 
   /** Pauses a running session: audio becomes silence until resume(). */
@@ -469,6 +494,7 @@ export class Session {
       session: {
         id: this.id, mode: this.opts.mode, status: this.status, paused: this.paused, dir: this.store.dir, startedAt: this.startedAt.toISOString(),
         streams: this.opts.sources.map((s) => s.stream), features: this.features,
+        echoGate: { active: this.echoGate.active, device: this.outputDevice },
       },
       speakers: this.speakers.list(),
       utterances: this.utterances.map((u) => ({

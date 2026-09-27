@@ -127,7 +127,7 @@ if useSystem, #available(macOS 14.2, *) {
     let t = SystemTap(status: status)
     do { try t.start(clock: clock, stream: 1) } catch { fail("system audio: \(error)", code: 4) }
     stopTap = { t.stop() }
-    started["remote"] = ["outputDevice": t.outputName, "sampleRate": t.sampleRate]
+    started["remote"] = ["outputDevice": t.outputName, "outputKind": t.outputKind, "sampleRate": t.sampleRate]
 }
 startupDone.signal()
 clock.startWatchdog()

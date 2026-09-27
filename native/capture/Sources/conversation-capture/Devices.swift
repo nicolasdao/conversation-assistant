@@ -77,6 +77,36 @@ enum Devices {
         }
     }
 
+    /// The output's current data source on a built-in device ('ispk' internal speakers, 'hdpn' headphones), when it has one.
+    static func outputDataSource(_ id: AudioDeviceID) -> UInt32? {
+        var addr = address(kAudioDevicePropertyDataSource, kAudioObjectPropertyScopeOutput)
+        var src: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectHasProperty(id, &addr), AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &src) == noErr else { return nil }
+        return src
+    }
+
+    private static func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { $0 << 8 | UInt32($1) } }
+
+    /// Where an output device plays: `speakers` (heard in the room, so the microphone hears it too), `headphones`, or
+    /// `virtual` (nobody hears it). Bluetooth counts as headphones (AirPods, earbuds). Anything unsure counts as speakers:
+    /// muting the microphone needlessly costs less than transcribing the call twice.
+    static func outputKind(_ id: AudioDeviceID) -> String {
+        switch transportType(id) {
+        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: return "headphones"
+        case kAudioDeviceTransportTypeVirtual: return "virtual"
+        case kAudioDeviceTransportTypeBuiltIn:
+            // Apple silicon lists the headphone jack as its own device ("External Headphones"); older Macs switch the
+            // built-in output's data source instead.
+            if let src = outputDataSource(id) {
+                if src == fourCC("hdpn") { return "headphones" }
+                if src == fourCC("ispk") { return "speakers" }
+            }
+            return name(id).localizedCaseInsensitiveContains("headphone") ? "headphones" : "speakers"
+        default: return "speakers"
+        }
+    }
+
     static func hasInput(_ id: AudioDeviceID) -> Bool {
         var addr = address(kAudioDevicePropertyStreams, kAudioObjectPropertyScopeInput)
         var size: UInt32 = 0

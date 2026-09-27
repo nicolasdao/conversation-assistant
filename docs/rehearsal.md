@@ -18,7 +18,7 @@ Everything to check before going on air with Conversation Assistant, the lines t
 
 ## Pre-show checklist
 
-- [ ] Everyone wears headphones, and the host wears **earbuds**. The app assumes it: there is no echo handling, so speakers would put the call on the host's microphone as well.
+- [ ] Everyone wears headphones, and the host wears **earbuds**. On the Mac's speakers the app switches to speaker mode (a **Speakers** chip next to the meters): the microphone is muted while the call plays, so anything the host says over a guest is lost.
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
 - [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10), and a credit limit on the OpenRouter key.
