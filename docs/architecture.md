@@ -71,7 +71,7 @@ A `Session` wires everything together and runs until input ends or it is stopped
 6. **Segmenter.** A reorder buffer releases utterances in `startMs` order across both streams — when everything earlier has finished transcribing and the other stream has passed that time and is not mid-speech, or 8 s after transcription. Each non-filler utterance gets one Jev request carrying the `boundary` question and the System 1 fact-check questions; code closes segments (see [Jev](jev.md)).
 7. **Timeline.** Each closed segment gets one Jev request with the host-editable label set (see [Jev](jev.md)).
 8. **Fact-checker.** System 1 answers from step 6 flag claims; System 2 researches, audits, and rewrites (see [System 1 and System 2](system1-system2.md)).
-9. **Stats** every 60 s and at the end (`src/pipeline/stats.ts`): the Rogan index (share of labelled time on `personal_life` and `other_topics`), talk time, disagreements and duration-weighted hype per speaker, predictions, recommendations, clip-worthy segments, fact-check totals, and cost.
+9. **Stats** every 60 s and at the end (`src/pipeline/stats.ts`): the Off-topic index (`roganIndex` in stored stats; the share of labelled time on `personal_life` and `other_topics`), talk time, disagreements and duration-weighted hype per speaker, predictions, recommendations, clip-worthy segments, fact-check totals, and cost.
 
 At end of input, in order: close the WAVs (their final headers are written at once, so the audio is complete however long the rest takes, or if the Mac app quits during it); flush every VAD; wait for transcriptions and the segmenter; close the open segment (`final: true`) and label it; drain research, audits, and rewrites for at most 180 s; emit `stats`; write `speakers.json`; emit `session.ended`.
 
@@ -111,6 +111,8 @@ The router (`createApiServer`) uses Node's `http` module and serves one session 
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
 | GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.conversation-recording` file (see [Recordings](recordings.md#export-and-import)) |
 | GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
+
+**Every request must come from the page itself** (`fromThisPage`): the `Host` must be `127.0.0.1` or `localhost`, which defeats DNS rebinding, and any `Origin` must match it, so another website open in the browser can neither read anything nor act, not even with the "simple" cross-site requests that skip CORS (a text/plain POST that would start a recording). Anything else gets 403 (added 27 September 2026, after a review found only the setup routes guarded). The page itself is served with a Content-Security-Policy (`PAGE_CSP`): scripts, fonts, media, and connections from its own origin only, inline styles allowed because the page sets them from code.
 
 It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own URLs), and `web/styles.css`, `web/dist/**` and `web/fonts/**` as static files, confined to `web/` (inside the app bundle in the Mac app).
 

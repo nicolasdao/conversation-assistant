@@ -4,6 +4,8 @@
 
 <!-- BEGIN toc -->
 - [Install](#install)
+- [Privacy: what leaves your Mac](#privacy-what-leaves-your-mac)
+- [Responsible use](#responsible-use)
 - [Develop](#develop)
 - [Scripts](#scripts)
 - [Using it](#using-it)
@@ -11,6 +13,7 @@
 - [Design decisions](#design-decisions)
 - [Built with Claude Code](#built-with-claude-code)
 - [Releasing](#releasing)
+- [Security](#security)
 - [License](#license)
 - [Versioning](#versioning)
 <!-- END toc -->
@@ -31,6 +34,23 @@ For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2
 5. Click Allow when macOS asks for **Microphone** and **System Audio Recording**. The app asks for both on its first launch, so they never interrupt a show.
 
 It updates itself from GitHub Releases, never during a show. Recordings are kept in `~/Library/Application Support/Conversation Assistant/sessions` (**File → Show Recordings in Finder**), next to the saved keys. See [The Mac app](docs/desktop.md).
+
+## Privacy: what leaves your Mac
+
+Conversation Assistant has no server of its own and collects nothing: no account, no analytics, no telemetry. What leaves your Mac, and where it goes:
+
+| What | Sent to | When |
+| --- | --- | --- |
+| The conversation's audio, in short clips and a live stream | OpenAI, with your key, for transcription | During a session (never while paused), and again for a replay |
+| Transcript lines and the conversation so far | OpenRouter, with your key, for Jev (labels, fact-check flags) and GPT-6 Luna (fact-check research, audits) | During a session with those features on |
+| Your chat questions with the transcript | OpenRouter, with your key, to the model you pick | When you ask |
+| A check for a new version | GitHub | At launch and every 4 hours, never during a show |
+
+OpenRouter calls ask providers not to keep or train on the data (`data_collection: "deny"`); what OpenAI and OpenRouter do with it is governed by your agreements with them. Recordings, transcripts, and keys stay on your Mac (`~/Library/Application Support/Conversation Assistant/`), and nothing reaches the project's authors. An exported recording goes wherever you send it.
+
+## Responsible use
+
+Conversation Assistant records and transcribes everyone on a call, including the people you are talking to. Many places require the consent of everyone recorded, and some require it to be explicit: tell the people on the call, and get their consent, before you record. You are responsible for how you use the app and its recordings. The fact-checker's verdicts are produced by AI models and can be wrong; treat them as leads to check, not as facts.
 
 ## Develop
 
@@ -185,9 +205,19 @@ sh $S/publish-app.sh x.y.z notes.md # the Mac app, as the GitHub Release (needs 
 
 After a release, installed apps offer the new version within a few hours, or at their next launch; the settings menu (the cog) shows the version. In development, reload the page.
 
+## Security
+
+Report a vulnerability privately (the repository's Security tab, or email), never in a public issue: see [SECURITY.md](SECURITY.md), which also explains how to check that a download is genuine. The only official downloads are this repository's [Releases](https://github.com/nicolasdao/conversation-assistant/releases), signed by **Developer ID Application: Nicolas Dao (UX774V7BK2)** and notarized by Apple, with their SHA-256 checksums in the release notes.
+
 ## License
 
-BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it, with the version, at the bottom of the settings menu (the cog).
+BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it, with the version, at the bottom of the settings menu (the cog), and under **Help → License**.
+
+**Third-party software.** The Mac app includes components under their own licenses, listed with their notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (in the app: **Help → Third-Party Notices**), with the full texts in [licenses/](licenses/). One of them is under the GPL-3.0: the prebuilt speech library from sherpa-onnx compiles in eSpeak NG (text-to-speech, which this app does not use); its source is linked there and attached to every release. The speaker-recognition model is the WeSpeaker ResNet34-LM, CC BY 4.0.
+
+**The Claude Code skills** in `.agents/skills/` (and `.claude/skills/`, which links to them) are by their authors named in each `skill.json`, under the license declared there; they help maintain the project and are not part of the app.
+
+**Trademarks.** Conversation Assistant is an independent project. It is not affiliated with, sponsored, or endorsed by Apple, OpenAI, OpenRouter, TypeSafe AI, Riverside, or Meta (WhatsApp). Their names, and names such as macOS, GPT-6 Luna, and Jev (TypeSafe AI's), are trademarks of their owners, used here only to say what the app works with.
 
 ## Versioning
 

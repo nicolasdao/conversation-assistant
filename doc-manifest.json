@@ -17,6 +17,8 @@
         "Conversation Assistant",
         "Table of Contents",
         "Install",
+        "Privacy: what leaves your Mac",
+        "Responsible use",
         "Develop",
         "Scripts",
         "Using it",
@@ -24,12 +26,15 @@
         "Design decisions",
         "Built with Claude Code",
         "Releasing",
+        "Security",
         "License",
         "Versioning"
       ],
-      "line_count": 194,
+      "line_count": 224,
       "links_to": [
         "CHANGELOG.md",
+        "SECURITY.md",
+        "THIRD_PARTY_NOTICES.md",
         "docs/architecture.md",
         "docs/chat.md",
         "docs/desktop.md",
@@ -71,7 +76,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 219,
+      "line_count": 221,
       "links_to": [
         "docs/chat.md",
         "docs/desktop.md",
@@ -172,9 +177,10 @@
         "Building",
         "Signing and notarization",
         "Hardening",
+        "Licenses",
         "Publishing"
       ],
-      "line_count": 146,
+      "line_count": 163,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -192,7 +198,10 @@
         "src/paths.ts",
         "electron-builder.yml",
         "scripts/build-mac.sh",
-        "scripts/make-icon.mjs"
+        "scripts/make-icon.mjs",
+        "scripts/third-party-notices.mjs",
+        "THIRD_PARTY_NOTICES.md",
+        "licenses/**"
       ],
       "source_unresolved": [],
       "tags": [
@@ -229,7 +238,7 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 80,
+      "line_count": 82,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
@@ -367,7 +376,7 @@
         "Export and import",
         "API"
       ],
-      "line_count": 134,
+      "line_count": 135,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
@@ -418,7 +427,7 @@
         "Planted lines to say on air",
         "Calibration on an old episode"
       ],
-      "line_count": 63,
+      "line_count": 65,
       "links_to": [
         "docs/recordings.md",
         "docs/speakers.md",
