@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-28
+
+### Security
+- When running `npm run serve`, websites open in your browser can no longer reach the app: every request must come from the app's own page, which stops cross-site requests and DNS rebinding (before, a website could have started a recording). The page also gets a strict content security policy
+- A recording file shared with you can no longer fill your disk, break your recordings list, or take over a link: sizes in imported files are checked before use, padding is capped, fact-check source links are web pages only, and imports wait until the show ends
+- The Mac app's window refuses browser permissions it never needs (microphone, camera, location), and has no developer tools, so no one can run code with the app's microphone permission
+- The capture helper and audio converter no longer receive your API keys, and the chat log is filtered for keys like every other recording file
+
+### Fixed
+- The Mac app now includes the licenses of everything it contains, under Help → License, Third-Party Notices, and Chromium Licenses, including the GPL-3.0 notice for eSpeak NG, which is inside the speech library; its exact source is attached to each release
+- The About panel says where the third-party notices are
+
+### Changed
+- The stats' "Rogan index" is now the Off-topic index (the same measure: the share of the show spent on personal life and other topics)
+- The project's repository was recreated without private details in its history; installed copies keep updating from it. Releases now come with SHA-256 checksums, a software bill of materials, and are built only from locked, signature-verified dependencies with no known high-severity vulnerabilities
+- New: SECURITY.md (reporting a vulnerability, checking a download is genuine), and README sections on what leaves your Mac, responsible use, and trademarks
+
 ## [0.6.0] - 2026-09-27
 
 ### Added
