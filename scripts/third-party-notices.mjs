@@ -13,10 +13,11 @@ const text = (p) => readFileSync(p, "utf8").replace(/\r\n/g, "\n").trim();
 const fence = (t) => "```text\n" + t + "\n```";
 const electron = pkg("node_modules/electron").version;
 const sherpa = pkg("node_modules/sherpa-onnx-node").version;
-// the Chromium inside this Electron, asked of Electron itself (running as Node)
-const chromium = execFileSync(join("node_modules", ".bin", "electron"), ["-p", "process.versions.chromium"], {
-  encoding: "utf8", env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-}).trim();
+// Electron's own license files come with its binary, which is downloaded on first use: right after `npm ci` it is
+// missing, so fetch it first (the app build needs these files too)
+if (!existsSync("node_modules/electron/dist/LICENSES.chromium.html")) {
+  execFileSync(process.execPath, ["node_modules/electron/install.js"], { stdio: "ignore" });
+}
 
 // ---------- npm: the production dependencies, as installed ----------
 
@@ -46,7 +47,7 @@ const npmEntries = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name
 const other = [
   `### Electron ${electron}
 
-MIT · https://github.com/electron/electron. Electron includes Chromium, Node.js, FFmpeg (LGPL-2.1, in its own replaceable library), and many other components, whose licenses are in \`LICENSES.chromium.html\`, shipped with the app. The source of that Chromium and FFmpeg is Chromium ${chromium} (https://chromium.googlesource.com/chromium/src/+/refs/tags/${chromium}).
+MIT · https://github.com/electron/electron. Electron includes Chromium, Node.js, FFmpeg (LGPL-2.1, in its own replaceable library), and many other components, whose licenses are in \`LICENSES.chromium.html\`, shipped with the app. Their source is the Chromium version this Electron release names in its notes (https://github.com/electron/electron/releases/tag/v${electron}), at https://chromium.googlesource.com/chromium/src.
 
 ${fence(text("node_modules/electron/dist/LICENSE"))}`,
 
