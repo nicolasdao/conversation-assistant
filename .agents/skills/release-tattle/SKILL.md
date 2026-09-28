@@ -83,7 +83,7 @@ AskUserQuestion, presenting: current → new version, the bump and why, the full
 ## Step 7 — Write, commit, tag (on this Mac only)
 
 1. Create `CHANGELOG.md` if missing, then stamp the release ([references/changelog.md § Stamping](references/changelog.md)): the entries go under `## [<version>] - <today>`, and `## [Unreleased]` stays, empty.
-2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): conversation-assistant v<version>`, and tags `v<version>`, locally.
+2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): tattle v<version>`, and tags `v<version>`, locally.
 
 ## Step 8 — Build and verify the app (on this Mac only)
 
