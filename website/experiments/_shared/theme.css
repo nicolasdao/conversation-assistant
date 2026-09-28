@@ -1,0 +1,96 @@
+/* Conversation Assistant — the app's "On Air" broadcast theme (web/styles.css), for the website experiments.
+   Colors and type come from the app. Experiments may add fonts, never new theme colors. */
+
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-400-italic.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Barlow"; src: url("fonts/Barlow-500-italic.woff2") format("woff2"); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("fonts/BarlowCondensed-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("fonts/BarlowCondensed-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("fonts/BarlowCondensed-700.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("fonts/BarlowCondensed-800.woff2") format("woff2"); font-weight: 800; font-style: normal; font-display: swap; }
+
+:root {
+  /* grounds and surfaces, darkest to lightest */
+  --ground: #0a1628;
+  --deck: #0f2038;
+  --deck-2: #152b4a;
+  --deck-3: #1b365b;
+  --rule: #213a5e;
+  /* text */
+  --ink: #f3f6fa;
+  --ink-2: #c4cfde;
+  --mute: #8497b3;
+  --paper: #f3f6fa;       /* the white strap */
+  --paper-ink: #0a1628;   /* text on paper and on the accent */
+  --strap-eyebrow: #4a5d7a;
+  /* signals */
+  --accent: #2bd4f0;
+  --live: #e8263b;
+  --good: #1db86a;        /* verdict: supported */
+  --bad: #e8263b;         /* verdict: contradicted */
+  --warn: #f29422;        /* verdict: misleading; paused */
+  --neutral: #6a7d98;     /* verdict: unverifiable */
+  --host: #8cb4ff;        /* the host's microphone */
+  --remote: #ff93c0;      /* the call */
+  --heat: #ff6b3d;
+  --hype: #ffd23f;
+  /* the app icon's red, top to bottom */
+  --icon-top: #f0384c;
+  --icon-bottom: #c9142a;
+  /* timeline: subjects */
+  --s-ai-models: #3f7df0; --s-ai-tools: #6fa0ff; --s-ai-industry: #2a58c9; --s-tech: #1fa89a;
+  --s-marketing: #d0892a; --s-personal-life: #d9588a; --s-other-topics: #8b6fd6; --s-the-show: #6f7a8c;
+  /* timeline: modes */
+  --m-news: #3e8ee0; --m-analysis: #9a7fe0; --m-personal-story: #d9679a; --m-explainer: #2fb39c;
+  --m-banter: #d99a2b; --m-transition: #6a7d98;
+  /* type */
+  --cond: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  /* the broadcast slant: every strap's right edge is cut 14px */
+  --slant: 14px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.5 var(--body); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+a { color: var(--ink); text-decoration-color: rgba(43, 212, 240, 0.6); text-underline-offset: 3px; }
+a:hover { color: var(--accent); }
+
+/* Only one of these shows: [data-when="mac"] on a Mac, [data-when="other"] elsewhere (download.js sets data-platform). */
+:root:not([data-platform="other"]) [data-when="other"] { display: none !important; }
+:root[data-platform="other"] [data-when="mac"] { display: none !important; }
+
+/* The app mark: the icon's red rounded square with the record dot and ring. */
+.ca-mark { --s: 28px; width: var(--s); height: var(--s); border-radius: 22.5%; flex: none; position: relative;
+  background: linear-gradient(var(--icon-top), var(--icon-bottom)); display: inline-block; vertical-align: middle; }
+.ca-mark::before { content: ""; position: absolute; inset: 27%; border-radius: 50%; background: #fff; }
+.ca-mark::after { content: ""; position: absolute; inset: 17.5%; border-radius: 50%; border: calc(var(--s) * 0.034) solid rgba(255, 255, 255, 0.35); }
+
+/* A default Download button in the app's primary style. Experiments may restyle it to fit their concept. */
+.ca-download {
+  display: inline-flex; align-items: center; gap: 12px; text-decoration: none; cursor: pointer;
+  background: var(--accent); color: var(--paper-ink); border: 0; border-radius: 2px;
+  font: 800 22px/1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 18px calc(28px + var(--slant)) 18px 24px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  transition: transform 0.15s, filter 0.15s;
+}
+.ca-download:hover { color: var(--paper-ink); filter: brightness(1.08); transform: translateY(-1px); }
+.ca-download svg { width: 22px; height: 22px; flex: none; }
+.ca-meta { font: 600 13px/1.3 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); }
+
+/* Back to the gallery. */
+.ca-back { position: fixed; z-index: 1000; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  font: 700 12px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none;
+  color: var(--ink-2); background: rgba(10, 22, 40, 0.8); border: 1px solid var(--rule); padding: 7px 10px; backdrop-filter: blur(6px); }
+.ca-back:hover { color: var(--accent); border-color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}

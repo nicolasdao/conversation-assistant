@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversation Assistant: The Timeline</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Scroll to scrub through one episode.">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='28'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- the app's marker glyphs (web/index.html) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="g-disagreement" viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.2h4.1L6.3 15l6.2-8.4H8.4z" fill="currentColor"/></symbol>
+  <symbol id="g-hot_take" viewBox="0 0 16 16"><path d="M8.2 1c.4 2.6 3.9 4.2 3.9 8.1a4.1 4.1 0 0 1-8.2 0c0-2 1.1-3.2 2-4.1.2 1.3.9 2.2 1.8 2.5C7.4 5.3 7.1 3.1 8.2 1z" fill="currentColor"/></symbol>
+  <symbol id="g-prediction" viewBox="0 0 16 16"><path d="M1.5 12.5 6 8l3 3 5.2-6.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 4.3h4.6v4.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-recommendation" viewBox="0 0 16 16"><path d="M8 1.3l2 4.4 4.7.4-3.6 3.1 1.1 4.7L8 11.4l-4.2 2.5 1.1-4.7L1.3 6.1 6 5.7z" fill="currentColor"/></symbol>
+  <symbol id="g-clip_worthy" viewBox="0 0 16 16"><circle cx="4" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.4 10.5 12.5 1.5M10.6 10.5 3.5 1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+  <symbol id="g-flag" viewBox="0 0 16 16"><path d="M3.5 15V1.8h9l-2 3.3 2 3.3h-9" fill="currentColor"/></symbol>
+  <symbol id="g-import" viewBox="0 0 16 16"><path d="M8 1.6v8.7M4.6 7 8 10.4 11.4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 9.5v4h11v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="top" id="top">
+  <div class="top-l">
+    <div class="onair enter" id="onair"><i></i><span id="onair-label">On air</span></div>
+    <div class="strap">
+      <span class="eyebrow">Open-source Mac app <span class="ver" data-version></span></span>
+      <span class="name">Conversation Assistant</span>
+    </div>
+  </div>
+  <div class="dl">
+    <div class="dl-mac" data-when="mac">
+      <a class="ca-download dl-btn" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <svg aria-hidden="true"><use href="#g-import"/></svg>Download for Mac
+      </a>
+      <span class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</span>
+    </div>
+    <div class="dl-other" data-when="other">
+      <p>It's a Mac app. Open this page on your Mac to download it.</p>
+      <div class="dl-other-row">
+        <button type="button" class="chipbtn" data-copy-link>Copy link</button>
+        <a class="chipbtn ghost" href="https://github.com/nicolasdao/conversation-assistant">GitHub</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="scrub" id="scrub" aria-label="One episode, scrubbed by scrolling">
+    <div class="stage" id="stage">
+      <div class="hero">
+        <div class="rundown" id="rundown">
+          <article class="card is-on" data-from="0" data-to="5">
+            <p class="kicker"><span class="seg-chip" style="--c: var(--s-the-show)">Cold open</span> Episode 01 · 60 min</p>
+            <h1>It listens. It maps. <em>It checks the facts.</em></h1>
+            <p class="lede">Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.</p>
+          </article>
+
+          <article class="card" data-from="5" data-to="21">
+            <p class="kicker"><span class="seg-chip" style="--c: var(--s-ai-tools)">Segment 1</span> What it is</p>
+            <h2>A live transcript, mapped while you talk.</h2>
+            <ul class="facts">
+              <li><b>Your mic and the call your Mac plays.</b> Any call app, because it listens to the Mac's own audio.</li>
+              <li><b>Every voice becomes a speaker</b> you can name.</li>
+              <li><b>One timeline:</b> topic, mode, heat and hype, hot takes, predictions, disagreements, clip-worthy moments.</li>
+              <li><b>Chat with the transcript</b> (⌘K), live or afterwards.</li>
+            </ul>
+          </article>
+
+          <article class="card" data-from="21" data-to="42">
+            <p class="kicker"><span class="seg-chip" style="--c: var(--s-other-topics)">Segment 2</span> Fact-checks</p>
+            <h2>Claims checked while they're still being said.</h2>
+            <div class="lt-slot" id="lt-slot" aria-live="off"></div>
+            <p class="small">System 1 flags checkable claims in about 0.4 s each. System 2 researches the web, checks them, and makes System 1 better.</p>
+          </article>
+
+          <article class="card" data-from="42" data-to="56">
+            <p class="kicker"><span class="seg-chip" style="--c: var(--s-tech)">Segment 3</span> Your Mac, your data</p>
+            <h2>No server. No account. No analytics.</h2>
+            <ul class="facts">
+              <li><b>Recordings and keys stay on your Mac.</b></li>
+              <li><b>Two API keys,</b> from OpenAI and OpenRouter, with prepaid credit. The app walks you through both.</li>
+              <li><b>About $1.60 per hour of show,</b> or about $1.23 for a transcript only.</li>
+              <li><b>Signed and notarized by Apple.</b> It updates itself. BSD 3-Clause.</li>
+            </ul>
+          </article>
+
+          <article class="card" data-from="56" data-to="60.01">
+            <p class="kicker"><span class="seg-chip" style="--c: var(--s-the-show)">Outro</span> That's the show</p>
+            <h2>Your next conversation, on the timeline.</h2>
+            <div data-when="mac" class="outro-dl">
+              <a class="ca-download" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+                <svg aria-hidden="true"><use href="#g-import"/></svg>Download for Mac
+              </a>
+              <span class="ca-meta"><span data-size></span> · Apple Silicon · macOS 14.2 or later · Free and open source</span>
+            </div>
+            <p data-when="other" class="small">It's a Mac app. Open this page on your Mac to download it. <button type="button" class="chipbtn" data-copy-link>Copy link</button></p>
+          </article>
+        </div>
+
+        <div class="tc" aria-hidden="true">
+          <span class="tc-k"><i class="rec"></i>Episode timecode</span>
+          <span class="tc-t" id="tc">00:00</span>
+          <span class="tc-of">/ 60:00 · <b id="tc-seg">Cold open</b></span>
+          <span class="hint" id="hint">Scroll to scrub the episode<i></i></span>
+        </div>
+      </div>
+
+      <div class="tl" id="tl" role="group" aria-label="Timeline of the episode: drag or click to scrub">
+        <div class="tl-labels" aria-hidden="true">
+          <span class="lbl cap-lbl">Live<br>caption</span>
+          <span></span>
+          <span class="lbl">Topic</span>
+          <span class="lbl">Mode</span>
+          <span class="lbl lbl-chart"><span><i class="ln heat"></i>Heat</span><span><i class="ln hype"></i>Hype</span></span>
+          <span class="lbl">Markers</span>
+          <span class="lbl">Checks</span>
+          <span></span>
+        </div>
+        <div class="tl-view" id="tl-view">
+          <div class="track" id="track">
+            <div class="lane caprow"></div>
+            <div class="lane sections" id="lane-sections"></div>
+            <div class="lane subject" id="lane-subject"></div>
+            <div class="lane mode" id="lane-mode"></div>
+            <div class="lane chart" id="lane-chart">
+              <span class="gridline" style="top:25%"></span><span class="gridline" style="top:50%"></span><span class="gridline" style="top:75%"></span>
+              <svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs><clipPath id="drawn"><rect id="drawn-rect" x="0" y="-10" width="0" height="120"/></clipPath></defs>
+                <g clip-path="url(#drawn)">
+                  <polygon class="area heat" id="heat-area" points=""/>
+                  <polyline class="heat" id="heat-line" points=""/>
+                  <polyline class="hype" id="hype-line" points=""/>
+                </g>
+              </svg>
+              <span class="pen heat" id="pen-heat"></span>
+              <span class="pen hype" id="pen-hype"></span>
+            </div>
+            <div class="lane markers" id="lane-markers"></div>
+            <div class="lane checks" id="lane-checks"></div>
+            <div class="lane axis" id="lane-axis"></div>
+          </div>
+          <div class="cap" id="cap"><span class="who-tab host" id="cap-who">Host</span><p id="cap-text">We're live. Welcome back to the show.</p></div>
+          <div class="playhead" id="playhead"><span id="ph-tag">00:00</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="credits">
+    <p class="kicker"><span class="seg-chip" style="--c: var(--s-the-show)">End credits</span></p>
+    <p>Conversation Assistant. Transcripts, a timeline, fact-checks, chat (⌘K), a recordings library with playback at up to 4× and one-file export. Signed and notarized by Apple. It updates itself. BSD 3-Clause. <a href="https://github.com/nicolasdao/conversation-assistant">Source on GitHub</a>.</p>
+  </footer>
+</main>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<a class="ca-back" href="../">All experiments</a>
+
+<script src="../_shared/download.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

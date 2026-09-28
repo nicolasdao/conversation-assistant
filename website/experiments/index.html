@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Website Rundown</title>
+  <meta name="description" content="Ten design experiments for the Conversation Assistant website, all in the app's On Air theme.">
+  <link rel="stylesheet" href="_shared/theme.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23e8263b'/><circle cx='8' cy='8' r='3.5' fill='%23fff'/></svg>">
+  <style>
+    body { padding-inline: 16px; }
+    .wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 72px; display: grid; gap: 28px; }
+
+    /* the header strap, as in the app */
+    .top { display: flex; align-items: stretch; height: 60px; background: var(--deck); border-bottom: 1px solid var(--rule); }
+    .onair { background: var(--live); color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 22px 0 16px;
+      font: 800 20px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+      clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%); }
+    .onair i { width: 10px; height: 10px; border-radius: 50%; background: #fff; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.25; } }
+    .strap { background: var(--paper); color: var(--paper-ink); display: flex; flex-direction: column; justify-content: center; min-width: 0;
+      padding: 0 26px 0 22px; margin-left: calc(-1 * var(--slant)); clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%); }
+    .strap .eyebrow { font: 700 11px/1 var(--cond); letter-spacing: 0.16em; text-transform: uppercase; color: var(--strap-eyebrow); }
+    .strap .name { font: 700 19px/1.15 var(--cond); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .count { margin-left: auto; display: flex; flex-direction: column; justify-content: center; padding: 0 16px; }
+    .count .k { font: 700 10.5px/1 var(--cond); letter-spacing: 0.16em; color: var(--mute); text-transform: uppercase; }
+    .count .t { font: 700 26px/1 var(--cond); font-variant-numeric: tabular-nums; margin-top: 3px; }
+
+    .intro { max-width: 68ch; color: var(--ink-2); margin: 0; }
+    .intro b { color: var(--ink); font-weight: 600; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 18px; list-style: none; margin: 0; padding: 0; }
+    .item a { display: grid; text-decoration: none; background: var(--deck); color: var(--ink); height: 100%; grid-template-rows: auto 1fr; }
+    .shot { aspect-ratio: 16 / 10; max-width: 100%; background: repeating-linear-gradient(135deg, var(--deck-3) 0 8px, var(--deck-2) 8px 16px); position: relative; overflow: hidden; }
+    .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform 0.4s; }
+    .item a:hover .shot img { transform: scale(1.03); }
+    .body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; padding: 14px 16px 16px; align-content: start; }
+    .num { grid-row: span 2; background: var(--deck-3); color: var(--ink-2); font: 800 22px/1 var(--cond); font-variant-numeric: tabular-nums;
+      padding: 8px 16px 8px 10px; clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); align-self: start; }
+    .item a:hover .num { background: var(--accent); color: var(--paper-ink); }
+    .title { font: 800 22px/1.05 var(--cond); letter-spacing: 0.04em; text-transform: uppercase; }
+    .desc { color: var(--ink-2); font-size: 14.5px; line-height: 1.45; margin: 0; }
+    .tags { grid-column: 2; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tags span { font: 700 11.5px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); box-shadow: inset 0 0 0 1px var(--rule); padding: 4px 6px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="onair"><i></i>Rundown</div>
+      <div class="strap"><span class="eyebrow">Conversation Assistant · Website</span><span class="name">Ten design experiments</span></div>
+      <div class="count"><span class="k">Segments</span><span class="t">10</span></div>
+    </header>
+
+    <p class="intro">Each experiment is one idea for the website's single page, taken as far as it goes. They share the app's <b>On Air</b> theme, the same <b>Download for Mac</b> button at the top, and the same facts. What differs is how each one makes you want to press it. The brief they were built from is in <code>_shared/BRIEF.md</code>.</p>
+
+    <ol class="grid" id="grid"></ol>
+  </main>
+
+  <script>
+    const experiments = [
+      ["01-breaking-news", "Breaking News", "The page is a live news channel: the ON AIR block wipes in, lower thirds slide, and a ticker crawls with fact-checks.", ["Broadcast package", "GSAP"]],
+      ["02-record-button", "The Record Button", "The app icon as a huge glossy 3D key. Press it and the studio goes live, with sound rings and rising captions.", ["Three.js", "Tactile"]],
+      ["03-beat-jev", "Beat Jev", "An arcade game: catch the checkable claims in a live transcript before Jev flags them in 0.4 seconds.", ["Game", "Scoreboard"]],
+      ["04-timeline", "The Timeline", "Scrolling scrubs a playhead across an episode's timeline. Lanes, markers, and heat and hype paint in as it passes.", ["Scroll-driven", "Data viz"]],
+      ["05-say-something", "Say Something", "Talk to the page: your voice drives the level meter and becomes live captions. Say a myth and it gets fact-checked.", ["Microphone", "Speech"]],
+      ["06-split-flap", "Split-Flap Board", "A departures board for claims. Letters riffle and settle, and verdict tiles flap to green, orange, or red.", ["Mechanical", "3D CSS"]],
+      ["07-two-voices", "Two Voices", "Two particle clouds, host and guest, talk. Their words become a transcript, and a cyan lens catches the claims.", ["WebGL", "Generative"]],
+      ["08-kinetic-poster", "Kinetic Poster", "Swiss-brutalist type on monumental slanted slabs that slide and slice as you scroll.", ["Typography", "Scroll"]],
+      ["09-the-funnel", "The Funnel", "A physics toy: everything said pours through System 1's sieve, and the few claims drop into verdict bins.", ["Matter.js", "Physics"]],
+      ["10-channel-surfer", "Channel Surfer", "A CRT television with a test card in the app's colours. Turn the knob to change channels, with static and all.", ["Shader", "Retro"]],
+    ];
+    const grid = document.getElementById("grid");
+    for (const [slug, title, desc, tags] of experiments) {
+      const n = slug.slice(0, 2);
+      const li = document.createElement("li");
+      li.className = "item";
+      li.innerHTML = `<a href="${slug}/">
+        <div class="shot"><img src="_shared/thumbs/${n}.jpg" alt="" loading="lazy" onerror="this.remove()"></div>
+        <div class="body"><span class="num">${n}</span><span class="title">${title}</span><p class="desc">${desc}</p>
+        <div class="tags">${tags.map((t) => `<span>${t}</span>`).join("")}</div></div></a>`;
+      grid.append(li);
+    }
+  </script>
+</body>
+</html>

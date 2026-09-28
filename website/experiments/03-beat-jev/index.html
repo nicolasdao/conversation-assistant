@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beat Jev · Conversation Assistant</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Try to flag a claim faster than Jev, its 0.4-second fact-check spotter.">
+<meta name="theme-color" content="#0a1628">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+<script src="../_shared/download.js" defer></script>
+<script src="main.js" defer></script>
+</head>
+<body>
+
+<div class="screen">
+  <!-- The very top: name, one line, the big button. -->
+  <header class="masthead">
+    <div class="id">
+      <span class="ca-mark" style="--s:44px" aria-hidden="true"></span>
+      <div>
+        <h1 class="name">Conversation Assistant</h1>
+        <p class="line">A Mac app that transcribes live conversations, maps them on a timeline, and <b>fact-checks claims as they're said</b>.</p>
+      </div>
+    </div>
+    <div class="get">
+      <div data-when="mac" class="get-mac">
+        <a class="ca-download big" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+          Download for Mac
+        </a>
+        <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source<span class="ver"> · <span data-version>latest</span> <span data-size></span></span></p>
+      </div>
+      <div data-when="other" class="get-other">
+        <p class="other-msg">It's a Mac app. Open this page on your Mac to download it.</p>
+        <div class="other-row">
+          <button type="button" class="btn-copy" data-copy-link>Copy link</button>
+          <a class="gh" href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a>
+        </div>
+        <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- The scoreboard, built like the app's header strap. -->
+  <section class="board" aria-label="Scoreboard">
+    <div class="onair demo" id="onair"><i></i><span id="onair-label">Demo</span></div>
+    <div class="strap">
+      <span class="eyebrow" id="eyebrow">Beat Jev · attract mode</span>
+      <span class="score" aria-live="polite">
+        <span class="side you"><em>You</em> <b id="s-you">0</b></span>
+        <span class="vs">vs</span>
+        <span class="side jev"><b id="s-jev">0</b> <em>Jev</em></span>
+      </span>
+    </div>
+    <div class="clock">
+      <span class="k" id="clock-k">On the clock</span>
+      <span class="t" id="clock-t">00:12:04</span>
+    </div>
+    <div class="stat">
+      <span class="k">Streak</span>
+      <span class="t" id="streak">×0</span>
+    </div>
+    <div class="stat react">
+      <span class="k">Your reaction</span>
+      <span class="t"><span id="react">—</span><small> ms</small></span>
+    </div>
+    <div class="board-right">
+      <button type="button" class="play" id="play">Play 45 s</button>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+  </section>
+
+  <!-- The game. -->
+  <section class="arena" id="arena" aria-label="Beat Jev: a live transcript game">
+    <aside class="rules">
+      <h2>How to play</h2>
+      <ol>
+        <li><span>A live show streams up the screen.</span></li>
+        <li><span>Tap a line the moment it's a <b>checkable claim</b>.</span></li>
+        <li><span>Jev flags claims about <b>0.4 s</b> after they're said. Beat it to score.</span></li>
+        <li><span>Tap banter and you lose a point.</span></li>
+      </ol>
+      <p class="keys"><kbd>Space</kbd> flags the newest line</p>
+      <div class="legend">
+        <span class="who host">Host · mic</span>
+        <span class="who remote">Guest · call</span>
+        <span class="jevflag"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1v14" stroke="currentColor" stroke-width="2"/><path d="M4 2h9l-2.5 3.5L13 9H4z" fill="currentColor"/></svg>Jev's flag</span>
+      </div>
+    </aside>
+
+    <div class="stage" id="stage">
+      <div class="track" id="track" role="list"></div>
+      <p class="hint" id="hint"><span class="blink"></span>Tap a claim to start · 45 seconds</p>
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+
+      <div class="result" id="result" hidden>
+        <div class="result-in">
+          <p class="final-k">Final score</p>
+          <p class="final"><span class="you">You <b id="r-you">0</b></span><span class="dash">·</span><span class="jev"><b id="r-jev">0</b> Jev</span></p>
+          <p class="verdict-line" id="r-line">Jev wins.</p>
+          <p class="r-stats" id="r-stats"></p>
+          <h2 class="pivot">Jev does this 2,000 times an hour, for cents. <span>Get the app.</span></h2>
+          <div data-when="mac">
+            <a class="ca-download big" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+              Download for Mac
+            </a>
+          </div>
+          <div data-when="other">
+            <p class="other-msg">It's a Mac app. Open this page on your Mac to download it.</p>
+            <button type="button" class="btn-copy" data-copy-link>Copy link</button>
+          </div>
+          <button type="button" class="again" id="again">Play again</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="tally-panel">
+      <h2>System 2 verdicts</h2>
+      <ul class="tally">
+        <li class="t-good"><i></i>Supported <b id="t-supported">0</b></li>
+        <li class="t-bad"><i></i>Contradicted <b id="t-contradicted">0</b></li>
+        <li class="t-warn"><i></i>Misleading <b id="t-misleading">0</b></li>
+      </ul>
+      <p class="small">Every claim Jev flags goes to System 2, a slower model that researches the web and answers with a sourced verdict.</p>
+    </aside>
+  </section>
+</div>
+
+<!-- Player select: the two systems. -->
+<section class="sect select">
+  <p class="kicker">Player select</p>
+  <h2 class="h">Two players, one fact-check</h2>
+  <div class="cards">
+    <article class="char c-jev">
+      <header><span class="slot">P1</span><h3>Jev</h3><span class="cls">System 1 · the spotter</span></header>
+      <p>A fast decision model. It listens to every line and flags the ones worth checking.</p>
+      <dl class="stats">
+        <div><dt>Speed</dt><dd><span class="bar" style="--v:.96"></span><span>~0.4 s a judgment</span></dd></div>
+        <div><dt>Stamina</dt><dd><span class="bar" style="--v:.9"></span><span>~2,000 judgments an hour</span></dd></div>
+        <div><dt>Cost</dt><dd><span class="bar" style="--v:.08"></span><span>cents</span></dd></div>
+      </dl>
+    </article>
+    <article class="char c-s2">
+      <header><span class="slot">P2</span><h3>System 2</h3><span class="cls">the researcher</span></header>
+      <p>A slower LLM that researches the web, puts a sourced verdict on screen within seconds, and makes Jev better.</p>
+      <ul class="verdicts">
+        <li class="v-supported">Supported</li>
+        <li class="v-contradicted">Contradicted</li>
+        <li class="v-misleading">Misleading</li>
+        <li class="v-unverifiable">Unverifiable</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- The rest of the machine, as a high-score table. -->
+<section class="sect scores">
+  <p class="kicker">Also in the cabinet</p>
+  <h2 class="h">Built for a live podcast. Works with any call.</h2>
+  <ol class="hs">
+    <li><span class="rk">01</span><span class="nm">Live transcript</span><span class="ds">Your mic and the call your Mac plays. Each voice becomes a speaker you can name.</span></li>
+    <li><span class="rk">02</span><span class="nm">Timeline</span><span class="ds">Topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations, clip-worthy moments.</span></li>
+    <li><span class="rk">03</span><span class="nm">Chat <kbd>⌘K</kbd></span><span class="ds">Ask about the transcript, live or afterwards.</span></li>
+    <li><span class="rk">04</span><span class="nm">Recordings</span><span class="ds">A library. Play back at up to 4×, export a recording as one file.</span></li>
+    <li><span class="rk">05</span><span class="nm">Private</span><span class="ds">No server, no account, no analytics. Recordings and keys stay on your Mac.</span></li>
+    <li><span class="rk">06</span><span class="nm">Trusted</span><span class="ds">Signed and notarized by Apple. Updates itself. BSD 3-Clause.</span></li>
+  </ol>
+</section>
+
+<!-- Insert coin: what it costs. -->
+<section class="sect coin">
+  <div class="coin-in">
+    <p class="kicker">Insert coin</p>
+    <p class="price"><b>~$1.60</b> per hour of show</p>
+    <p class="coin-note">About $1.23 for a transcript only. You bring two API keys, from OpenAI and OpenRouter, with prepaid credit. The app walks you through both.</p>
+    <div data-when="mac">
+      <a class="ca-download" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+        Download for Mac
+      </a>
+    </div>
+    <div data-when="other">
+      <p class="other-msg">It's a Mac app. Open this page on your Mac to download it.</p>
+      <button type="button" class="btn-copy" data-copy-link>Copy link</button>
+    </div>
+    <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source · <a href="https://github.com/nicolasdao/conversation-assistant">GitHub</a></p>
+  </div>
+</section>
+
+<a class="ca-back" href="../">All experiments</a>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Conversation Assistant — Live on your Mac</title>
+  <meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Download it for Mac.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23e8263b'/%3E%3Ccircle cx='50' cy='50' r='23' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="../_shared/theme.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- the stinger: the broadcast transition that plays when you take it live again -->
+<div class="stinger" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<!-- download celebration -->
+<div class="flash" id="flash" role="status" aria-live="polite">
+  <span class="flash-tag"><i></i>Breaking</span>
+  <span class="flash-body"><b>Download started</b><span>Thanks for tuning in</span></span>
+</div>
+
+<header class="hero is-live" id="top">
+  <div class="scan" aria-hidden="true"></div>
+  <div class="safe" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <div class="bug" aria-hidden="true">
+    <span class="ca-mark"></span>
+    <span class="bug-live"><i></i>Live</span>
+    <span class="bug-tc" id="tc">00:00:00:00</span>
+  </div>
+
+  <div class="strapline">
+    <div class="onair"><i></i><span>On air</span></div>
+    <h1 class="strap">
+      <span class="eyebrow">Breaking · open-source Mac app</span>
+      <span class="name">Conversation Assistant</span>
+    </h1>
+    <div class="clock"><span class="k">On air for</span><span class="t" id="elapsed">00:00</span></div>
+  </div>
+
+  <p class="deckline">Transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.</p>
+
+  <div class="dl">
+    <a class="bn-dl" data-download data-when="mac" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+      <span class="bn-tag"><i></i><span>Breaking</span></span>
+      <span class="bn-main">
+        <span class="bn-eyebrow">Now available · <span data-version>latest version</span> · <span data-size>DMG</span></span>
+        <span class="bn-word">Download for Mac</span>
+      </span>
+      <span class="bn-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M12 3v14M5 11l7 7 7-7M4 21h16"/></svg></span>
+    </a>
+    <div class="bn-other" data-when="other">
+      <div class="bn-other-strap">
+        <span class="bn-tag"><i></i><span>Mac only</span></span>
+        <p>It's a Mac app. Open this page on your Mac to download it.</p>
+      </div>
+      <div class="bn-other-actions">
+        <button type="button" class="chip-btn solid" data-copy-link>Copy link</button>
+        <a class="chip-btn" href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a>
+      </div>
+    </div>
+    <div class="dl-row">
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+      <button type="button" class="golive" id="golive"><i></i>Take it live</button>
+    </div>
+  </div>
+
+  <div class="ident" aria-hidden="true">
+    <div class="ident-sweep" id="sweep"></div>
+    <svg viewBox="0 0 400 400" id="identSvg">
+      <defs>
+        <linearGradient id="icoG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0384c"/><stop offset="1" stop-color="#c9142a"/></linearGradient>
+      </defs>
+      <circle cx="200" cy="200" r="192" class="ring-o"/>
+      <circle cx="200" cy="200" r="140" class="ring-i"/>
+      <g id="dots"></g>
+      <g id="bars"></g>
+      <g class="ico">
+        <rect x="140" y="112" width="120" height="120" rx="27" fill="url(#icoG)"/>
+        <circle cx="200" cy="172" r="27.7" fill="#fff" class="rec"/>
+        <circle cx="200" cy="172" r="36.4" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="4"/>
+      </g>
+      <text x="200" y="282" class="ident-t" id="identTime">00:00:00</text>
+      <text x="200" y="304" class="ident-k">Local time</text>
+    </svg>
+  </div>
+
+  <div class="onscreen">
+    <div class="captions" id="cap"><span class="cap-who" id="capWho"></span><span class="cap-words" id="capWords"></span></div>
+    <div class="lt-slot" id="ltSlot"></div>
+  </div>
+</header>
+
+<main>
+  <!-- SEGMENT 1 -->
+  <section class="seg" id="seg1" aria-labelledby="s1t">
+    <div class="slate reveal">
+      <span class="slate-no"><i></i>Seg 01</span>
+      <h2 class="slate-title" id="s1t"><span class="eyebrow">The transcript · the timeline</span>Every word, as it's said</h2>
+    </div>
+    <div class="seg1-grid">
+      <div class="copy reveal">
+        <p class="lede">It listens to your microphone and the call your Mac plays, so it works with any call app.</p>
+        <p>Built for a live podcast: the host's microphone plus the guests on the call. The transcript streams as people speak. Each voice is recognised as a speaker, whom you can name.</p>
+        <p>Then it maps the show on a timeline: topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments.</p>
+      </div>
+      <div class="mon reveal" id="mon">
+        <div class="mon-bar">
+          <span class="mon-k"><i class="livedot"></i>Transcript</span>
+          <span class="who-key host">Host · mic</span>
+          <span class="who-key remote">Guest · call</span>
+        </div>
+        <ol class="utts" id="utts"></ol>
+        <div class="tl" id="tl">
+          <div class="tl-lbl">Topic</div>
+          <div class="lane topic">
+            <span class="blk" style="left:0;width:24%;--c:var(--s-ai-models)">AI models</span>
+            <span class="blk" style="left:24%;width:40%;--c:var(--s-personal-life)">Personal life</span>
+            <span class="blk" style="left:64%;width:36%;--c:var(--s-other-topics)">Other topics</span>
+          </div>
+          <div class="tl-lbl">Mode</div>
+          <div class="lane mode">
+            <span class="blk" style="left:0;width:22%;--c:var(--m-banter)">Banter</span>
+            <span class="blk" style="left:22%;width:30%;--c:var(--m-personal-story)">Personal story</span>
+            <span class="blk" style="left:52%;width:30%;--c:var(--m-explainer)">Explainer</span>
+            <span class="blk" style="left:82%;width:18%;--c:var(--m-banter)">Banter</span>
+          </div>
+          <div class="tl-lbl">Heat<br>Hype</div>
+          <div class="lane chart">
+            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+              <polyline class="hype" points="0,30 10,26 20,28 30,14 40,18 50,22 60,10 70,16 80,8 90,20 100,18"/>
+              <polyline class="heat" points="0,34 10,32 20,30 30,32 40,24 50,26 60,30 70,12 80,18 90,6 100,14"/>
+            </svg>
+          </div>
+          <div class="tl-lbl">Marks</div>
+          <div class="lane marks">
+            <span class="mk" style="left:30%">Clip</span>
+            <span class="mk" style="left:58%">Hot take</span>
+            <span class="mk" style="left:86%">Disagreement</span>
+          </div>
+          <div class="tl-future" aria-hidden="true"></div>
+          <div class="tl-now" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEGMENT 2 -->
+  <section class="seg" id="seg2" aria-labelledby="s2t">
+    <div class="slate reveal">
+      <span class="slate-no"><i></i>Seg 02</span>
+      <h2 class="slate-title" id="s2t"><span class="eyebrow">The fact-check desk</span>Sourced verdicts, on screen in seconds</h2>
+    </div>
+    <ul class="verdict-key reveal">
+      <li class="v-supported">Supported</li><li class="v-contradicted">Contradicted</li><li class="v-misleading">Misleading</li><li class="v-unverifiable">Unverifiable</li>
+    </ul>
+    <div class="desk" id="desk">
+      <article class="lt v-supported stampable" style="--i:0">
+        <div class="lt-v"><span class="vw">Supported</span><span class="vm">Fact check</span></div>
+        <div class="lt-b"><p class="lt-c">“Bananas are berries.”</p><p class="lt-n">Botanically, yes.</p></div>
+      </article>
+      <article class="lt v-contradicted stampable" style="--i:1">
+        <div class="lt-v"><span class="vw">Contradicted</span><span class="vm">Fact check</span></div>
+        <div class="lt-b"><p class="lt-c">“Goldfish only have a three-second memory.”</p><p class="lt-n">They remember for months.</p></div>
+      </article>
+      <article class="lt v-misleading stampable" style="--i:2">
+        <div class="lt-v"><span class="vw">Misleading</span><span class="vm">Fact check</span></div>
+        <div class="lt-b"><p class="lt-c">“Coffee dehydrates you.”</p><p class="lt-n">Its water outweighs the mild diuretic effect.</p></div>
+      </article>
+      <article class="lt v-researching stampable" id="pending" style="--i:3">
+        <div class="lt-v"><span class="vw">Checking</span><span class="vm">System 2</span></div>
+        <div class="lt-b"><p class="lt-c">“Mount Everest gets a little taller every year.”</p><p class="lt-n">Researching the web…</p></div>
+      </article>
+    </div>
+    <div class="systems">
+      <div class="sys reveal">
+        <span class="sys-tag">System 1 · Jev</span>
+        <p class="sys-big"><span class="count" data-to="0.4" data-dec="1">0.4</span><small> s a judgment</small></p>
+        <p>A fast decision model flags the checkable claims. About 2,000 judgments an hour, for cents.</p>
+      </div>
+      <div class="sys reveal">
+        <span class="sys-tag s2">System 2</span>
+        <p class="sys-big">Researches<small> the web</small></p>
+        <p>A slower LLM checks each flagged claim with sources, and makes System 1 better.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEGMENT 3 -->
+  <section class="seg" id="seg3" aria-labelledby="s3t">
+    <div class="slate reveal">
+      <span class="slate-no"><i></i>Seg 03</span>
+      <h2 class="slate-title" id="s3t"><span class="eyebrow">The small print, read out loud</span>What it costs, where it lives</h2>
+    </div>
+    <div class="board" id="board">
+      <div class="brow reveal" style="--i:0"><span class="bfig">$<span class="count" data-to="1.60" data-dec="2">1.60</span></span><span class="blbl"><b>About, per hour of show</b>It needs two API keys, from OpenAI and OpenRouter, with prepaid credit. The app walks you through both.</span></div>
+      <div class="brow reveal" style="--i:1"><span class="bfig">$<span class="count" data-to="1.23" data-dec="2">1.23</span></span><span class="blbl"><b>About, per hour, transcript only</b>Skip the fact-checks and it costs less.</span></div>
+      <div class="brow reveal" style="--i:2"><span class="bfig"><span class="count" data-to="0" data-dec="0">0</span></span><span class="blbl"><b>Servers, accounts, analytics</b>Recordings and keys stay on your Mac.</span></div>
+      <div class="brow reveal" style="--i:3"><span class="bfig"><span class="count" data-to="4" data-dec="0">4</span>×</span><span class="blbl"><b>Playback, at most</b>A recordings library. Export a recording as one file to send.</span></div>
+      <div class="brow reveal" style="--i:4"><span class="bfig">⌘K</span><span class="blbl"><b>Chat about the transcript</b>Live, or afterwards.</span></div>
+    </div>
+    <ul class="chips reveal">
+      <li>Signed and notarized by Apple</li><li>Updates itself</li><li>BSD 3-Clause</li><li>Apple Silicon · macOS 14.2+</li>
+    </ul>
+
+    <div class="signoff reveal">
+      <p class="signoff-k"><i></i>That's the news</p>
+      <a class="bn-dl small" data-download data-when="mac" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <span class="bn-tag"><i></i><span>Now</span></span>
+        <span class="bn-main"><span class="bn-eyebrow"><span data-version>latest version</span> · <span data-size>DMG</span></span><span class="bn-word">Download for Mac</span></span>
+        <span class="bn-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M12 3v14M5 11l7 7 7-7M4 21h16"/></svg></span>
+      </a>
+      <div class="bn-other" data-when="other">
+        <div class="bn-other-strap">
+          <span class="bn-tag"><i></i><span>Mac only</span></span>
+          <p>It's a Mac app. Open this page on your Mac to download it.</p>
+        </div>
+        <div class="bn-other-actions">
+          <button type="button" class="chip-btn solid" data-copy-link>Copy link</button>
+          <a class="chip-btn" href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a>
+        </div>
+      </div>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+    </div>
+  </section>
+</main>
+
+<!-- the news ticker -->
+<div class="ticker" id="ticker">
+  <span class="tk-label"><i></i>Fact check</span>
+  <div class="tk-view"><div class="tk-track" id="tkTrack"></div></div>
+  <span class="tk-clock" id="tkClock">00:00</span>
+</div>
+<div class="tk-card" id="tkCard" hidden></div>
+
+<a class="ca-back" href="../">All experiments</a>
+
+<script src="../_shared/download.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

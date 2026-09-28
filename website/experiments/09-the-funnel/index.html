@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversation Assistant: The Funnel</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Pour a show through the funnel and watch the claims come out checked.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='0.35' stroke-width='28'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="onair"><i></i><span>On air</span></div>
+    <div class="strap">
+      <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
+      <span class="name">Conversation Assistant</span>
+    </div>
+    <div class="clock"><span class="k">Show time</span><span class="t" id="clock">00:00</span></div>
+  </div>
+
+  <div class="get">
+    <div data-when="mac" class="get-mac">
+      <a class="ca-download big" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>
+        Download for Mac
+      </a>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source<span class="ver"> · <span data-version>latest</span> <span data-size></span></span></p>
+    </div>
+    <div data-when="other" class="get-other">
+      <p class="other-line">It's a Mac app. Open this page on your Mac to download it.</p>
+      <div class="other-actions">
+        <button type="button" class="ca-download big" data-copy-link>Copy link</button>
+        <a class="gh" href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a>
+      </div>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="pitch">
+      <h1><span class="l1">Every word in.</span> <span class="l2">Every claim <em>checked.</em></span></h1>
+      <p class="lede">An open-source Mac app that <strong>transcribes your live conversation</strong>, maps it on a timeline, and <strong>fact-checks claims as they're said</strong>. Your microphone and the call your Mac plays, both at once.</p>
+
+      <ol class="funnel" aria-label="The funnel, live">
+        <li class="step"><b id="n-heard">0</b><span class="label">Lines heard</span><span class="sub">every one transcribed</span></li>
+        <li class="step s1"><b id="n-flagged">0</b><span class="label">Claims flagged</span><span class="sub">System 1, Jev</span></li>
+        <li class="step s2"><b id="n-verdicts">0</b><span class="label">Verdicts</span><span class="sub">System 2, sourced</span></li>
+        <li class="step cost"><b id="n-cost">$0.000</b><span class="label">Cost so far</span><span class="sub">about $1.60 an hour</span></li>
+      </ol>
+
+      <div class="controls">
+        <button type="button" class="btn pour" id="pour">Pour more <span class="x" id="speed">1×</span></button>
+        <button type="button" class="btn shake" id="shake">Shake it <kbd>S</kbd></button>
+        <p class="hint">Grab any line and throw it. Drag the machine to shake it loose.</p>
+      </div>
+
+      <div class="lastword" aria-live="polite">
+        <span class="lw-k">Latest verdict</span>
+        <div class="fc v-researching" id="fc">
+          <div class="fc-verdict"><span class="vw">Researching</span><span class="vm">System 2</span></div>
+          <div class="fc-body">
+            <div class="fc-meta"><span class="who-tab host" id="fc-who">Host</span><span class="fc-time" id="fc-time">first claim incoming</span></div>
+            <blockquote id="fc-claim">Waiting for someone to say something checkable.</blockquote>
+            <p class="restated" id="fc-note"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="machine-wrap">
+      <div class="machine" id="machine">
+        <div class="m-strap"><span>The funnel</span><em>every line heard, down to the few verdicts</em></div>
+        <div class="stage" id="stage">
+          <canvas id="world" aria-label="A physics toy: everything said in a show falls through System 1, claims are diverted to System 2, and verdicts drop into bins. Drag the lines, or shake the machine." role="img"></canvas>
+          <div class="ov" id="ov">
+            <div class="tag src host" data-at="nozzleA"><span>Host mic</span><span class="lvl"><b></b></span></div>
+            <div class="tag src remote" data-at="nozzleB"><span>The call</span><span class="lvl"><b></b></span></div>
+            <div class="tag sys1" data-at="sys1"><b>System 1 · Jev</b><span>0.4 s a judgment</span></div>
+            <div class="tag sys2" data-at="sys2"><b>System 2</b><span id="s2-state">researching the web</span></div>
+            <div class="tag heard" data-at="heard"><b>Heard</b><span>transcript</span></div>
+            <div class="bin v-supported" data-at="bin0"><b id="b0">0</b><span>Supported</span></div>
+            <div class="bin v-misleading" data-at="bin1"><b id="b1">0</b><span>Misleading</span></div>
+            <div class="bin v-contradicted" data-at="bin2"><b id="b2">0</b><span>Contradicted</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="two">
+    <h2 class="sh"><span>Fast thinking,</span> <span>slow thinking</span></h2>
+    <div class="systems">
+      <article class="sys-card s1">
+        <p class="k">System 1 · Jev</p>
+        <p class="big"><b>0.4</b><small>s a judgment</small></p>
+        <p>A fast decision model hears every line and flags the checkable claims. About 2,000 judgments an hour, for cents.</p>
+      </article>
+      <div class="hand" aria-hidden="true"><span>claim</span></div>
+      <article class="sys-card s2">
+        <p class="k">System 2</p>
+        <p class="big"><b>Seconds</b><small>to a sourced verdict</small></p>
+        <p>A slower LLM researches the web and puts a sourced verdict on screen. Every verdict it reaches makes System 1 better.</p>
+      </article>
+    </div>
+    <div class="thirds">
+      <div class="fc v-supported"><div class="fc-verdict"><span class="vw">Supported</span></div><div class="fc-body"><blockquote>"Octopuses have three hearts."</blockquote></div></div>
+      <div class="fc v-misleading"><div class="fc-verdict"><span class="vw">Misleading</span></div><div class="fc-body"><blockquote>"Coffee dehydrates you."</blockquote><p class="restated">Its water outweighs the mild diuretic effect.</p></div></div>
+      <div class="fc v-contradicted"><div class="fc-verdict"><span class="vw">Contra&shy;dicted</span></div><div class="fc-body"><blockquote>"Lightning never strikes the same place twice."</blockquote><p class="restated">The Empire State Building is hit about 20–25 times a year.</p></div></div>
+      <div class="fc v-unverifiable"><div class="fc-verdict"><span class="vw">Unverifiable</span></div><div class="fc-body"><p class="restated muted">And when the web can't settle it, it says so.</p></div></div>
+    </div>
+  </section>
+
+  <section class="three">
+    <h2 class="sh"><span>Out the other end:</span> <span>the whole show, mapped</span></h2>
+    <div class="lanes" aria-label="The timeline lanes">
+      <div class="lane"><span class="ln">Speakers</span><span class="track"><i class="h" style="--a:0;--b:18"></i><i class="r" style="--a:19;--b:41"></i><i class="h" style="--a:42;--b:55"></i><i class="r" style="--a:56;--b:80"></i><i class="h" style="--a:81;--b:100"></i></span></div>
+      <div class="lane"><span class="ln">Topic</span><span class="track"><i style="--a:0;--b:34;--c:var(--s-ai-models)"></i><i style="--a:35;--b:62;--c:var(--s-personal-life)"></i><i style="--a:63;--b:100;--c:var(--s-tech)"></i></span></div>
+      <div class="lane"><span class="ln">Mode</span><span class="track"><i style="--a:0;--b:20;--c:var(--m-news)"></i><i style="--a:21;--b:40;--c:var(--m-analysis)"></i><i style="--a:41;--b:60;--c:var(--m-banter)"></i><i style="--a:61;--b:77;--c:var(--m-personal-story)"></i><i style="--a:78;--b:100;--c:var(--m-explainer)"></i></span></div>
+      <div class="lane"><span class="ln">Heat &amp; hype</span><span class="track wave"><svg viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 16 C8 15 10 6 16 8 S26 17 32 14 40 3 48 5 56 15 64 12 72 2 80 6 90 16 100 12" fill="none" stroke="var(--heat)" stroke-width="1.6" vector-effect="non-scaling-stroke"/><path d="M0 18 C10 17 14 12 22 13 S34 9 44 11 58 17 66 10 78 8 88 13 100 9" fill="none" stroke="var(--hype)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg></span></div>
+      <div class="lane"><span class="ln">Moments</span><span class="track pins"><em style="--a:12">Disagreement</em><em style="--a:36">Hot take</em><em style="--a:58">Prediction</em><em style="--a:74">Recommendation</em><em style="--a:90">Clip</em></span></div>
+    </div>
+    <ul class="extras">
+      <li><b>Live transcript</b> It streams as people speak. Each voice is recognised as a speaker you can name.</li>
+      <li><b>Chat <kbd>⌘K</kbd></b> Ask about the transcript, live or afterwards.</li>
+      <li><b>Library</b> Play recordings back at up to 4×, and export one as a single file to send.</li>
+    </ul>
+  </section>
+
+  <section class="four">
+    <h2 class="sh"><span>Before you</span> <span>press the button</span></h2>
+    <dl class="rundown">
+      <div><dt>Any call app</dt><dd>It listens to your microphone and to your Mac's own audio, so it works with whatever you call on.</dd></div>
+      <div><dt>Two keys</dt><dd>It needs API keys from OpenAI and OpenRouter, with prepaid credit. The app walks you through both.</dd></div>
+      <div><dt>Running cost</dt><dd>About <b>$1.60</b> per hour of show, or about <b>$1.23</b> for a transcript only.</dd></div>
+      <div><dt>Private</dt><dd>No server, no account, no analytics. Recordings and keys stay on your Mac.</dd></div>
+      <div><dt>Trusted</dt><dd>Signed and notarized by Apple. It updates itself. BSD 3-Clause.</dd></div>
+    </dl>
+    <div class="again">
+      <a class="ca-download big" data-download data-when="mac" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>
+        Download for Mac
+      </a>
+      <div data-when="other" class="again-other"><p>It's a Mac app. Open this page on your Mac to download it.</p><button type="button" class="btn" data-copy-link>Copy link</button></div>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><span class="ca-mark" style="--s:18px"></span> Conversation Assistant · <a href="https://github.com/nicolasdao/conversation-assistant">Source on GitHub</a> · BSD 3-Clause</footer>
+
+<a class="ca-back" href="../">All experiments</a>
+
+<script src="../_shared/download.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
