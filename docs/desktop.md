@@ -164,7 +164,9 @@ The app was called Conversation Assistant before 0.8.0 (and Podcast Assistant be
 
 **The data folder moves once.** At launch (the Mac app, and `npm run serve`), `migrateAppSupportDir()` in `src/paths.ts` renames `~/Library/Application Support/Conversation Assistant/` to `~/Library/Application Support/Tattle/` when only the old one exists, so the keys, the recordings, and the window's storage come along. It never touches a `Tattle` folder that exists already.
 
-**Installing over the old app.** An auto-update keeps the app's file where it was, so an updated copy can stay `Conversation Assistant.app` in Applications while it shows Tattle everywhere else. Installing the DMG gives `Tattle.app`; delete `Conversation Assistant.app` then, since two copies of one bundle id confuse macOS about which one to open and update.
+**Updating from the old app.** The update renames the app's file too. Tested on 28 September 2026: an installed 0.6.2 updated itself to 0.8.0, Squirrel's installer (ShipIt) moved `/Applications/Conversation Assistant.app` to `/Applications/Tattle.app`, and at the first launch the keys and all 38 recordings moved to `Application Support/Tattle/`. **It does not reopen by itself after that update:** ShipIt looks for its relaunch helper inside the old bundle path, which no longer exists (`posix_spawn: No such file or directory` in `~/Library/Caches/com.cloudlesslabs.conversation-assistant.ShipIt/ShipIt_stderr.log`), so the app quits for Restart Now and must be opened again from Applications. Only this one update crosses the rename; later ones relaunch as before. Installing the DMG instead also gives `Tattle.app`; delete `Conversation Assistant.app` then, since two copies of one bundle id confuse macOS about which one to open and update.
+
+**0.7.0 was tagged but never published:** 0.8.0, the first release as Tattle, ships its changes.
 
 ## Building
 

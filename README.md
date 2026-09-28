@@ -34,7 +34,7 @@ For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2
 4. Paste the two API keys: the app explains how to get each one (create the account, add prepaid credit, create the key) and checks each key before saving it.
 5. Click Allow when macOS asks for **Microphone** and **System Audio Recording**. The app asks for both on its first launch, so they never interrupt a show.
 
-**Coming from Conversation Assistant?** It is the same app, renamed. Install Tattle and delete `Conversation Assistant.app`: your keys, recordings, and permissions carry over.
+**Coming from Conversation Assistant?** It is the same app, renamed, and it updates itself to Tattle: after **Restart Now**, open **Tattle** from Applications (that one update does not reopen the app by itself). Your keys and recordings carry over. If you install the DMG instead, delete `Conversation Assistant.app`.
 
 It updates itself from GitHub Releases, never during a show. Recordings are kept in `~/Library/Application Support/Tattle/sessions` (**File → Show Recordings in Finder**), next to the saved keys. See [The Mac app](docs/desktop.md).
 
