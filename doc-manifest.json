@@ -30,7 +30,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 224,
+      "line_count": 228,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -180,7 +180,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 163,
+      "line_count": 171,
       "links_to": [
         "README.md",
         "docs/architecture.md",

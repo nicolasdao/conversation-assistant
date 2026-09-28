@@ -1,6 +1,6 @@
 ---
 name: release-conversation-assistant
-description: Release — cut a conversation-assistant version by bumping package.json, updating CHANGELOG.md, tagging, pushing, and publishing the Mac app. Use when asked to release, ship a version, bump the version, or record unreleased changes. Not for running the app.
+description: Release — cut a conversation-assistant version and deploy it to production (the signed Mac app on GitHub Releases, which installed copies update to), after bumping package.json, updating CHANGELOG.md, and tagging. Use when asked to release, ship, deploy, bump the version, or record unreleased changes. Not for running the app.
 argument-hint: "[patch|minor|major|unreleased|auto] [description]"
 arguments: [action, note]
 allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
 
 # Release conversation-assistant
 
-Cuts a release of this project: bring the docs up to date and commit everything, then analyse what changed, write the changelog, bump the version, commit, tag, push, and publish the Mac app. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
+Cuts a release of this project and deploys it: bring the docs up to date and commit everything, analyse what changed, write the changelog, bump the version, commit and tag **locally**, build and verify the Mac app **locally**, then deploy to production (push, and publish the GitHub Release), and verify production from the outside. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
 
 **Project facts** (standalone repo, branch `master`, remote `origin`):
 
@@ -17,9 +17,10 @@ Cuts a release of this project: bring the docs up to date and commit everything,
 | Version | `version` in the root `package.json` — the **only** place it lives. The server reads it (`GET /api/about`) and the app shows it in the settings menu footer. Never write it anywhere else. `package-lock.json` follows via `npm version`. |
 | Tag | `v<version>`, annotated |
 | Changelog | `CHANGELOG.md` in the project root, Keep a Changelog — rules in [references/changelog.md](references/changelog.md) |
-| Gates | `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop` — offline, no API spend |
+| Gates | `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, and the third-party notices check (`checks.sh`) — no API spend; offline, except that right after a clean install the notices check downloads Electron's binary once |
 | First release | No `v*` tag yet → release the current `0.1.0` as-is (no bump), analysing the whole history |
-| Published | The Mac app, as a GitHub Release `v<version>` with the DMG people download and the files the installed app updates from (Step 9, `docs/desktop.md`). Never to npm. |
+| Production | There is no server: production is the GitHub Release `v<version>` — the DMG new users download, and the update every installed copy offers within about 4 hours or at its next launch (`docs/desktop.md`). Never npm. |
+| Final | A pushed tag and a published release can never be moved, replaced, or deleted (tag rules, immutable releases). A mistake found after the push is fixed forward, with a new version. That is why the app is built and verified **before** anything is pushed. |
 
 Run every script from the project root: `sh "${CLAUDE_SKILL_DIR}/scripts/<script>"`.
 
@@ -48,6 +49,7 @@ If either skill stops with an error, or you or the user declined a commit, stop 
 
 1. `sh "${CLAUDE_SKILL_DIR}/scripts/preflight.sh" release`. After Step 2 the tree should be clean; anything left means something was not committed. If it fails, show its output verbatim and **stop**. Never offer to proceed anyway: the release commits only `package.json`, `package-lock.json` and `CHANGELOG.md`, so uncommitted code would ship under a tag that doesn't contain it.
 2. `sh "${CLAUDE_SKILL_DIR}/scripts/checks.sh"`. If a gate fails, show the failure and stop.
+3. `sh "${CLAUDE_SKILL_DIR}/scripts/credentials.sh"`: can this Mac deploy (the Developer ID certificate and how long it has left, the notary credentials, GitHub access)? Relay any `warning` or `note` line. If it fails, show its output, and ask with AskUserQuestion: **Stop** (fix the credentials, then release), or **Release without deploying** (Steps 4–7 only: the commit and tag stay on this Mac, and deploying later needs Steps 8–10). Never tag and push a version that is not deployed: the version number would be spent without an app.
 
 ## Step 4 — What ships
 
@@ -74,31 +76,33 @@ Group the changes into Keep a Changelog categories, one bullet per logical chang
 - An explicit `$action` **higher**: use it, no warning.
 - First release: `0.1.0`, no bump.
 
-## Step 6 — Confirm (before anything irreversible)
+## Step 6 — Confirm the release
 
-AskUserQuestion, presenting: current → new version, the bump and why, the full changelog entry, and what will happen (files changed, commit message, tag name). Options: **Release**, **Change the bump**, **Edit the changelog first**, **Abort**.
+AskUserQuestion, presenting: current → new version, the bump and why, the full changelog entry, and what will happen next: the release commit and tag are made **on this Mac only**, then the app is built and verified locally; nothing is pushed or published until Step 9 asks. Options: **Release**, **Change the bump**, **Edit the changelog first**, **Abort**.
 
-## Step 7 — Write, commit, tag
+## Step 7 — Write, commit, tag (on this Mac only)
 
 1. Create `CHANGELOG.md` if missing, then stamp the release ([references/changelog.md § Stamping](references/changelog.md)): the entries go under `## [<version>] - <today>`, and `## [Unreleased]` stays, empty.
-2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): conversation-assistant v<version>`, and tags `v<version>`.
+2. `sh "${CLAUDE_SKILL_DIR}/scripts/apply-release.sh" <version> "<attribution>"`, passing the session's commit attribution line (`Co-Authored-By: …`) when there is one. It sets the version (skipped when unchanged), stages only `package.json`, `package-lock.json` and `CHANGELOG.md`, commits `chore(release): conversation-assistant v<version>`, and tags `v<version>`, locally.
 
-## Step 8 — Push (a second confirmation)
+## Step 8 — Build and verify the app (on this Mac only)
 
-AskUserQuestion: push the release commit and tag `v<version>` to `origin`? On yes, `sh "${CLAUDE_SKILL_DIR}/scripts/push.sh" <version>`. On no, remind: `git push origin master && git push origin v<version>`.
+`sh "${CLAUDE_SKILL_DIR}/scripts/build-app.sh" <version>` (about 5 minutes, mostly Apple's notarization; run it in the background and wait). It installs exactly the locked dependencies, verifies their registry signatures, refuses a high-severity advisory in what ships, checks the third-party notices, builds, has Apple notarize, checks the signature, the stapled ticket, and Gatekeeper, fetches the GPL sources, and writes the SBOM and `out/SHA256SUMS`. Nothing is pushed or published.
 
-Then Step 9.
+**If it fails:** show the failure, then `sh "${CLAUDE_SKILL_DIR}/scripts/undo-local-release.sh" <version>`, which deletes the local tag and release commit, so nothing is lost and the same version can be released after the fix. Stop there; the fix is new work, committed on its own, and the release starts again from Step 1.
 
-## Step 9 — Publish the Mac app (a third confirmation)
+## Step 9 — Deploy to production (the one outward-facing confirmation)
 
-Only after the push. Publishing is outward-facing: installed apps download what it publishes, so it is never automatic.
+AskUserQuestion, stating plainly: deploying pushes `master` and the tag `v<version>` to `origin` and publishes the GitHub Release, which new users download and **every installed copy will install**; it cannot be undone or replaced (a problem found later means a new version). Options: **Deploy**, **Not now**.
 
-1. Check the requirements without building: `security find-identity -v -p codesigning | grep "Developer ID Application"`, and notary credentials: `xcrun notarytool history --keychain-profile conversation-assistant` succeeds, or `APPLE_KEYCHAIN_PROFILE`, `APPLE_API_KEY` or `APPLE_ID` is set. If either is missing, skip this step and say why: until the Developer ID and its notary credentials exist, the Mac app is not published (see `docs/desktop.md` § Signing). Never publish an ad-hoc build.
-2. AskUserQuestion: publish the Mac app for `v<version>` as a GitHub Release, which every installed copy will offer to update to? Options: **Publish**, **Not now**.
-3. On yes, write the version's changelog entry (its bullets, without the `## [x.y.z]` heading) to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/publish-app.sh" <version> <notes-file>`. It builds from the tag, checks the signature, notarization and Gatekeeper, and creates the release with the DMG, the zip, their blockmaps, and `latest-mac.yml`. If it fails, show its output and stop; nothing is published before its last line.
-4. On "Not now", remind: from the tag, `sh .claude/skills/release-conversation-assistant/scripts/publish-app.sh <version> <notes-file>`.
+- **Deploy:** write the version's changelog entry (its bullets, without the `## [x.y.z]` heading; include earlier versions' entries that were tagged but never deployed) plus an **Install** paragraph to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/deploy.sh" <version> <notes-file>`. It refuses unless `build-app.sh` verified a build of exactly this commit and the built files are unchanged; then it pushes, and creates the release with the DMG, the zip, their blockmaps, `latest-mac.yml`, the SBOM, the GPL sources, and the checksums in the notes. If the push succeeded but publishing failed, rerun `deploy.sh`: it skips what is done.
+- **Not now:** everything stays on this Mac. Remind: deploy later with `sh .claude/skills/release-conversation-assistant/scripts/deploy.sh <version> <notes-file>` (from the same commit, with `out/` intact), or drop the release with `undo-local-release.sh <version>`.
 
-Finish with: the version, the tag, the changelog entry, whether it was pushed, and whether the Mac app was published (with the release URL). Installed apps pick up a published version within a few hours, or at their next launch.
+## Step 10 — Verify production
+
+`sh "${CLAUDE_SKILL_DIR}/scripts/verify-release.sh" <version>`: without logging in, the update feed installed apps read names `<version>`, the published DMG matches the build, and a downloaded copy, flagged as from the internet, passes Gatekeeper as notarized. If it fails, show it and say that the release is live but unverified.
+
+Finish with: the version, the tag, the changelog entry, whether it was deployed (with the release URL) and verified, and any credentials warning from Step 3. Installed apps offer the new version within about 4 hours, or at their next launch.
 
 ## Mode C — Record unreleased changes (the ledger)
 
@@ -117,8 +121,10 @@ For recording work between releases. **No version bump, no tag, `package.json` u
 - **Never** release with uncommitted changes (Modes A and B), and never offer to.
 - **Never** put anything but `package.json`, `package-lock.json` and `CHANGELOG.md` in the release commit itself (Mode C: only `CHANGELOG.md`); every other change goes in Step 2's commits.
 - **Never** write the version anywhere but `package.json` (via `npm version`).
-- **Always** confirm before the commit and tag, separately before the push, and separately before publishing the Mac app.
-- **Never** publish a Mac app signed ad hoc or not notarized: `publish-app.sh` refuses, and nothing is to be done around it.
+- **Always** confirm before the local commit and tag (Step 6), and separately before deploying (Step 9), which is the only step that sends anything out.
+- **Never** push a release tag before `build-app.sh` has verified the app for that exact commit: a pushed tag is permanent, so a failed build after it would spend the version number.
+- **Never** try to move, delete, or replace a pushed tag or a published release: fix forward with a new version.
+- **Never** deploy a Mac app signed ad hoc or not notarized: `build-app.sh` and `deploy.sh` refuse, and nothing is to be done around them.
 - **Never** push `--tags` wholesale: push the release branch and the one new tag.
 - **Never** run the app, `npm run smoke`, `preflight`, or anything that calls paid APIs as a release gate.
 - Keep every path relative to the project root or `${CLAUDE_SKILL_DIR}`.

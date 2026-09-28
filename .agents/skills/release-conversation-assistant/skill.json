@@ -1,7 +1,7 @@
 {
 	"name": "release-conversation-assistant",
-	"version": "0.2.0",
-	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits, tags, pushes, and publishes the Mac app as a GitHub Release, plus an [Unreleased] ledger mode.",
+	"version": "0.3.0",
+	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits and tags locally, builds and verifies the signed Mac app, deploys it to production (push and GitHub Release, which installed copies update to), and verifies production, plus an [Unreleased] ledger mode.",
 	"type": "skill",
 	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "conversation-assistant"],
 	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],

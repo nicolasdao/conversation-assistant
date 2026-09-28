@@ -1,5 +1,6 @@
 #!/bin/sh
-# Release gates: all offline, no API spend. Run from the project root; stops at the first failure.
+# Release gates: no API spend, and offline except that right after a clean install the notices check downloads
+# Electron's binary once. Run from the project root; stops at the first failure.
 set -e
 echo "== npm run typecheck"; npm run typecheck
 echo "== npm test"; npm test

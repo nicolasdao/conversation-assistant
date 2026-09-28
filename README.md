@@ -169,7 +169,9 @@ Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.
 
 ## Releasing
 
-A release bumps the version in `package.json` (the only place it lives; see [Versioning](#versioning)), adds an entry to [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com) format, [Semantic Versioning](https://semver.org/)), commits, tags `v<version>`, pushes, and publishes the Mac app as the GitHub Release `v<version>` (the DMG people download, and the files installed copies update from). Nothing is published to npm or deployed to a server.
+A release bumps the version in `package.json` (the only place it lives; see [Versioning](#versioning)), adds an entry to [CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com) format, [Semantic Versioning](https://semver.org/)), commits and tags `v<version>`, and **deploys it to production**. For this app, production is the GitHub Release: the DMG new users download, and the update every installed copy offers within about 4 hours or at its next launch. There is no server, and nothing goes to npm.
+
+A deployed version is final: GitHub keeps release tags and published releases from ever being moved, replaced, or deleted. A problem found afterwards is fixed with a new version. So the app is built and verified on the Mac **before** anything is pushed.
 
 **With Claude Code**, run:
 
@@ -182,28 +184,30 @@ A release bumps the version in `package.json` (the only place it lives; see [Ver
 It does, in order:
 
 1. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
-2. Refuses to continue if anything is still uncommitted.
-3. Runs the gates, all offline and free: `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`. A failure stops the release.
-4. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
-5. Shows you the version, the bump, and the entry, and waits for your go.
-6. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): conversation-assistant v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and creates the annotated tag.
-7. Asks again before pushing `master` and that one tag.
-8. Asks a third time before publishing the Mac app: it builds it from the tag, checks that it is signed with the Developer ID and notarized, and creates the GitHub Release. It refuses an ad-hoc or unnotarized build, and skips this step while the Developer ID and notary credentials are missing (see [The Mac app](docs/desktop.md#signing-and-notarization)).
+2. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.
+3. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
+4. Shows you the version, the bump, and the entry, and waits for your go.
+5. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): conversation-assistant v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and tags it, **on this Mac only**.
+6. Builds and verifies the app, still on this Mac: the locked dependencies (`npm ci`), their registry signatures, no high-severity advisory in what ships, the notices, the build, Apple's notarization, and Gatekeeper. If anything fails, it undoes the local tag and commit, so the same version can be released after the fix.
+7. Asks once before **deploying**: it pushes `master` and the tag, and publishes the GitHub Release with the DMG, the update files, an SBOM, the GPL sources, and SHA-256 checksums.
+8. Verifies production from the outside: the update feed names the new version, the published DMG is the one that was built, and a downloaded copy passes Gatekeeper.
 
 **Without Claude Code**, the same steps are plain shell scripts, run from the project root:
 
 ```bash
 S=.claude/skills/release-conversation-assistant/scripts
-sh $S/preflight.sh release          # the working tree must be clean
-sh $S/checks.sh                     # typecheck, tests, web build, Mac app bundle
-sh $S/release-info.sh               # current version, last tag, commits since it
+sh $S/preflight.sh release              # the working tree must be clean
+sh $S/checks.sh                         # typecheck, tests, web build, Mac app bundle, notices
+sh $S/credentials.sh                    # can this Mac deploy? (certificate, notary credentials, GitHub)
+sh $S/release-info.sh                   # current version, last tag, commits since it
 # edit CHANGELOG.md: move [Unreleased] into "## [x.y.z] - YYYY-MM-DD", leave [Unreleased] empty
-sh $S/apply-release.sh x.y.z        # npm version, release commit, tag vx.y.z
-sh $S/push.sh x.y.z                 # push master and the tag
-sh $S/publish-app.sh x.y.z notes.md # the Mac app, as the GitHub Release (needs the Developer ID, notary credentials, and gh)
+sh $S/apply-release.sh x.y.z            # npm version, release commit, tag vx.y.z (local)
+sh $S/build-app.sh x.y.z                # build, notarize, verify (local); if it fails: sh $S/undo-local-release.sh x.y.z
+sh $S/deploy.sh x.y.z notes.md          # push, and publish the GitHub Release (final)
+sh $S/verify-release.sh x.y.z           # check production from the outside
 ```
 
-After a release, installed apps offer the new version within a few hours, or at their next launch; the settings menu (the cog) shows the version. In development, reload the page.
+After a release, installed apps offer the new version within about 4 hours, or at their next launch; the settings menu (the cog) shows the version. In development, reload the page.
 
 ## Security
 
