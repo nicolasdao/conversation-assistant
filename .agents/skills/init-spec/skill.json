@@ -2,6 +2,7 @@
 	"name": "init-spec",
 	"version": "0.3.0",
 	"description": "Generate a one-shot-ready SPEC.md under specs/YYMMDD-NN-slug/, move a spec folder to specs/-DONE or specs/-ARCHIVED, or configure per-project spec rules via an external rules file.",
+	"license": "BSD-3-Clause",
 	"keywords": [
 		"spec",
 		"specification",

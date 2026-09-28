@@ -1,7 +1,9 @@
 #!/bin/sh
 # Publishes the Mac app for a release already tagged and pushed: builds it from the tag, checks its signature and
 # notarization, and creates the GitHub Release v<version> with the DMG (what people download) and the files the
-# installed app reads to update itself (see docs/desktop.md). Run only after the user confirms.
+# installed app reads to update itself (see docs/desktop.md), with SHA-256 checksums in the notes and an SBOM. It
+# installs the locked dependencies first and refuses to publish if a registry signature fails or a high-severity
+# vulnerability is known in what ships. Run only after the user confirms.
 #   publish-app.sh <version> <notes-file>
 set -e
 version="$1"
@@ -22,6 +24,12 @@ fi
 [ -n "$APPLE_API_KEY$APPLE_ID$APPLE_KEYCHAIN_PROFILE" ] \
   || { echo "no notary credentials (the keychain profile conversation-assistant, APPLE_KEYCHAIN_PROFILE, APPLE_API_KEY…, or APPLE_ID…): Gatekeeper blocks an app that is not notarized"; exit 1; }
 
+# the dependencies exactly as locked, with registry signatures verified, and nothing known to be vulnerable in what ships
+npm ci
+npm audit signatures
+npm audit --omit=dev --audit-level=high
+node scripts/third-party-notices.mjs --check
+
 npm run dist:mac
 app="out/mac-arm64/Conversation Assistant.app"
 dmg="out/Conversation-Assistant-$version-arm64.dmg"
@@ -30,6 +38,22 @@ codesign --verify --deep --strict "$app"
 xcrun stapler validate "$app"
 spctl --assess --type execute -vv "$app"
 
-gh release create "v$version" --verify-tag --title "Conversation Assistant $version" --notes-file "$notes" \
-  "$dmg" "$dmg.blockmap" "$zip" "$zip.blockmap" out/latest-mac.yml
+# The GPL-3.0 component inside sherpa-onnx's library (eSpeak NG, see THIRD_PARTY_NOTICES.md) must come with its
+# source: the exact sherpa-onnx and eSpeak NG sources it was built from are attached to the release.
+sherpa="$(node -p "require('./node_modules/sherpa-onnx-node/package.json').version")"
+src_sherpa="out/source-sherpa-onnx-v$sherpa.tar.gz"
+src_espeak="out/source-espeak-ng-ed530aa113046142eb5115cf2fc9157854d0ffe1.zip"
+curl -fsSL -o "$src_sherpa" "https://github.com/k2-fsa/sherpa-onnx/archive/refs/tags/v$sherpa.tar.gz"
+curl -fsSL -o "$src_espeak" "https://github.com/csukuangfj/espeak-ng/archive/ed530aa113046142eb5115cf2fc9157854d0ffe1.zip"
+echo "e4e262cbe34f7fe21f91f1ba3397f2728e1f30eafbae7853f2b753a9ed13f0dd  $src_espeak" | shasum -a 256 -c -
+
+# what ships inside the app (CycloneDX), and checksums anyone can verify a download against
+sbom="out/Conversation-Assistant-$version-sbom.cdx.json"
+npm sbom --omit=dev --sbom-format=cyclonedx > "$sbom"
+full="$(mktemp)"
+{ cat "$notes"; printf '\n**SHA-256**\n\n```\n'; (cd out && shasum -a 256 "$(basename "$dmg")" "$(basename "$zip")"); printf '```\n\nThe app is signed by "Developer ID Application: Nicolas Dao (UX774V7BK2)" and notarized by Apple. Download it only from this page.\n'; } > "$full"
+
+gh release create "v$version" --verify-tag --title "Conversation Assistant $version" --notes-file "$full" \
+  "$dmg" "$dmg.blockmap" "$zip" "$zip.blockmap" out/latest-mac.yml "$sbom" "$src_sherpa" "$src_espeak"
+rm -f "$full"
 echo "ok: published v$version with $(basename "$dmg")"
