@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-28
+
+The first published release since 0.6.2: it also ships everything listed under 0.7.0, which was tagged but never published.
+
 ### Changed
 - The app is now called **Tattle**: the app, its menus and dialogs, the DMG (`Tattle-<version>-arm64.dmg`), the permission prompts, and the GitHub repository (`nicolasdao/tattle`; the old address redirects)
 - Your keys, recordings, and saved preferences move to `~/Library/Application Support/Tattle/` the first time Tattle opens, and macOS keeps its Microphone and System Audio Recording permissions
