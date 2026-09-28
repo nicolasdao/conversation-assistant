@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-28
+
+The first published release since 0.6.0: it ships everything listed under 0.6.1, which was tagged but never published because the release checks caught the error fixed below.
+
+### Fixed
+- The third-party notices named the Chromium inside the app as "undefined"; they now point to Electron's release notes, which name it exactly
+- A release built right after a clean install could miss Electron's own license files; they are now fetched first
+
 ## [0.6.1] - 2026-09-28
 
 ### Security
