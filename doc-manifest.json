@@ -76,7 +76,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 221,
+      "line_count": 227,
       "links_to": [
         "docs/chat.md",
         "docs/desktop.md",
@@ -163,7 +163,7 @@
     },
     {
       "dangling": false,
-      "description": "The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.",
+      "description": "The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, the menu bar (Settings, Check for Updates, Licenses and Acknowledgements) and its bridge to the page, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.",
       "has_frontmatter": true,
       "headings": [
         "The Mac app",
@@ -171,6 +171,9 @@
         "The in-process connection — `src/server/inProcess.ts`",
         "Where the app keeps its files — `src/paths.ts`",
         "The window — `desktop/main.ts`",
+        "The menu bar — `desktop/main.ts`",
+        "The bridge to the page — `desktop/preload.ts`, `web/src/desktop.ts`",
+        "Licenses and Acknowledgements — `web/licenses.html`, `src/licenses.ts`",
         "macOS permissions",
         "A show in progress",
         "Updates",
@@ -180,7 +183,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 172,
+      "line_count": 223,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -196,6 +199,10 @@
         "desktop/**",
         "src/server/inProcess.ts",
         "src/paths.ts",
+        "src/licenses.ts",
+        "web/licenses.html",
+        "web/src/licenses.ts",
+        "web/src/desktop.ts",
         "electron-builder.yml",
         "scripts/build-mac.sh",
         "scripts/make-icon.mjs",
@@ -208,12 +215,15 @@
         "desktop",
         "electron",
         "mac-app",
+        "menu-bar",
+        "preload",
         "packaging",
         "signing",
         "notarization",
         "auto-update",
         "permissions",
-        "install"
+        "install",
+        "licenses"
       ],
       "toc": {
         "linked": false,

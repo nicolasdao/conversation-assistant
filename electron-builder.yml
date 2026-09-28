@@ -5,7 +5,7 @@ copyright: © 2026 Cloudless Consulting Pty Ltd
 directories:
   output: out
   buildResources: desktop
-# the app's code: the bundled engine and window (dist/desktop), the version (package.json), and the license
+# the app's code: the bundled engine and window, and the windows' preload (dist/desktop), the version (package.json), and the license
 files:
   - dist/desktop/**
   - package.json
@@ -29,7 +29,7 @@ asarUnpack:
 extraResources:
   - from: web
     to: web
-    filter: [index.html, styles.css, "dist/**/*.js", "fonts/**"]
+    filter: [index.html, licenses.html, styles.css, "dist/**/*.js", "fonts/**"]
   - from: config
     to: config
   - from: models

@@ -33,7 +33,7 @@ The screen is built around one call to action: fill two fields, press one button
 
 The button checks each key with its service and saves them only if none is refused; each result shows under its field. If a check leaves a warning, the screen shows an **Open Conversation Assistant** button; otherwise the app opens by itself after about a second.
 
-Keys can be replaced later from the cog menu → **API keys** (`?panel=keys`). There, the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
+Keys can be replaced later from **Conversation Assistant → Settings…** (⌘,) in the Mac app, or the cog menu → **API keys** in a browser; both open the same window (`?panel=keys`). There, the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
 
 ## Where keys are stored
 

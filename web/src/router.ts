@@ -4,19 +4,28 @@
 //   /recordings/<id>           that recording, opened read-only
 //   ?t=1:23:45                 the playback position in a recording
 //   ?tab=thinking | jev-log    the right column's tab (fact-check is the default)
-//   ?panel=recordings | speakers | system-1 | labels | stats | log | chat | keys     the window that is open
+//   ?panel=recordings | insights | speakers | labels | chat | keys     the window that is open
+//   ?panel=insights&section=fact-checker | log     the Insights tab (Overview is the default)
 //   ?panel=chat&chat=chat_2    a chat of the session on screen
+//
+// Before Insights (28 September 2026), Stats, System 1, and Log were windows of their own: ?panel=stats, system-1, and
+// log still open their tab of it.
 //
 // The URL follows what is on screen (history entries for a change of recording, silent updates for the rest), and
 // opening a URL — on load, or with Back and Forward — makes the screen match it.
 
-export interface Route { recording: string | null; t: number | null; tab: string | null; panel: string | null; chat?: string | null }
+export interface Route {
+  recording: string | null; t: number | null; tab: string | null; panel: string | null; chat?: string | null; section?: string | null;
+}
 
 export const TABS: Record<string, string> = { "fact-check": "pane-fc", thinking: "pane-think", "jev-log": "pane-jev" };
 export const PANELS: Record<string, string> = {
-  recordings: "dlg-recordings", "system-1": "dlg-s1", speakers: "dlg-speakers", labels: "dlg-labels", stats: "dlg-stats", log: "dlg-log",
-  chat: "dlg-chat", keys: "dlg-keys",
+  recordings: "dlg-recordings", insights: "dlg-insights", speakers: "dlg-speakers", labels: "dlg-labels", chat: "dlg-chat", keys: "dlg-keys",
 };
+/** The Insights window's tabs, Overview first (the default). */
+export const SECTIONS = ["overview", "fact-checker", "log"] as const;
+/** The windows Insights replaced, and the tab each one is now. */
+const FORMER: Record<string, string> = { stats: "overview", "system-1": "fact-checker", log: "log" };
 const nameOf = (map: Record<string, string>, value: string) => Object.keys(map).find((k) => map[k] === value) ?? null;
 export const tabName = (paneId: string) => nameOf(TABS, paneId);
 export const panelName = (dialogId: string) => nameOf(PANELS, dialogId);
@@ -39,7 +48,9 @@ export function readRoute(loc: { pathname: string; search: string } = location):
   const m = /^\/recordings\/([A-Za-z0-9][A-Za-z0-9_-]*)\/?$/.exec(loc.pathname);
   const q = new URLSearchParams(loc.search);
   const tab = q.get("tab");
-  const panel = q.get("panel");
+  const former = FORMER[q.get("panel") ?? ""];
+  const panel = former ? "insights" : q.get("panel");
+  const section = former ?? q.get("section");
   const chat = q.get("chat");
   return {
     recording: m ? decodeURIComponent(m[1]!) : null,
@@ -47,6 +58,7 @@ export function readRoute(loc: { pathname: string; search: string } = location):
     tab: tab && TABS[tab] ? tab : null,
     panel: panel && PANELS[panel] ? panel : null,
     chat: panel === "chat" && chat && /^chat_\d+$/.test(chat) ? chat : null,
+    section: panel === "insights" && (SECTIONS as readonly (string | null)[]).includes(section) ? section : null,
   };
 }
 
@@ -57,6 +69,7 @@ export function buildUrl(r: Route): string {
 
   if (r.panel) q.set("panel", r.panel);
   if (r.panel === "chat" && r.chat) q.set("chat", r.chat);
+  if (r.panel === "insights" && r.section && r.section !== "overview") q.set("section", r.section);
   const qs = q.toString().replace(/%3A/g, ":");
   return `${r.recording ? `/recordings/${encodeURIComponent(r.recording)}` : "/"}${qs ? `?${qs}` : ""}`;
 }

@@ -1,5 +1,7 @@
 import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.js";
 import { openExport, openImport } from "./transfer.js";
+import { desktop } from "./desktop.js";
+import { setRoute } from "./router.js";
 import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
 import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
 import { featuresOf, resolveSpeaker, s1Counters, speakerName, type MissingLine, type Utterance, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
@@ -92,18 +94,20 @@ let onViewGone: () => void = () => {};
 /** How many people are on the call, from the header picker (0 = any number). */
 const voicesOnCall = () => Number($<HTMLSelectElement>("#voices")?.value ?? 0);
 
-/** The menu footer: the version from package.json, and the license, which opens in full in a window. */
+/**
+ * The menu footer: the version from package.json, and Licenses, the Licenses and Acknowledgements window (licenses.html):
+ * the app's own in the Mac app (the same as Help → Licenses and Acknowledgements), a new tab in a browser.
+ */
 async function bindAbout() {
   $("#license-link")?.addEventListener("click", () => {
     closePops();
-    $<HTMLDialogElement>("#dlg-license")?.showModal();
+    if (desktop) desktop.run("open-licenses");
+    else window.open("/licenses", "_blank", "noopener");
   });
   try {
     const a = await api.about();
     replace($("#app-version"), `v${a.version}`);
     $("#app-version")!.title = `${a.name} ${a.version}`;
-    replace($("#license-sub"), `${a.license.id ?? ""} · ${a.license.holder ?? ""}`);
-    replace($("#license-text"), a.license.text || "No LICENSE file.");
   } catch { /* an older server has no /api/about */ }
 }
 
@@ -323,16 +327,48 @@ export function renderClock(ms: number) {
   replace($("#clock"), hh ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`);
 }
 
-/** One-line summaries under each settings menu item. */
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** Windows that act on the session on screen (live or a recording), so they are greyed out while there is none. */
+export const SESSION_WINDOWS = new Set(["dlg-speakers", "dlg-labels"]);
+
+/**
+ * One-line summaries under each settings menu item. Insights' says what it would be opened for: how off-topic the
+ * show is, how busy the fact-checker has been, and, in red, whether anything went wrong.
+ */
 export function renderMenu(st: State) {
-  const c = s1Counters(st);
   const voices = [...st.speakers.values()].filter((s) => !s.mergedInto).length;
   replace($("#m-recordings"), "Open, rename, replay");
-  replace($("#m-s1"), `${st.s1.active} · ${c.flags} flag${c.flags === 1 ? "" : "s"}`);
-  replace($("#m-speakers"), `${voices} voice${voices === 1 ? "" : "s"}`);
-  replace($("#m-labels"), st.labels.version || "–");
-  replace($("#m-stats"), st.stats ? `Off-topic index ${Math.round((st.stats.roganIndex ?? 0) * 100)}%` : "Every minute");
-  replace($("#m-log"), st.errors.length ? `${st.errors.length} error${st.errors.length === 1 ? "" : "s"}` : "No errors");
+  const parts: Node[] = [];
+  const sep = () => (parts.length ? [document.createTextNode(" · ")] : []);
+  if (st.stats) parts.push(document.createTextNode(`Off-topic ${Math.round((st.stats.roganIndex ?? 0) * 100)}%`));
+  if (st.session && featuresOf(st).factcheck) parts.push(...sep(), document.createTextNode(plural(s1Counters(st).flags, "flag")));
+  if (st.errors.length) parts.push(...sep(), h("em", { class: "error-text" }, plural(st.errors.length, "error")));
+  replace($("#m-insights"), ...(parts.length ? parts : ["Stats, fact-checker, log"]));
+  for (const id of SESSION_WINDOWS) $<HTMLButtonElement>(`#cog-menu [data-open="${id}"]`)!.disabled = !st.session;
+  const none = "Start or open a recording";
+  replace($("#m-speakers"), st.session ? plural(voices, "voice") : none);
+  replace($("#m-labels"), !st.session ? none : featuresOf(st).labels ? st.labels.version || "–" : "Off for this session");
+}
+
+// ---------- Insights: Overview (stats), Fact-checker (System 1), Log ----------
+
+/** Shows an Insights tab, and puts it in the URL. */
+export function showInsights(section: string) {
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>("#dlg-insights .tab")];
+  const tab = tabs.find((t) => t.dataset.section === section) ?? tabs[0]!;
+  for (const t of tabs) {
+    t.setAttribute("aria-selected", String(t === tab));
+    $(`#${t.getAttribute("aria-controls")}`)!.hidden = t !== tab;
+  }
+  replace($("#insights-sub"), tab.dataset.sub ?? "");
+  setRoute({ section: tab.dataset.section! });
+}
+
+export function bindInsights() {
+  for (const t of document.querySelectorAll<HTMLButtonElement>("#dlg-insights .tab")) {
+    t.addEventListener("click", () => showInsights(t.dataset.section!));
+  }
 }
 
 // ---------- stream health ----------
@@ -782,10 +818,17 @@ export async function renderS1(st: State) {
   const counters: [string, number, string][] = [
     ["Flags", c.flags, ""], ["Good flags", c.goodFlags, "good"], ["False alarms", c.falseAlarms, "bad"], ["Misses", c.misses, "bad"], ["Repeats", c.repeats, ""],
   ];
+  // the totals the stats add every minute (they were the Stats window's last line)
+  const fc = st.stats?.factcheck;
+  const verdicts = fc ? Object.entries(fc.verdicts ?? {}).filter(([, n]) => (n as number) > 0).map(([k, n]) => `${VERDICT_LABEL[k] ?? k} ${n}`).join(" · ") : "";
   replace(box,
-    h("div", { class: "kv" }, "Active version ", h("strong", {}, st.s1.active), ` · ${st.s1.memorySize} memory question${st.s1.memorySize === 1 ? "" : "s"}`),
+    h("div", { class: "kv" }, "System 1 ", h("strong", {}, st.s1.active), ` · ${plural(st.s1.memorySize, "memory question")}`),
     h("div", { class: "counters" }, counters.map(([k, n, cls]) =>
       h("div", { class: `counter ${cls}` }, h("div", { class: "n" }, String(n)), h("div", { class: "k" }, k)))),
+    fc ? h("dl", { class: "fc-totals" },
+      h("dt", {}, "Verdicts"), h("dd", {}, verdicts || "None yet"),
+      h("dt", {}, "System 2"), h("dd", {}, `${fc.researched ?? 0} researched · ${fc.duplicates ?? 0} duplicates · ${fc.dropped ?? 0} dropped`),
+      h("dt", {}, "Rewrites"), h("dd", {}, `${fc.promoted ?? 0} promoted · ${fc.rejected ?? 0} rejected`)) : null,
     last ? h("div", { class: `outcome ${last.outcome}` },
       h("div", { class: "stamp" }, pretty(last.outcome), h("small", {}, `${last.candidate ? `${last.candidate} → ` : ""}active ${last.active}`)),
       h("div", { class: "txt" },
@@ -929,8 +972,6 @@ export function renderCost(st: State) {
 export function renderStats(st: State) {
   const s = st.stats;
   if (!s) return replace($("#stats"), h("div", { class: "empty" }, "Stats arrive every minute and at the end of the show."));
-  const fc = s.factcheck ?? {};
-  const verdicts = Object.entries(fc.verdicts ?? {}).filter(([, n]) => (n as number) > 0).map(([k, n]) => `${VERDICT_LABEL[k] ?? k} ${n}`).join(" · ");
   const list = (k: "predictions" | "recommendations" | "clips") => h("div", {},
     h("h3", {}, pretty(k)),
     (s[k] ?? []).length
@@ -943,11 +984,12 @@ export function renderStats(st: State) {
       h("tbody", {}, (s.speakers ?? []).map((sp: any) => h("tr", {},
         h("td", {}, speakerName(st, sp.speakerId)), h("td", {}, clock(sp.talkMs)), h("td", {}, String(sp.disagreements)),
         h("td", {}, sp.hype === null ? "–" : `${sp.hype.toFixed(1)} / 4`))))),
-    h("div", { class: "lists" }, list("predictions"), list("recommendations"), list("clips")),
-    h("p", { class: "note" }, `Fact-check: ${fc.flagged ?? 0} flagged · ${fc.researched ?? 0} researched · ${verdicts || "no verdicts"} · ${fc.repeats ?? 0} repeats · ${fc.duplicates ?? 0} duplicates · ${fc.dropped ?? 0} dropped · ${fc.falseAlarms ?? 0} false alarms · ${fc.misses ?? 0} misses · System 1 versions ${fc.promoted ?? 0} promoted, ${fc.rejected ?? 0} rejected`));
+    h("div", { class: "lists" }, list("predictions"), list("recommendations"), list("clips")));
 }
 
 export function renderErrors(st: State) {
+  replace($("#log-count"), st.errors.length ? String(st.errors.length) : "");
+  $("#log-count")?.classList.toggle("bad", st.errors.length > 0);
   if (st.errors.length === 0) return replace($("#errors"), h("div", { class: "empty" }, "No errors."));
   replace($("#errors"), st.errors.map((e) => h("div", { class: "err" },
     h("span", { class: "c" }, e.component),

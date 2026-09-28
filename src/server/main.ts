@@ -21,6 +21,7 @@ import {
 import { appInfo } from "../version.ts";
 import { KeyError, KeySetup, KeyStore } from "../keys.ts";
 import { appPaths } from "../paths.ts";
+import { licenses } from "../licenses.ts";
 
 /** Export and import of recordings as one `.conversation-recording` file (see docs/recordings.md § Export and import). */
 export interface TransferApi {
@@ -622,11 +623,12 @@ function sse(res: ServerResponse, e: AppEvent) {
   res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
 }
 
-/** Serves web/index.html at /, and web/styles.css, web/dist/** and web/fonts/** as static files, confined to web/. */
+/** Serves web/index.html at /, web/licenses.html at /licenses, and web/styles.css, web/dist/** and web/fonts/** as static files, confined to web/. */
 function serveStatic(webRoot: string, path: string, res: ServerResponse): boolean {
   let rel: string;
   // the page's own URLs (see docs/architecture.md): home, and an opened recording
   if (path === "/" || path === "/index.html" || /^\/recordings\/[A-Za-z0-9][A-Za-z0-9_-]*\/?$/.test(path)) rel = "index.html";
+  else if (path === "/licenses") rel = "licenses.html";
   else if (path === "/styles.css") rel = "styles.css";
   else if (path.startsWith("/dist/") || path.startsWith("/fonts/")) rel = path.slice(1);
   else return false;
@@ -667,8 +669,8 @@ function fromThisPage(req: IncomingMessage): boolean {
   return !origin || origin === `http://${host}`;
 }
 
-/** Routes that work before the keys are set: the setup page's own, and the page's footer. */
-const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/about", "/api/engine"]);
+/** Routes that work before the keys are set: the setup page's own, the page's footer, and the licenses. */
+const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/about", "/api/licenses", "/api/engine"]);
 
 export function createApiServer(engine: EngineApi, opts: { webRoot?: string; setup?: SetupApi } = {}): Server {
   const webRoot = opts.webRoot ?? appPaths().web;
@@ -706,6 +708,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
         return send(res, 200, engine.callLog(system, limit));
       }
       if (m === "GET" && path === "/api/about") return send(res, 200, about());
+      if (m === "GET" && path === "/api/licenses") return send(res, 200, licenses());
       if (m === "GET" && path === "/api/engine") return send(res, 200, { startedAt: new Date(BOOTED_AT).toISOString(), stale: engineStale() });
       if (m === "GET" && path === "/api/stats") return send(res, 200, engine.stats());
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());

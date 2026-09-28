@@ -1,10 +1,14 @@
 ---
-description: The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.
-tags: [desktop, electron, mac-app, packaging, signing, notarization, auto-update, permissions, install]
+description: The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, the menu bar (Settings, Check for Updates, Licenses and Acknowledgements) and its bridge to the page, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.
+tags: [desktop, electron, mac-app, menu-bar, preload, packaging, signing, notarization, auto-update, permissions, install, licenses]
 source:
   - desktop/**
   - src/server/inProcess.ts
   - src/paths.ts
+  - src/licenses.ts
+  - web/licenses.html
+  - web/src/licenses.ts
+  - web/src/desktop.ts
   - electron-builder.yml
   - scripts/build-mac.sh
   - scripts/make-icon.mjs
@@ -57,6 +61,7 @@ flowchart LR
 | `web`, `config`, `models` | `web/`, `config/`, `models/` | `Contents/Resources/…`, read-only |
 | `helper` | `native/capture/.build/release/conversation-capture` | `Contents/Resources/bin/conversation-capture` |
 | `sessions` | `sessions/` | `~/Library/Application Support/Conversation Assistant/sessions` |
+| `notices`, `licenses` (the Licenses window) | `THIRD_PARTY_NOTICES.md`, `licenses/` | `Contents/Resources/licenses/THIRD_PARTY_NOTICES.txt`, `Contents/Resources/licenses/` |
 | `src` (the restart banner's watch) | `src/` | none: `/api/engine` never reports stale |
 
 - `~/Library/Application Support/Conversation Assistant/` (`appSupportDir()`) also holds `credentials.json`, the keys saved from the setup page ([Setup](setup.md)), and `Window/`, the window's own storage (the preferences the page remembers). The app's working directory is set there too, so anything still relative lands there, never in `/`.
@@ -72,10 +77,40 @@ flowchart LR
 - **Links to other sites** (the key setup steps, fact-check sources) open in the default browser (`setWindowOpenHandler`). Any other navigation away from `app://conversation-assistant/` is refused.
 - **Exports** are saved to Downloads, like a browser: `<name>.conversation-recording`, then `<name> (2).conversation-recording` if taken. The Dock's Downloads stack bounces when one finishes.
 - **Imports** (the Import button, or a file dropped on the window) work as in a browser. The upload is in-process and instant, and the scheme reports no upload progress, so the progress bar moves back and forth while the recording is unpacked (`web/src/transfer.ts`).
-- **The menu:** the standard app, Edit, View, and Window menus; **File → Show Recordings in Finder**; **Help → Conversation Assistant on GitHub**, **License**, **Third-Party Notices**, and **Chromium Licenses** (the files in `Contents/Resources/licenses/`). **About** shows the version, the license, and where the third-party notices are.
 - **No browser permissions** but the clipboard: Electron grants a page any permission it asks for unless told otherwise, so the window refuses them all except `clipboard-sanitized-write` (the chat's Copy buttons). Capture never goes through the page.
 - **No DevTools in the packaged app** (`webPreferences.devTools`): code pasted into its console would run with the app's microphone grant. `npm run app` keeps them.
 - **Every dialog is a sheet on the window** (`ask()`). A dialog without a window runs macOS's modal loop (`NSAlert runModal`), which stops the main process until it is answered, and with it the engine: a show on air would stop being captured (see [Gotchas](gotchas.md#mac-app-electron)).
+
+## The menu bar — `desktop/main.ts`
+
+Since 28 September 2026 the app menu is the app's own, as in a native Mac app, not Electron's stock one:
+
+| Menu | Items |
+| --- | --- |
+| Conversation Assistant | **About Conversation Assistant** (macOS's panel: the version, the copyright and license, and where the licenses are), **Check for Updates…** (below), **Settings…** (⌘,), then the standard Services, Hide, Hide Others, Show All, and Quit |
+| File | **Show Recordings in Finder**, Close |
+| Edit, View, Window | The standard ones |
+| Help | **Conversation Assistant on GitHub**, **Licenses and Acknowledgements** (below) |
+
+**Settings…** opens the API keys window ([Setup](setup.md)), the page's `?panel=keys`. The app's own windows (Recordings, Insights, Speakers, Labels) stay in the page's settings cog, not in the menu bar: the menu bar holds what is about the app (its version, updates, the API keys, the licenses), and the cog what is about the show, one click away in the window shared on air. So in the Mac app the cog leaves out what the menu bar has: API keys, the footer's version and Licenses link, and the Replay-a-folder button (see [Architecture](architecture.md#web-front-end--web)). In a browser (`npm run serve`), which has no menu bar, the cog keeps them all.
+
+### The bridge to the page — `desktop/preload.ts`, `web/src/desktop.ts`
+
+The page runs sandboxed with context isolation, so a menu item cannot reach it directly. A preload script (bundled on its own to `dist/desktop/preload.cjs`, CommonJS as a sandboxed preload must be) gives the page `window.desktop`, with two functions:
+
+- **`onCommand(cb)`: the menu bar to the page.** A command is the URL name of one of the page's windows (`web/src/router.ts`'s `PANELS`), and `app.ts` opens that window (closing any other). A command sent before the page listens waits in the preload: **Settings…** with the window closed reopens it, and the command is delivered once the page has loaded. The setup screen never listens, since it already is the keys screen.
+- **`run(request)`: the page to the app,** for what only the app can do: `open-licenses`, `open-chromium-licenses`, and `show-license-files`. `desktop/main.ts` answers only these three, and only from a page of the app's own origin.
+
+In a browser `window.desktop` is undefined, and the page does without: the cog's **Licenses** link opens `/licenses` in a new tab instead.
+
+## Licenses and Acknowledgements — `web/licenses.html`, `src/licenses.ts`
+
+**Help → Licenses and Acknowledgements** (and, in a browser, the cog menu's **Licenses** link) opens the licenses in a window of the app's own, which stays open beside the main one, instead of sending the files to TextEdit and the browser as before 28 September 2026. It is a second page of the app, `/licenses`, reading `GET /api/licenses` (open before the keys are set, so it works on the setup screen too):
+
+- A list, with a search: **This app** (the `LICENSE` text, with the version and holder), then every component in `THIRD_PARTY_NOTICES.md`: "Built into the app" (Electron, its update frameworks, sherpa-onnx, eSpeak NG, ONNX Runtime, the two models, the fonts) and "npm packages", each with the license on its first line. ↑ and ↓ move through it.
+- A component shows its notice (Markdown, with its links opening in the browser) and, below, the full texts it names (`licenses/GPL-3.0.txt`, `web/fonts/OFL.txt`…), folded when longer than 60 KB (ONNX Runtime's own third-party notices are 338 KB).
+- `src/licenses.ts` splits the notices at their `##` groups and `###` components, never at a heading inside a code block (sax's Blue Oak license has its own `##` headings), and reads the files on each request, like `/api/about`, so the window shows exactly what ships.
+- In the app, the window adds **Chromium, Node.js, FFmpeg**, which opens `LICENSES.chromium.html` in the browser (20 MB, too large for the window), and **Show license files in Finder** (`Contents/Resources/licenses/`).
 
 ## macOS permissions
 
@@ -94,7 +129,23 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 
 ## Updates
 
-`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/conversation-assistant`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**.
+`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/conversation-assistant`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**, once per version.
+
+**Check for Updates…** (the app menu, since 28 September 2026) says what it finds, each time on a sheet:
+
+| Situation | The sheet |
+| --- | --- |
+| Nothing newer | "You're up to date", with the version |
+| A newer version | "A new version is available", with both versions: **Download and Install**, **Later**, or **Release Notes** (the release's GitHub page; the sheet comes back) |
+| Downloading | No sheet: the menu item reads "Downloading 0.6.3… 45%" (greyed, in steps of 5 %) and the Dock icon shows a progress bar; when it is done, the Restart Now / Later sheet |
+| Already downloaded | The Restart Now / Later sheet again, even after Later |
+| A session on air | "Updates wait until the show ends", with the version |
+| No connection, or a GitHub error | "Can't check for updates right now", with the reason, or "The download failed" |
+| `npm run app` | "Updates come only to the installed app" |
+
+So `autoDownload` is off, and `desktop/main.ts` starts each download itself: at once after an automatic check (the behaviour before), on **Download and Install** after a manual one. While a check or download runs, the item is greyed ("Checking for Updates…").
+
+Tested with `npm run app` on 28 September 2026: the menus, **Settings…** (also with the window closed), the development sheet, and the Licenses window. The other sheets need a signed build, and a newer published version for the download ones: not tested yet.
 
 - It needs a signed app: macOS refuses to update an ad-hoc build.
 - It reads `latest-mac.yml` from the newest published (not draft, not pre-release) GitHub Release.
@@ -105,7 +156,7 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 | Command | Does |
 | --- | --- |
 | `npm run app` | Builds the page and the bundle, then opens the app from the project folder (development) |
-| `npm run build:desktop` | Bundles `desktop/main.ts` and the engine with esbuild into `dist/desktop/main.mjs` (ESM; `electron`, `electron-updater`, and `sherpa-onnx-node` stay external) |
+| `npm run build:desktop` | Bundles `desktop/main.ts` and the engine with esbuild into `dist/desktop/main.mjs` (ESM; `electron`, `electron-updater`, and `sherpa-onnx-node` stay external), and `desktop/preload.ts` into `dist/desktop/preload.cjs` |
 | `npm run dist:mac` | `scripts/build-mac.sh`: the models if missing, the capture helper, the page, the bundle, then electron-builder into `out/` |
 
 `npm run dist:mac` writes `out/Conversation-Assistant-<version>-arm64.dmg` (what people download), `out/Conversation-Assistant-<version>-arm64-mac.zip` (what updates download), their `.blockmap` files, `out/latest-mac.yml`, and the app itself in `out/mac-arm64/`. It takes about 3.5 minutes. Measured at 0.6.2: the app is about 345 MB (328 MiB), the DMG 146 MB; Electron's framework is most of it, then sherpa-onnx (33 MB) and the models (26 MB).
@@ -113,7 +164,7 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 What `electron-builder.yml` puts in the app:
 - `app.asar`: the bundle, `package.json` (the version), and `LICENSE`, plus the production `node_modules` (`electron-updater`, `sherpa-onnx-node`).
 - `app.asar.unpacked`: sherpa-onnx's addon and dylibs, which cannot load from inside the archive.
-- `Contents/Resources/`: `web/` (without source maps), `config/`, `models/*.onnx`, and `bin/conversation-capture`.
+- `Contents/Resources/`: `web/` (`index.html`, `licenses.html`, the styles, the compiled scripts without source maps, the fonts), `config/`, `models/*.onnx`, `bin/conversation-capture`, and `licenses/`.
 - `Info.plist`: the bundle id `com.cloudlesslabs.conversation-assistant`, macOS 14.2 or later (the Core Audio process tap), and the Microphone and System Audio usage descriptions macOS shows in its prompts.
 - English only (`electronLanguages`): the page is in English, and Electron's other languages cost 47 MB.
 - Apple Silicon (`arm64`) only, like the capture helper and sherpa-onnx's addon.
@@ -147,9 +198,9 @@ A signed app holds the user's Microphone and System Audio Recording grants, so i
 
 ### Licenses
 
-The app ships every license it must, in `Contents/Resources/licenses/`, opened from the Help menu:
+The app ships every license it must, in `Contents/Resources/licenses/`, shown by the Licenses and Acknowledgements window (above):
 
-- `LICENSE.txt`: the project's BSD 3-Clause license (also in `app.asar`, and in the settings menu's license window).
+- `LICENSE.txt`: the project's BSD 3-Clause license (also in `app.asar`, which is the copy the Licenses window shows).
 - `THIRD_PARTY_NOTICES.txt`: `THIRD_PARTY_NOTICES.md`, generated by `scripts/third-party-notices.mjs` (`npm run notices`) from the installed production dependencies, plus the components npm does not list: Electron and its frameworks, sherpa-onnx's native libraries, ONNX Runtime, eSpeak NG, the two models, and the fonts. `npm run dist:mac` regenerates it; the release gates (`checks.sh`, `build-app.sh`) fail when the committed copy is out of date.
 - The full texts it refers to (`licenses/`: Apache-2.0, GPL-3.0, MIT, ONNX Runtime's license and third-party notices, Silero VAD's, and the three Electron frameworks'), `LICENSE.electron.txt`, and `LICENSES.chromium.html` (Chromium, Node.js, FFmpeg, and the rest of Electron).
 

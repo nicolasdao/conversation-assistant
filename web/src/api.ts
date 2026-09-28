@@ -95,6 +95,12 @@ export interface ExportInfo {
   bytes: Record<"compressed" | "original" | "none", number>; chats: number; hasAudio: boolean;
 }
 /** `copyToken`: when the library already had it, the upload is kept for 15 minutes so it can be imported again as a copy. */
+export interface LicenseComponent { title: string; license: string; body: string; files: string[] }
+export interface Licenses {
+  app: { name: string; version: string; license: string | null; holder: string | null; text: string };
+  groups: { title: string; components: LicenseComponent[] }[];
+  texts: Record<string, string>;
+}
 export interface ImportResult { summary: SessionSummary; already: boolean; copyToken?: string }
 
 /** Uploads a recording file with progress (fetch cannot report upload progress). */
@@ -121,6 +127,7 @@ export const api = {
   setup: () => call<SetupStatus>("GET", "/api/setup"),
   saveKeys: (keys: Partial<Record<KeyName, string>>) => call<SaveKeysResult>("POST", "/api/setup/keys", keys),
   about: () => call<{ name: string; version: string; license: { id: string | null; holder: string | null; text: string } }>("GET", "/api/about"),
+  licenses: () => call<Licenses>("GET", "/api/licenses"),
   closeView: () => call<{ closed: string | null }>("POST", "/api/sessions/close"),
   calls: (system: "s1" | "s2", limit = 300) =>
     call<{ rows: unknown[]; models: { s1: string | null; s2: string | null } }>("GET", `/api/calls?system=${system}&limit=${limit}`),

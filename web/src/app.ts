@@ -2,13 +2,14 @@
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
-  bindControls, bindSessionName, bindSplit, checkEngine, jumpToSegment, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
-  renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches,
+  bindControls, bindInsights, bindSessionName, bindSplit, checkEngine, jumpToSegment, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
+  renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches, SESSION_WINDOWS, showInsights,
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
 import { renderThinking } from "./calls.js";
 import { bindChat, chatOpened, openChat, renderChat } from "./chat.js";
 import { bindBespoke } from "./ui.js";
+import { desktop } from "./desktop.js";
 import { bindTransfer, renderTransferButtons } from "./transfer.js";
 import { renderKeys } from "./keys.js";
 import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
@@ -44,7 +45,7 @@ function schedule() {
     if (all || dirty.has("timeline") || dirty.has("transcript")) drawTimeline();
     if (all || dirty.has("speakers") || dirty.has("stats")) { renderSpeakers(st); renderFilters(st, onFilter); }
     if (all || dirty.has("claims")) renderClaims(st);
-    if (all || dirty.has("s1")) void renderS1(st);
+    if (all || dirty.has("s1") || dirty.has("stats")) void renderS1(st); // the fact-checker tab shows the stats' totals too
     if (all || dirty.has("labels")) renderLabels(st);
     if (all || dirty.has("cost")) renderCost(st);
     if (all || dirty.has("stats")) renderStats(st);
@@ -73,6 +74,7 @@ function onOpen(id: string) {
   setRoute({ panel: panelName(id) });
   if (id === "dlg-recordings") void renderRecordings(st);
   if (id === "dlg-labels") renderLabels(st);
+  if (id === "dlg-insights") showInsights(readRoute().section ?? "overview");
   if (id === "dlg-chat") chatOpened();
   if (id === "dlg-keys") void renderKeys((m) => toast(m, "ok"));
 }
@@ -187,12 +189,15 @@ async function applyRoute(r: Route, why: "load" | "history") {
     }
     if (r.tab) showPane(TABS[r.tab]!);
     else if (why === "history") showPane("pane-fc");
+    // Speakers and Labels need a session on screen: a URL naming one with nothing on screen opens nothing
+    if (r.panel && !st.session && SESSION_WINDOWS.has(PANELS[r.panel]!)) { r = { ...r, panel: null }; setRoute({ panel: null }); }
     for (const [name, id] of Object.entries(PANELS)) {
       const d = $<HTMLDialogElement>(`#${id}`);
       if (!d) continue;
       if (name === r.panel && !d.open) { onOpen(id); d.showModal(); }
       else if (name !== r.panel && d.open) d.close();
     }
+    if (r.panel === "insights") showInsights(r.section ?? "overview"); // Back and Forward between its tabs
     if (r.recording && r.t !== null && st.session?.status === "archived") {
       syncPlayer(st); // make sure the audio exists before seeking
       seek(r.t);
@@ -201,6 +206,16 @@ async function applyRoute(r: Route, why: "load" | "history") {
     routeReady = true;
     followState();
   }
+}
+
+/** Opens a settings window by its URL name (router.ts), as the Mac app's menu bar asks: Settings… opens API keys. */
+function openPanel(name: string) {
+  const id = PANELS[name];
+  const d = id ? $<HTMLDialogElement>(`#${id}`) : null;
+  if (!d || d.open) return;
+  for (const other of Object.values(PANELS)) if (other !== id) $<HTMLDialogElement>(`#${other}`)?.close();
+  onOpen(id!);
+  d.showModal();
 }
 
 function connect() {
@@ -245,6 +260,8 @@ window.addEventListener("popstate", () => void applyRoute(readRoute(), "history"
 bindBespoke();
 bindTransfer(() => st);
 bindChat({ onTime: jumpToTime });
+bindInsights();
+desktop?.onCommand(openPanel);
 $("#chat-btn")?.addEventListener("click", () => openChat());
 bindTabs();
 void checkEngine();

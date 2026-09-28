@@ -7,7 +7,7 @@ Please report security issues privately, never in a public issue:
 - **GitHub:** the repository's **Security** tab → **Report a vulnerability** (private vulnerability reporting), or
 - **Email:** nic@cloudlesslabs.com, with "Conversation Assistant security" in the subject.
 
-Include what you found, how to reproduce it, and the version (the settings menu shows it). You will get a reply within a week. Please give us a reasonable time to ship a fix before you disclose it.
+Include what you found, how to reproduce it, and the version (**Conversation Assistant → About Conversation Assistant** shows it; in a browser, the settings menu). You will get a reply within a week. Please give us a reasonable time to ship a fix before you disclose it.
 
 Only the latest release is supported: fixes ship as a new version, which installed apps download by themselves.
 

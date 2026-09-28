@@ -63,7 +63,7 @@
         <button id="stop" class="btn stop" disabled>Stop</button>
         <span class="vsep"></span>
         <button id="chat-btn" class="btn chat-btn" title="Chat about the transcript (⌘K)" aria-haspopup="dialog"><svg class="g"><use href="#g-chat"/></svg><span class="lbl">Chat</span><i class="dot" hidden></i></button>
-        <button id="replay-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Replay a folder"><svg class="g"><use href="#g-replay"/></svg></button>
+        <button id="replay-btn" class="btn icon browser-only" aria-haspopup="true" aria-expanded="false" title="Replay a folder"><svg class="g"><use href="#g-replay"/></svg></button>
         <button id="cog-btn" class="btn icon" aria-haspopup="true" aria-expanded="false" title="Settings"><svg><use href="#g-cog"/></svg></button>
 
         <div id="replay-pop" class="pop replay-pop" hidden>
@@ -79,13 +79,12 @@
 
         <div id="cog-menu" class="pop menu" role="menu" hidden>
           <button role="menuitem" data-open="dlg-recordings"><b>Recordings</b><span id="m-recordings"></span></button>
-          <button role="menuitem" data-open="dlg-s1"><b>System 1</b><span id="m-s1"></span></button>
+          <button role="menuitem" data-open="dlg-insights"><b>Insights</b><span id="m-insights"></span></button>
           <button role="menuitem" data-open="dlg-speakers"><b>Speakers</b><span id="m-speakers"></span></button>
           <button role="menuitem" data-open="dlg-labels"><b>Labels</b><span id="m-labels"></span></button>
-          <button role="menuitem" data-open="dlg-stats"><b>Stats</b><span id="m-stats"></span></button>
-          <button role="menuitem" data-open="dlg-log"><b>Log</b><span id="m-log"></span></button>
-          <button role="menuitem" data-open="dlg-keys"><b>API keys</b><span>OpenAI, OpenRouter</span></button>
-          <div class="menu-foot"><span id="app-version"></span><button id="license-link" class="linkbtn">BSD 3-Clause license</button></div>
+          <!-- the Mac app hides these (body.in-app): Settings… (⌘,) and About / Help → Licenses have them -->
+          <button role="menuitem" class="browser-only" data-open="dlg-keys"><b>API keys</b><span>OpenAI, OpenRouter</span></button>
+          <div class="menu-foot browser-only"><span id="app-version"></span><button id="license-link" class="linkbtn">Licenses</button></div>
         </div>
       </div>
     </div>
@@ -174,10 +173,6 @@
     <div class="dlg-head"><h2 id="h-rec">Recordings</h2><span class="sub">Newest first</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="recordings" class="dlg-body"></div>
   </dialog>
-  <dialog id="dlg-s1" aria-labelledby="h-s1">
-    <div class="dlg-head"><h2 id="h-s1">System 1</h2><span class="sub">Jev flags claims; System 2 grades and rewrites</span><button class="x" data-close aria-label="Close">×</button></div>
-    <div id="s1" class="dlg-body"></div>
-  </dialog>
   <dialog id="dlg-speakers" aria-labelledby="h-sp">
     <div class="dlg-head"><h2 id="h-sp">Speakers</h2><span class="sub">Rename a voice, or merge two that are the same person</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="speakers" class="dlg-body"></div>
@@ -186,13 +181,17 @@
     <div class="dlg-head"><h2 id="h-lb">Labels</h2><span class="sub">Changes apply from the next segment</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="labels" class="dlg-body"></div>
   </dialog>
-  <dialog id="dlg-stats" aria-labelledby="h-st">
-    <div class="dlg-head"><h2 id="h-st">Stats</h2><span class="sub">Updated every minute and at the end of the show</span><button class="x" data-close aria-label="Close">×</button></div>
-    <div id="stats" class="dlg-body"></div>
-  </dialog>
-  <dialog id="dlg-log" aria-labelledby="h-lg">
-    <div class="dlg-head"><h2 id="h-lg">Log</h2><span class="sub">Last 30 errors</span><button class="x" data-close aria-label="Close">×</button></div>
-    <div id="errors" class="dlg-body"></div>
+  <!-- Insights: what the session on screen produced, how the fact-checker did, and what went wrong, in three tabs -->
+  <dialog id="dlg-insights" class="insights-dlg" aria-labelledby="h-ins">
+    <div class="dlg-head"><h2 id="h-ins">Insights</h2><span id="insights-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="dlg-tabs tabs" role="tablist" aria-label="Insights">
+      <button role="tab" class="tab" data-section="overview" aria-controls="stats" aria-selected="true" data-sub="Updated every minute and at the end of the show">Overview</button>
+      <button role="tab" class="tab" data-section="fact-checker" aria-controls="s1" aria-selected="false" data-sub="Jev flags claims; System 2 grades them and rewrites System 1">Fact-checker</button>
+      <button role="tab" class="tab" data-section="log" aria-controls="errors" aria-selected="false" data-sub="The last 30 errors">Log <span id="log-count" class="n"></span></button>
+    </div>
+    <div id="stats" class="dlg-body" role="tabpanel" data-section="overview"></div>
+    <div id="s1" class="dlg-body" role="tabpanel" data-section="fact-checker" hidden></div>
+    <div id="errors" class="dlg-body" role="tabpanel" data-section="log" hidden></div>
   </dialog>
 
   <dialog id="dlg-keys" class="keys-dlg" aria-labelledby="h-keys">
@@ -245,11 +244,6 @@
     <div id="import-body" class="dlg-body"></div>
   </dialog>
   <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .conversation-recording file</span></div></div>
-
-  <dialog id="dlg-license" aria-labelledby="h-license">
-    <div class="dlg-head"><h2 id="h-license">License</h2><span id="license-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
-    <div class="dlg-body"><pre id="license-text" class="license-text"></pre></div>
-  </dialog>
 
   <!-- A speaker, from a click on their name in the transcript: rename or merge -->
   <dialog id="dlg-speaker" class="speaker-dlg" aria-labelledby="h-speaker">

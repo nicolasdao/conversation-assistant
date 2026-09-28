@@ -127,6 +127,7 @@ describe("the server before the keys are set", () => {
 
   test("only the setup routes answer until both keys are saved", async () => {
     expect((await call("GET", "/api/state")).status).toBe(503);
+    expect((await call("GET", "/api/licenses")).status).toBe(200); // Help → Licenses works on the setup screen too
     const s = await call("GET", "/api/setup");
     expect(s.json).toMatchObject({ configured: false, keys: [{ name: "openai", set: false }, { name: "openrouter", set: false }] });
     expect((await call("POST", "/api/setup/keys", { openai: OPENAI })).json).toMatchObject({ saved: true, configured: false });

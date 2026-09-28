@@ -25,7 +25,7 @@
     "build:capture": "swift build -c release --package-path native/capture",
     "capture:test": "sh scripts/capture-test.sh",
     "build:web": "tsc -p web/tsconfig.json",
-    "build:desktop": "esbuild desktop/main.ts --bundle --platform=node --format=esm --target=node24 --sourcemap --log-level=warning --external:electron --external:electron-updater --external:sherpa-onnx-node --outfile=dist/desktop/main.mjs",
+    "build:desktop": "esbuild desktop/main.ts --bundle --platform=node --format=esm --target=node24 --sourcemap --log-level=warning --external:electron --external:electron-updater --external:sherpa-onnx-node --outfile=dist/desktop/main.mjs && esbuild desktop/preload.ts --bundle --platform=node --format=cjs --target=node24 --log-level=warning --external:electron --outfile=dist/desktop/preload.cjs",
     "app": "npm run build:web && npm run build:desktop && electron .",
     "dist:mac": "sh scripts/build-mac.sh",
     "notices": "node scripts/third-party-notices.mjs"

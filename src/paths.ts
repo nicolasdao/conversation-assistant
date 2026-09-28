@@ -18,6 +18,10 @@ export interface AppPaths {
   sessions: string;
   /** The conversation-capture helper. */
   helper: string;
+  /** The third-party notices, THIRD_PARTY_NOTICES.md (in the Mac app, a .txt copy next to the full texts). */
+  notices: string;
+  /** The full license texts the notices point to: licenses/. */
+  licenses: string;
   /** The engine's TypeScript sources, watched for the restart banner; null where there are none (the Mac app). */
   src: string | null;
 }
@@ -31,6 +35,8 @@ const DEFAULTS: AppPaths = {
   models: "models",
   sessions: "sessions",
   helper: "native/capture/.build/release/conversation-capture",
+  notices: join(ROOT, "THIRD_PARTY_NOTICES.md"),
+  licenses: join(ROOT, "licenses"),
   src: join(ROOT, "src"),
 };
 

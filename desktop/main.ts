@@ -1,7 +1,7 @@
 // The Mac app (see docs/desktop.md). The engine runs in this process, the one `npm run serve` starts, and the window
 // loads the same web page from the private app:// scheme, answered in-process: no server, no port.
-import { app, BrowserWindow, dialog, Menu, powerSaveBlocker, protocol, session, shell, systemPreferences } from "electron";
-import electronUpdater from "electron-updater";
+import { app, BrowserWindow, dialog, ipcMain, Menu, powerSaveBlocker, protocol, session, shell, systemPreferences } from "electron";
+import electronUpdater, { type UpdateInfo } from "electron-updater";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { extname, join } from "node:path";
@@ -30,12 +30,14 @@ if (app.isPackaged) {
   setAppPaths({
     root: app.getAppPath(), web: join(res, "web"), config: join(res, "config"), models: join(res, "models"),
     helper: join(res, "bin", "conversation-capture"), sessions: join(appSupportDir(), "sessions"), src: null,
+    notices: join(res, "licenses", "THIRD_PARTY_NOTICES.txt"), licenses: join(res, "licenses"),
   });
   mkdirSync(appPaths().sessions, { recursive: true });
   process.chdir(appSupportDir()); // anything still relative lands here, never in "/"
 } else {
   // `npm run app`: the project folder, like `npm run serve`; the engine is bundled, so src/ edits need a restart
-  setAppPaths({ root: app.getAppPath(), src: join(app.getAppPath(), "src") });
+  const dir = app.getAppPath();
+  setAppPaths({ root: dir, src: join(dir, "src"), notices: join(dir, "THIRD_PARTY_NOTICES.md"), licenses: join(dir, "licenses") });
 }
 // the window's own storage (preferences the page remembers) goes in a subfolder, next to the keys and recordings
 app.setPath("userData", join(appSupportDir(), "Window"));
@@ -54,29 +56,55 @@ const { engine, server } = bootEngine({ allowOverDevCap: app.isPackaged });
 const handle = inProcessHandler(server);
 const onAir = () => engine.current?.status === "running";
 let win: BrowserWindow | null = null;
+let licensesWin: BrowserWindow | null = null;
 
-// ---------- the window ----------
+// ---------- the windows ----------
 
 function openOutside(url: string) {
   if (/^(https?|mailto):/.test(url)) void shell.openExternal(url);
 }
 
-function createWindow() {
-  win = new BrowserWindow({
-    width: 1440, height: 900, minWidth: 1024, minHeight: 640, title: "Conversation Assistant", backgroundColor: "#0a1628", show: false,
+/** A window on a page of the app: sandboxed, with the preload's bridge (desktop/preload.ts), and nowhere else to go. */
+function appWindow(opts: Electron.BrowserWindowConstructorOptions, path: string): BrowserWindow {
+  const w = new BrowserWindow({
+    ...opts, backgroundColor: "#0a1628", show: false,
     // no DevTools in the packaged app: pasted into its console, code could use the app's microphone grant
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false, devTools: !app.isPackaged },
+    webPreferences: {
+      contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false, devTools: !app.isPackaged,
+      preload: join(import.meta.dirname, "preload.cjs"),
+    },
   });
-  win.once("ready-to-show", () => win?.show());
-  // links to other sites (key setup steps, fact-check sources) open in the default browser, never in the app
-  win.webContents.setWindowOpenHandler(({ url }) => { openOutside(url); return { action: "deny" }; });
-  win.webContents.on("will-navigate", (e, url) => {
+  w.once("ready-to-show", () => w.show());
+  // links to other sites (key setup steps, fact-check sources, license pages) open in the default browser, never in the app
+  w.webContents.setWindowOpenHandler(({ url }) => { openOutside(url); return { action: "deny" }; });
+  w.webContents.on("will-navigate", (e, url) => {
     if (url.startsWith(`${ORIGIN}/`)) return;
     e.preventDefault();
     openOutside(url);
   });
+  void w.loadURL(`${ORIGIN}${path}`);
+  return w;
+}
+
+function createWindow() {
+  win = appWindow({ width: 1440, height: 900, minWidth: 1024, minHeight: 640, title: "Conversation Assistant" }, "/");
   win.on("closed", () => { win = null; });
-  void win.loadURL(`${ORIGIN}/`);
+}
+
+/** Licenses and Acknowledgements (web/licenses.html): its own window, which stays open beside the app's. */
+function openLicenses() {
+  if (licensesWin) return licensesWin.show();
+  licensesWin = appWindow({ width: 1040, height: 760, minWidth: 720, minHeight: 480, title: "Licenses and Acknowledgements" }, "/licenses");
+  licensesWin.on("closed", () => { licensesWin = null; });
+}
+
+/** A command from the menu bar to the page (web/src/desktop.ts): opens the window first, if it was closed. */
+function sendCommand(command: string) {
+  if (!win) createWindow();
+  win!.show();
+  const w = win!.webContents;
+  if (w.isLoading()) w.once("did-finish-load", () => w.send("desktop:command", command));
+  else w.send("desktop:command", command);
 }
 
 /**
@@ -99,14 +127,46 @@ function downloadPath(fileName: string): string {
   return p;
 }
 
-/** A license file: in the app's Resources/licenses when packaged, in the project folder in development. */
-function licensePath(packaged: string, project: string): string {
-  return app.isPackaged ? join(process.resourcesPath, "licenses", packaged) : join(app.getAppPath(), project);
+/** The license files: the app's Resources/licenses when packaged, the project's licenses/ in development. */
+const licensesDir = () => (app.isPackaged ? join(process.resourcesPath, "licenses") : join(app.getAppPath(), "licenses"));
+/** Chromium's, Node.js's, FFmpeg's, and the rest of Electron's: a 20 MB page, which opens in the browser. */
+const chromiumLicenses = () => (app.isPackaged
+  ? join(licensesDir(), "LICENSES.chromium.html") : join(app.getAppPath(), "node_modules/electron/dist/LICENSES.chromium.html"));
+
+/** What a page may ask the app for (web/src/desktop.ts), from the app's own pages only. */
+ipcMain.on("desktop:run", (e, request: unknown) => {
+  if (!e.senderFrame?.url.startsWith(`${ORIGIN}/`)) return;
+  if (request === "open-licenses") openLicenses();
+  else if (request === "open-chromium-licenses") void shell.openPath(chromiumLicenses());
+  else if (request === "show-license-files") void shell.openPath(licensesDir());
+});
+
+function updateItem(): Electron.MenuItemConstructorOptions {
+  if (update.kind === "checking") return { label: "Checking for Updates…", enabled: false };
+  if (update.kind === "downloading") return { label: `Downloading ${update.version}… ${update.percent}%`, enabled: false };
+  return { label: "Check for Updates…", click: () => void checkForUpdatesNow() };
 }
 
+/** The menu bar; rebuilt when the update item changes. */
 function menu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { role: "appMenu" },
+    {
+      label: app.name,
+      submenu: [
+        { role: "about" },
+        updateItem(),
+        { type: "separator" },
+        { label: "Settings…", accelerator: "CommandOrControl+,", click: () => sendCommand("keys") },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
     {
       label: "File",
       submenu: [
@@ -123,9 +183,7 @@ function menu() {
       submenu: [
         { label: "Conversation Assistant on GitHub", click: () => void shell.openExternal(REPO) },
         { type: "separator" },
-        { label: "License", click: () => void shell.openPath(licensePath("LICENSE.txt", "LICENSE")) },
-        { label: "Third-Party Notices", click: () => void shell.openPath(licensePath("THIRD_PARTY_NOTICES.txt", "THIRD_PARTY_NOTICES.md")) },
-        { label: "Chromium Licenses", click: () => void shell.openPath(licensePath("LICENSES.chromium.html", "node_modules/electron/dist/LICENSES.chromium.html")) },
+        { label: "Licenses and Acknowledgements", click: () => openLicenses() },
       ],
     },
   ]));
@@ -188,29 +246,125 @@ app.on("before-quit", (e) => {
 /**
  * Updates come from the project's GitHub Releases (see docs/desktop.md). They are looked for and downloaded only while
  * nothing is on air, so a download never competes with a live call, and installed when the app quits, or at once if
- * the host chooses to restart.
+ * the host chooses to restart. An automatic check downloads a new version quietly, then offers to restart; Check for
+ * Updates… says what it found and downloads only when asked.
  */
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "downloading"; version: string; percent: number }
+  | { kind: "ready"; version: string };
+
+let update: UpdateState = { kind: "idle" };
+/** The version whose restart was offered: "update-downloaded" offers each version once; Check for Updates… offers it again. */
+let offered: string | null = null;
+const { autoUpdater } = electronUpdater;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** An updater error, short enough for a sheet: its first line. */
+const reason = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n", 1)[0]!.slice(0, 200);
+
+/** Shows the state in the menu, and a download's progress on the Dock icon. */
+function setUpdate(next: UpdateState) {
+  update = next;
+  win?.setProgressBar(next.kind === "downloading" ? next.percent / 100 : -1);
+  menu();
+}
+
+/** Asks GitHub for a newer version: its info, or null when this is the newest. */
+async function lookForUpdate(): Promise<UpdateInfo | null> {
+  setUpdate({ kind: "checking" });
+  try {
+    const r = await autoUpdater.checkForUpdates();
+    return r?.isUpdateAvailable ? r.updateInfo : null;
+  } finally {
+    if (update.kind === "checking") setUpdate({ kind: "idle" });
+  }
+}
+
+/** Downloads a found version; "update-downloaded" then makes it ready. */
+async function download(version: string) {
+  setUpdate({ kind: "downloading", version, percent: 0 });
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (e) {
+    if (update.kind === "downloading") setUpdate({ kind: "idle" });
+    throw e;
+  }
+}
+
+async function offerRestart(version: string) {
+  offered = version;
+  while (onAir()) await sleep(30_000);
+  const { response } = await ask({
+    type: "info", buttons: ["Restart Now", "Later"], defaultId: 0, cancelId: 1,
+    message: `Conversation Assistant ${version} is ready`,
+    detail: "Restart to use it now, or it installs the next time you quit.",
+  });
+  if (response === 0) autoUpdater.quitAndInstall();
+}
+
+/** Check for Updates…: every outcome is said, on a sheet (see ask()). */
+async function checkForUpdatesNow() {
+  const current = app.getVersion();
+  const info = (message: string, detail: string, type: "info" | "warning" = "info") =>
+    ask({ type, buttons: ["OK"], message, detail });
+  const onAirSheet = () => info("Updates wait until the show ends",
+    `You have ${current}. Nothing is checked for or downloaded while a session is on air.`);
+  if (!app.isPackaged) {
+    return void info("Updates come only to the installed app",
+      `This copy runs from the project folder (${current}). Install a signed build to check for updates.`);
+  }
+  if (onAir()) return void onAirSheet();
+  if (update.kind === "ready") return offerRestart(update.version);
+  if (update.kind !== "idle") return;
+  let found: UpdateInfo | null;
+  try {
+    found = await lookForUpdate();
+  } catch (e) {
+    return void info("Can't check for updates right now", `${reason(e)}\n\nCheck the internet connection and try again. You have ${current}.`, "warning");
+  }
+  if (!found) return void info("You're up to date", `Conversation Assistant ${current} is the newest version.`);
+  for (;;) {
+    const { response } = await ask({
+      type: "info", buttons: ["Download and Install", "Later", "Release Notes"], defaultId: 0, cancelId: 1,
+      message: "A new version is available",
+      detail: `Conversation Assistant ${found.version} is out. You have ${current}.`,
+    });
+    if (response === 2) { void shell.openExternal(`${REPO}/releases/tag/v${found.version}`); continue; }
+    if (response !== 0) return;
+    break;
+  }
+  if (onAir()) return void onAirSheet(); // a session started while the sheet was up
+  // when it is done, "update-downloaded" offers the restart: this version was never offered, or it would be ready
+  try {
+    await download(found.version);
+  } catch (e) {
+    return void info("The download failed", `${reason(e)}\n\nTry Check for Updates… again later. You have ${current}.`, "warning");
+  }
+}
+
 function updates() {
   if (!app.isPackaged) return;
-  const { autoUpdater } = electronUpdater;
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false; // started here: at once after an automatic check, on request after Check for Updates…
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on("error", (e) => console.error(`update: ${e instanceof Error ? e.message : String(e)}`));
-  let offered = false;
-  autoUpdater.on("update-downloaded", async (info) => {
-    if (offered) return;
-    offered = true;
-    while (onAir()) await new Promise((r) => setTimeout(r, 30_000));
-    const { response } = await ask({
-      type: "info", buttons: ["Restart Now", "Later"], defaultId: 0, cancelId: 1,
-      message: `Conversation Assistant ${info.version} is ready`,
-      detail: "Restart to use it now, or it installs the next time you quit.",
-    });
-    if (response === 0) autoUpdater.quitAndInstall();
+  autoUpdater.on("download-progress", (p) => {
+    const percent = Math.floor(p.percent / 5) * 5; // the menu is rebuilt only every 5 %
+    if (update.kind === "downloading" && percent > update.percent) setUpdate({ ...update, percent });
   });
-  const check = () => { if (!onAir()) void autoUpdater.checkForUpdates().catch(() => {}); };
-  check();
-  setInterval(check, UPDATE_EVERY_MS).unref();
+  autoUpdater.on("update-downloaded", (i) => {
+    setUpdate({ kind: "ready", version: i.version });
+    if (offered !== i.version) void offerRestart(i.version);
+  });
+  const check = async () => {
+    if (onAir() || update.kind !== "idle") return;
+    try {
+      const found = await lookForUpdate();
+      if (found && !onAir()) await download(found.version);
+    } catch { /* logged by the "error" handler; the next check tries again */ }
+  };
+  void check();
+  setInterval(() => void check(), UPDATE_EVERY_MS).unref();
 }
 
 // ---------- start ----------
@@ -233,7 +387,7 @@ app.whenReady().then(() => {
   });
   app.setAboutPanelOptions({
     copyright: "© 2026 Cloudless Consulting Pty Ltd · BSD 3-Clause",
-    credits: "Includes third-party software under their own licenses: Help → Third-Party Notices.",
+    credits: "Includes third-party software under their own licenses: Help → Licenses and Acknowledgements.",
     website: REPO,
   });
   menu();

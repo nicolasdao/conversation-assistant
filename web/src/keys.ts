@@ -3,6 +3,7 @@
 // sends a key back, only its last 4 characters (see docs/setup.md).
 import { api, type KeyName, type KeyStatus, type SaveKeysResult, type SetupStatus } from "./api.js";
 import { $, h, replace, s } from "./dom.js";
+import { desktop } from "./desktop.js";
 
 interface Guide {
   title: string;
@@ -211,7 +212,7 @@ export function showSetup(status: SetupStatus) {
     h("section", { class: "setup-panel" }, cards, actions, trust()),
     h("p", { class: "note setup-privacy" },
       "A show costs about $1.60 an hour ($1.23 for a transcript only), from prepaid credit; each session stops itself at $10. ",
-      `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: cog menu → API keys.`)));
+      `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: ${desktop ? "Conversation Assistant → Settings… (⌘,)" : "cog menu → API keys"}.`)));
   document.body.append(root);
   fields[0]?.input.focus();
 }
@@ -242,7 +243,7 @@ function keyCard(name: KeyName, status: KeyStatus | undefined, submit: () => voi
   return { el, field };
 }
 
-/** The API keys window (cog menu): replaces a key; the next call uses it, without a restart. */
+/** The API keys window (cog menu; Settings… in the Mac app): replaces a key; the next call uses it, without a restart. */
 export async function renderKeys(onSaved: (message: string) => void) {
   const box = $("#keys");
   if (!box) return;

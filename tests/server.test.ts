@@ -8,6 +8,7 @@ import { about, ApiError, createApiServer, engineStale, type EngineApi, type Sta
 import { EventBus } from "../src/store/events.ts";
 import { wavHeader } from "../src/audio/wav.ts";
 import { limit, streamGain } from "../src/server/audio.ts";
+import { parseNotices } from "../src/licenses.ts";
 
 /** A fake pipeline: records every command and emits the events a real session would. */
 class FakeEngine implements EngineApi {
@@ -58,6 +59,7 @@ beforeAll(async () => {
   mkdirSync(join(web, "dist"), { recursive: true });
   mkdirSync(join(web, "fonts"), { recursive: true });
   writeFileSync(join(web, "index.html"), "<!doctype html><title>t</title>");
+  writeFileSync(join(web, "licenses.html"), "<!doctype html><title>l</title>");
   writeFileSync(join(web, "styles.css"), "body{}");
   writeFileSync(join(web, "dist", "app.js"), "export {}");
   writeFileSync(join(web, "fonts", "face.woff2"), "wOF2");
@@ -199,6 +201,29 @@ describe("HTTP API", () => {
     expect(about().version).toBe(a.version);
   });
 
+  test("the licenses: the app's own, then every third-party component with the full texts it names", async () => {
+    const l = (await call("GET", "/api/licenses")).json;
+    expect(l.app).toMatchObject({ name: "Conversation Assistant", license: "BSD-3-Clause", text: expect.stringMatching(/Cloudless Consulting Pty Ltd/) });
+    expect(l.groups.map((g: any) => g.title)).toEqual(["Components built into the app", "npm packages in the app"]);
+    const all = l.groups.flatMap((g: any) => g.components);
+    const find = (prefix: string) => all.find((c: any) => c.title.startsWith(prefix));
+    expect(find("Electron")).toMatchObject({ license: "MIT" });
+    expect(find("eSpeak NG")).toMatchObject({ license: "GPL-3.0-or-later", files: ["licenses/GPL-3.0.txt"] });
+    expect(find("Barlow")).toMatchObject({ files: ["web/fonts/OFL.txt"] });
+    expect(find("sax").body).toMatch(/# Blue Oak Model License/); // a heading inside a code block stays in its component
+    for (const c of all) for (const f of c.files) expect(l.texts[f]).toBeTruthy();
+    expect(l.texts["licenses/GPL-3.0.txt"]).toMatch(/GNU GENERAL PUBLIC LICENSE/);
+  });
+
+  test("the notices split into groups and components, not at headings inside code blocks", () => {
+    const md = "# Third-party notices\n\nIntro.\n\n## Built in\n\n### A 1.0\n\n**GPL-3.0** · https://a. Full text: `licenses/GPL-3.0.txt`.\n\n"
+      + "## Packages\n\n### B 2.0\n\nMIT · https://b\n\n```text\n## Purpose\n### Not a component\n```\n";
+    expect(parseNotices(md)).toEqual([
+      { title: "Built in", components: [{ title: "A 1.0", license: "GPL-3.0", body: "**GPL-3.0** · https://a. Full text: `licenses/GPL-3.0.txt`.", files: ["licenses/GPL-3.0.txt"] }] },
+      { title: "Packages", components: [{ title: "B 2.0", license: "MIT", body: "MIT · https://b\n\n```text\n## Purpose\n### Not a component\n```", files: [] }] },
+    ]);
+  });
+
   test("the page can tell when the engine code changed after the server started", async () => {
     expect((await call("GET", "/api/engine")).json).toMatchObject({ stale: false });
     const src = mkdtempSync(join(tmpdir(), "src-"));
@@ -246,6 +271,7 @@ describe("HTTP API", () => {
     // the page's own URLs serve the page; anything else is not found
     expect((await call("GET", "/recordings/20260925-202620")).type).toContain("text/html");
     expect((await call("GET", "/recordings/../secret.txt")).status).toBe(404);
+    expect((await call("GET", "/licenses")).type).toContain("text/html");
     expect((await call("POST", "/api/sessions/close")).json).toEqual({ closed: "20260925-120000" });
     expect((await call("GET", "/dist/%2e%2e/%2e%2e/secret.txt")).status).toBe(404);
     expect((await call("GET", "/dist/..%2F..%2Fsecret.txt")).status).toBe(404);

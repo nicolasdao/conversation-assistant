@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Licenses and Acknowledgements</title>
+  <link rel="preload" href="/fonts/BarlowCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/Barlow-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23e8263b'/><circle cx='8' cy='8' r='3.5' fill='%23fff'/></svg>">
+</head>
+<!-- The Licenses and Acknowledgements window (Help menu in the Mac app; the settings menu's footer in a browser). -->
+<body class="lic-page">
+  <nav class="lic-side" aria-label="Components">
+    <input id="lic-search" class="input" type="search" placeholder="Search" aria-label="Search licenses" autocomplete="off">
+    <div id="lic-list" class="lic-list" role="listbox" aria-label="Components"></div>
+    <div id="lic-desktop" class="lic-desktop" hidden>
+      <button id="lic-chromium" class="linkbtn">Chromium, Node.js, FFmpeg (20 MB) ↗</button>
+      <button id="lic-finder" class="linkbtn">Show license files in Finder</button>
+    </div>
+  </nav>
+  <main id="lic-detail" class="lic-detail" aria-live="polite"></main>
+  <script type="module" src="/dist/licenses.js"></script>
+</body>
+</html>
