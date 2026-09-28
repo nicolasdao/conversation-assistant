@@ -1,6 +1,6 @@
 ---
-description: Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.
-tags: [gotchas, macos, openai, openrouter, jev, sherpa-onnx, electron]
+description: Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.
+tags: [gotchas, macos, openai, openrouter, jev, sherpa-onnx, electron, website, cloudflare]
 source:
   - native/capture/**
   - src/audio/nativeSource.ts
@@ -11,6 +11,8 @@ source:
   - src/store/transfer.ts
   - desktop/**
   - src/server/inProcess.ts
+  - website/wrangler.jsonc
+  - website/_headers
 ---
 
 # Gotchas
@@ -72,6 +74,15 @@ source:
 - **An immutable release's tag name stays reserved on GitHub**, even after the repository is renamed away and a new one is created under the same name: pushing that tag again fails with "Cannot create ref due to creations being restricted", although the new repository has no rules. It stops a published version from being swapped. When the repository was recreated on 28 September 2026, `v0.6.0` could not be restored; the next version must always get a new number.
 - **Renaming the app must not rename its identifiers.** The bundle id carries the permissions and the updates, and the window's storage is kept per page address (`app://conversation-assistant`), so the rename to Tattle kept both, with the notary keychain profile (see [The Mac app](desktop.md#the-name-and-what-kept-the-old-one)). The data folder in Application Support is named after the app, so it has to be moved (`migrateAppSupportDir()`), or a renamed app starts with no keys and no recordings. And the update that carries a rename renames the `.app` too, then fails to relaunch it (ShipIt looks for its helper in the old path): the app quits and must be reopened by hand.
 - **In development the permission status is the terminal's.** `systemPreferences.getMediaAccessStatus("microphone")` reports Electron's own status, while macOS asks on behalf of the terminal that started `npm run app`, so the first-launch sheet would show on every launch. It runs only in the packaged app.
+
+## Website and Cloudflare
+
+- **Pushes do not deploy the website unless the Cloudflare GitHub App can see this repository.** On 28 September 2026 the first push to `master` started no build, while a build started by hand (dashboard, or `POST /builds/triggers/<id>/builds`) cloned the repository and deployed fine, which hid the cause: the app's installation was limited to selected repositories and `tattle` was not one of them. Grant it at **github.com/settings/installations → Cloudflare → Configure**; the next push built by itself (`build_trigger_source: push_event`). Check this again after renaming or recreating the repository. See [Website](website.md#deploying).
+- **Workers Builds runs `npm install` for the repository root before deploying**, even with `/website` as the root directory and no build command: the site's build installed the whole Electron app. The trigger's build variable `SKIP_DEPENDENCY_INSTALL=1` skips it; the deploy then goes straight to `npx wrangler deploy`.
+- **A build can fail with "Build failed to initialize and was timed out"** before running anything. It is Cloudflare's side; the same build started again succeeded. A failed build deploys nothing, so the live site is untouched.
+- **Editing the page's import map breaks the 3D key without an error on the page.** The Content Security Policy in `website/_headers` allows that inline `<script type="importmap">` only by its SHA-256 hash, and the import map pins Three.js files by `sha384`. A stale hash blocks the script (reported only in the browser console) and the page falls back to the CSS key. Recompute both after any change ([Website](website.md#security)).
+- **The `cloudflare` skill's `cf.js` does not run in this repository as installed.** It is CommonJS (`require`), and the root `package.json` says `"type": "module"`, so Node refuses it (`require is not defined in ES module scope`). It also reads the token only from a `.env` found by walking up from the current directory, not from `secrets/cloudflare.env`, the file the skill's own install names. Until the skill is fixed: copy it to a `.cjs` file outside the repository and load the token into the environment for the command (`set -a; . ./secrets/cloudflare.env; set +a`). Writes use `curl` with the token piped through `--config -`, never on the command line.
+- **`wrangler deploy --dry-run` reports more files than it uploads** ("Read 98 files" for an 18-file upload, more than `website/` held), so the count says nothing about whether `.assetsignore` works. Check the upload list of a real deploy, or request an ignored path (`/experiments/` answers 404).
 
 ## Jev questions
 

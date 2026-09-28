@@ -25,12 +25,13 @@
         "Documentation",
         "Design decisions",
         "Built with Claude Code",
+        "Website",
         "Releasing",
         "Security",
         "License",
         "Versioning"
       ],
-      "line_count": 231,
+      "line_count": 240,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -46,7 +47,8 @@
         "docs/setup.md",
         "docs/speakers.md",
         "docs/system1-system2.md",
-        "docs/transcription.md"
+        "docs/transcription.md",
+        "docs/website.md"
       ],
       "over_size": false,
       "parse_error": null,
@@ -234,7 +236,7 @@
     },
     {
       "dangling": false,
-      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.",
+      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.",
       "has_frontmatter": true,
       "headings": [
         "Gotchas",
@@ -246,14 +248,16 @@
         "Export and import",
         "Chat",
         "Mac app (Electron)",
+        "Website and Cloudflare",
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 84,
+      "line_count": 95,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
-        "docs/recordings.md"
+        "docs/recordings.md",
+        "docs/website.md"
       ],
       "over_size": false,
       "parse_error": null,
@@ -267,7 +271,9 @@
         "scripts/make-fixtures.ts",
         "src/store/transfer.ts",
         "desktop/**",
-        "src/server/inProcess.ts"
+        "src/server/inProcess.ts",
+        "website/wrangler.jsonc",
+        "website/_headers"
       ],
       "source_unresolved": [],
       "tags": [
@@ -277,7 +283,9 @@
         "openrouter",
         "jev",
         "sherpa-onnx",
-        "electron"
+        "electron",
+        "website",
+        "cloudflare"
       ],
       "toc": {
         "linked": false,
@@ -641,6 +649,55 @@
         "realtime",
         "latency",
         "cost"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.",
+      "has_frontmatter": true,
+      "headings": [
+        "Website",
+        "What is in `website/`",
+        "Hosting",
+        "Deploying",
+        "Security",
+        "The Cloudflare skills and the token",
+        "Changing the site"
+      ],
+      "line_count": 126,
+      "links_to": [
+        "docs/desktop.md",
+        "docs/gotchas.md",
+        "docs/jev.md",
+        "docs/mission.md",
+        "docs/system1-system2.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/website.md",
+      "source": [
+        "website/index.html",
+        "website/assets/**",
+        "website/wrangler.jsonc",
+        "website/_headers",
+        "website/.assetsignore",
+        "website/experiments/**"
+      ],
+      "source_unresolved": [],
+      "tags": [
+        "website",
+        "cloudflare",
+        "hosting",
+        "deployment",
+        "workers",
+        "dns",
+        "security",
+        "csp"
       ],
       "toc": {
         "linked": false,

@@ -1,5 +1,7 @@
 # Tattle
 
+**Website: [hey-tattle.com](https://hey-tattle.com)**
+
 **An open-source Mac app** that transcribes live conversations (your microphone and the call your Mac plays), maps them on a timeline, and fact-checks claims as they're said.
 
 **[Download for Mac](https://github.com/nicolasdao/tattle/releases/latest)** · Apple Silicon, macOS 14.2 or later · signed and notarized by Apple · updates itself · free and open source ([BSD 3-Clause](LICENSE))
@@ -18,6 +20,7 @@ It was built for a podcast recorded over Riverside: the host's microphone plus t
 - [Documentation](#documentation)
 - [Design decisions](#design-decisions)
 - [Built with Claude Code](#built-with-claude-code)
+- [Website](#website)
 - [Releasing](#releasing)
 - [Security](#security)
 - [License](#license)
@@ -106,7 +109,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - [Architecture](docs/architecture.md) — The end-to-end architecture — native capture, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.
 - [Chat](docs/chat.md) — The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.
 - [The Mac app](docs/desktop.md) — The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, the menu bar (Settings, Check for Updates, Licenses and Acknowledgements) and its bridge to the page, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.
-- [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.
+- [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.
 - [Jev](docs/jev.md) — What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.
 - [Mission](docs/mission.md) — Why Tattle exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 - [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, exports, imports, and deletes past sessions.
@@ -115,6 +118,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, voices tied to a stream with a per-stream limit, the 0.65 threshold, merge suggestions with confidence, and how to rename, merge, and calibrate.
 - [System 1 and System 2](docs/system1-system2.md) — The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.
 - [Transcription](docs/transcription.md) — How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.
+- [Website](docs/website.md) — Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
 <!-- END doc-index -->
 
 ## Design decisions
@@ -167,8 +171,13 @@ A good session starts with `/init-context <what you want to do>`: it loads the m
 | Checking work | `scrutinize`, `second-opinion` | Review and fix the session's own changes with evidence; audit an analysis and fix plan before it is implemented |
 | Explaining | `decision-brief`, `unconfuse` | Recast the last answer as a brief to act on, or re-explain it plainly |
 | Skill authoring | `happyskills-design` | Design, audit, and update skills like these |
+| Website hosting | `cloudflare`, `cloudflare-config`, `cloudflare-deploy` | Audit the Cloudflare account, change DNS and zone settings, and deploy the website (see [Website](docs/website.md)) |
 
-Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.claude/` holds a secret.
+Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.claude/` holds a secret. The Cloudflare skills' API token lives in `secrets/cloudflare.env`, and the whole `secrets/` folder is git-ignored.
+
+## Website
+
+The official website is **[hey-tattle.com](https://hey-tattle.com)** (`www.hey-tattle.com` redirects to it). It is the static page in `website/`, hosted on Cloudflare as the Worker `tattle-website`, and it redeploys by itself about three minutes after any push to `master` that changes `website/`; pushes that only touch the app do not deploy it. Its Download for Mac button always points at the latest release's DMG, read from GitHub, so an app release needs no website change. How it is hosted, deployed, secured, and changed: [Website](docs/website.md).
 
 ## Releasing
 
