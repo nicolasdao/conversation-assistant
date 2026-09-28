@@ -1,0 +1,17 @@
+// Tattle's website on Cloudflare: a Worker that serves this folder's files as they are. There is no build step.
+// Deploys on every push to master that changes website/ (Workers Builds, set up on 2026-09-28), or by hand with
+// `npx wrangler deploy` from this folder. www.hey-tattle.com redirects here through a zone redirect rule.
+{
+  "name": "tattle-website",
+  "compatibility_date": "2026-09-28",
+  "assets": {
+    "directory": ".",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "routes": [
+    { "pattern": "hey-tattle.com", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "preview_urls": false
+}

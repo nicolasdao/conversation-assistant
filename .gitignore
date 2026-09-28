@@ -51,6 +51,7 @@ build/
 out/
 .vite/
 dist-electron/
+.wrangler/
 coverage/
 
 # ------------------------------------------------------------

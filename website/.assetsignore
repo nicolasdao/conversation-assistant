@@ -1,0 +1,7 @@
+# Files in website/ that are never served. The ten design experiments stay in the repo, off the public site.
+wrangler.jsonc
+.assetsignore
+experiments/
+*.md
+.DS_Store
+.wrangler/

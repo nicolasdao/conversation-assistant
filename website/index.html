@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tattle · Live transcripts and fact-checks for your Mac</title>
+<meta name="description" content="Tattle is a free, open-source Mac app that transcribes your calls live, maps the conversation on a timeline, and fact-checks claims as they're said. Built on Jev, TypeSafe AI's decision model.">
+<meta name="theme-color" content="#0a1628">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tattle: live transcripts and fact-checks for your Mac">
+<meta property="og:description" content="An open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='0.35' stroke-width='28'/%3E%3C/svg%3E">
+<link rel="preload" href="assets/fonts/BarlowCondensed-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/Barlow-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/theme.css">
+<link rel="stylesheet" href="assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Tattle",
+  "description": "An open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS 14.2 or later (Apple Silicon)",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://opensource.org/license/bsd-3-clause",
+  "downloadUrl": "https://github.com/nicolasdao/tattle/releases/latest",
+  "codeRepository": "https://github.com/nicolasdao/tattle",
+  "author": { "@type": "Organization", "name": "Cloudless Consulting Pty Ltd" }
+}
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script src="assets/download.js" defer></script>
+<script type="module" src="assets/main.js"></script>
+<script src="assets/sections.js" defer></script>
+</head>
+<body>
+
+<header class="hero" id="top">
+  <!-- The studio: the record key, its sound rings, and the captions that rise out of them. -->
+  <div class="stage" id="stage">
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="csskey" id="csskey" aria-hidden="true" hidden>
+      <div class="ck-floor" id="ck-floor"></div>
+      <div class="ck-unit"><div class="ck-housing"></div><div class="ck-cap"><i></i></div></div>
+    </div>
+    <div class="caps" id="caps" aria-hidden="true"></div>
+    <button class="rec-hit" id="rec" type="button" aria-pressed="false" aria-label="Record key, a demo: press to go live. Nothing is recorded.">
+      <span class="hint" id="hint"><b id="hint-main">Press to record</b><span>Or press Space · a demo, nothing is recorded</span></span>
+    </button>
+    <div class="lower" id="lower" aria-live="polite"></div>
+  </div>
+
+  <div class="hero-copy">
+    <div class="topstrap">
+      <div class="onair" id="onair"><i></i><span id="onair-label">Off air</span></div>
+      <div class="strap">
+        <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
+        <h1 class="name">Tattle</h1>
+      </div>
+      <div class="clock" aria-hidden="true"><span class="eyebrow">Rec</span><time id="clock">00:00</time></div>
+    </div>
+
+    <p class="lede">Tattle listens to your calls. It transcribes them as people speak, maps the conversation on a timeline, and <b>fact-checks claims as they're said.</b></p>
+
+    <div class="dl" data-when="mac">
+      <a class="ca-download big" data-download href="https://github.com/nicolasdao/tattle/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+        Download for Mac
+      </a>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source<span class="ver" hidden> · <span data-version></span> · <span data-size></span></span></p>
+    </div>
+    <div class="dl-other" data-when="other">
+      <p class="other-title">It's a Mac app.</p>
+      <p class="other-text">Open this page on your Mac to download it.</p>
+      <div class="other-row">
+        <button class="btn-copy" type="button" data-copy-link>Copy link</button>
+        <a href="https://github.com/nicolasdao/tattle">See it on GitHub</a>
+      </div>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+    </div>
+
+    <a class="powered" href="#jev"><span>Judgment by</span> <b>Jev</b> <span>from TypeSafe AI</span></a>
+
+    <p class="cue" id="cue" aria-hidden="true"><span id="cue-a">Go on.</span><span id="cue-b">Press it.</span><svg class="cue-arrow" viewBox="0 0 80 40" aria-hidden="true"><path d="M2 20h68M54 6l16 14-16 14" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="square"/></svg></p>
+  </div>
+</header>
+
+<main>
+  <!-- 1. The rundown: what happens after you press record. -->
+  <section class="sect" id="rundown" aria-labelledby="rundown-title">
+    <div class="sect-head">
+      <span class="tag tag-accent">Rundown</span>
+      <div class="strap"><span class="eyebrow">What happens after you press record</span><h2 class="name" id="rundown-title">Tonight's show</h2></div>
+    </div>
+
+    <ol class="rundown">
+      <li class="seg">
+        <span class="seg-no"><em>01</em><small>On air</small></span>
+        <div class="seg-text"><h3>Listens</h3><p>Tattle hears two sides: your microphone, and the call your Mac plays. It listens to the Mac's own audio, so it works with any call app.</p></div>
+        <div class="seg-vis meters" aria-hidden="true">
+          <div class="meter-row"><span class="who host">Host · mic</span><span class="meter m1"></span></div>
+          <div class="meter-row"><span class="who remote">Guest · call</span><span class="meter m2"></span></div>
+        </div>
+      </li>
+      <li class="seg">
+        <span class="seg-no"><em>02</em><small>On air</small></span>
+        <div class="seg-text"><h3>Transcribes</h3><p>The transcript streams as people speak. Tattle tells the voices apart, and you can give each speaker a name.</p></div>
+        <div class="seg-vis script" aria-hidden="true">
+          <p><span class="who host">Host</span>Okay, enough about models, how was surfing in Sydney this weekend?</p>
+          <p><span class="who remote">Speaker 2 <svg viewBox="0 0 16 16"><path d="M3 13l1-3 7-7 2 2-7 7-3 1z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></span>I don't buy that at all, cheap is not the same as good.</p>
+        </div>
+      </li>
+      <li class="seg">
+        <span class="seg-no"><em>03</em><small>On air</small></span>
+        <div class="seg-text"><h3>Maps</h3><p>Jev labels every stretch of the conversation as it happens, and the labels build a timeline: topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations and clip-worthy moments.</p></div>
+        <div class="seg-vis tl" aria-hidden="true">
+          <div class="tl-row"><span class="tl-l">Topic</span><div class="tl-lane"><i style="--c:var(--s-ai-models);flex:5">AI models</i><i style="--c:var(--s-personal-life);flex:3">Personal life</i><i style="--c:var(--s-tech);flex:4">Tech</i></div></div>
+          <div class="tl-row"><span class="tl-l">Mode</span><div class="tl-lane thin"><i style="--c:var(--m-news);flex:3">News</i><i style="--c:var(--m-analysis);flex:2">Analysis</i><i style="--c:var(--m-banter);flex:3">Banter</i><i style="--c:var(--m-explainer);flex:4">Explainer</i></div></div>
+          <div class="tl-row"><span class="tl-l">Heat<br>Hype</span><svg class="tl-chart" viewBox="0 0 120 36" preserveAspectRatio="none"><polyline class="heat" points="0,28 12,24 24,26 36,14 46,8 56,18 68,22 80,12 92,16 104,26 120,20"/><polyline class="hype" points="0,30 12,30 24,20 36,22 46,26 56,12 68,6 80,18 92,24 104,14 120,10"/></svg></div>
+          <div class="tl-row"><span class="tl-l">Pins</span><div class="tl-pins"><b style="left:0">Hot take</b><b style="left:38%">Prediction</b><b style="right:0">Clip</b></div></div>
+        </div>
+      </li>
+      <li class="seg">
+        <span class="seg-no"><em>04</em><small>On air</small></span>
+        <div class="seg-text"><h3>Fact-checks</h3><p>Jev flags the checkable claims the moment they're said. A slower model then researches each one on the web, and a verdict with its sources appears on screen within seconds. <a href="#systems">How the two work together</a></p></div>
+        <div class="seg-vis thirds" aria-hidden="true">
+          <div class="fc v-supported"><div class="fc-verdict"><span class="vw">Supported</span></div><div class="fc-body"><p class="restated">"Octopuses have three hearts."</p></div></div>
+          <div class="fc v-misleading"><div class="fc-verdict"><span class="vw">Misleading</span></div><div class="fc-body"><p class="restated">"Coffee dehydrates you."</p><p class="correction">Its water outweighs the mild diuretic effect.</p></div></div>
+        </div>
+      </li>
+      <li class="seg">
+        <span class="seg-no"><em>05</em><small>On air</small></span>
+        <div class="seg-text"><h3>After the show</h3><p>Ask questions about the transcript, live or afterwards. Every show is saved in your recordings library, where you can play it back at up to 4× or export it as one file to share.</p></div>
+        <div class="seg-vis after" aria-hidden="true">
+          <span class="kbd">⌘</span><span class="kbd">K</span><span class="chip">4×</span><span class="chip">Export</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 2. Jev: the decision model that makes judging every sentence affordable. -->
+  <section class="sect" id="jev" aria-labelledby="jev-title">
+    <div class="sect-head">
+      <span class="tag tag-accent">Jev</span>
+      <div class="strap"><span class="eyebrow">The secret ingredient · by TypeSafe AI</span><h2 class="name" id="jev-title">Judgment, commoditized</h2></div>
+    </div>
+
+    <div class="jev-intro">
+      <p class="jev-thesis">Every sentence of your show gets judged, live, for cents an hour.</p>
+      <div class="jev-body">
+        <p>An LLM could always tell you whether a sentence is a checkable claim. The trouble was doing it for <b>every sentence</b> of a two-hour conversation, <b>while it happens</b>. An LLM writes an answer in prose, word by word, which takes seconds and costs dollars an hour. And what comes back is text that software then has to parse.</p>
+        <p><a href="https://docs.typesafe.ai/">Jev</a> is a different kind of model. <a href="https://typesafe.ai">TypeSafe AI</a> calls it a System One model. It doesn't write text. You give it a state and a set of typed questions, and it answers all of them at once, as probabilities and labels your code can act on directly. That makes judgment cheap and fast enough to run on everything anyone says, which is the one thing a live fact-checker needs.</p>
+      </div>
+    </div>
+
+    <div class="jev-stats">
+      <article class="jstat"><p class="big">Typed</p><p>Every answer is a yes/no probability, one of your labels, or a score. Code acts on it; nothing is parsed.</p></article>
+      <article class="jstat"><p class="big">0.4<small>s</small></p><p>About that for one call, with every question in it answered in parallel. Fast enough to keep up with speech.</p></article>
+      <article class="jstat"><p class="big">~2,000</p><p>Typed judgments in an hour of show: every sentence and every stretch of conversation gets its own set.</p></article>
+      <article class="jstat"><p class="big">~4<small>¢</small></p><p>Roughly the Jev cost of a one-hour show, estimated from Tattle's test conversation. A show full of claims costs a little more.</p></article>
+    </div>
+
+    <!-- One Jev call, as Tattle makes it for every sentence. -->
+    <div class="jevcall" id="jevcall">
+      <div class="jc-head">
+        <span class="jc-title">One Jev call, one sentence</span>
+        <span class="jc-meta"><span id="jc-n">7</span> questions · 1 call · <span id="jc-ms" class="tab">0.00 s</span></span>
+        <button class="jc-next" id="jc-next" type="button">Next line</button>
+      </div>
+      <div class="jc-grid">
+        <div class="jc-state">
+          <p class="jc-label">State</p>
+          <pre class="jc-json" id="jc-json"></pre>
+        </div>
+        <div class="jc-answers">
+          <p class="jc-label">Questions and typed answers</p>
+          <ol class="jc-rows" id="jc-rows"></ol>
+        </div>
+      </div>
+      <div class="jc-out" id="jc-out" aria-live="polite"></div>
+      <p class="jc-note">Example answers. The questions are the ones Tattle asks; the <a href="https://github.com/nicolasdao/tattle/blob/master/config/factcheck.s1.default.json">full wording is on GitHub</a>.</p>
+    </div>
+
+    <div class="jev-origin">
+      <p>Tattle began as a live, on-air demonstration of Jev for a podcast about AI. The point was to show that software should ask a model for <b>narrow, typed judgments</b>, and keep everything else in code: the timestamps, the counting and the speaker names are never asked of a model. The whole app is open source, so any developer can see how it's done.</p>
+      <div class="links">
+        <a class="lnk" href="https://docs.typesafe.ai/">Jev's documentation</a>
+        <a class="lnk" href="https://typesafe.ai">TypeSafe AI</a>
+        <a class="lnk" href="https://openrouter.ai/typesafe/jev-1.13">Jev on OpenRouter</a>
+        <a class="lnk" href="https://github.com/nicolasdao/tattle/blob/master/docs/jev.md">How Tattle uses Jev</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. System 1 and System 2: the fact-checker's two speeds. -->
+  <section class="sect" id="systems" aria-labelledby="systems-title">
+    <div class="sect-head">
+      <span class="tag tag-live">Thinking</span>
+      <div class="strap"><span class="eyebrow">How the fact-checker thinks</span><h2 class="name" id="systems-title">Fast and slow</h2></div>
+    </div>
+
+    <p class="sys-intro">The psychologist Daniel Kahneman described two ways of thinking. <b>System 1</b> is fast and automatic, and it's always on. <b>System 2</b> is slow and deliberate, and it's called in only when something needs a closer look. Tattle's fact-checker works the same way.</p>
+
+    <div class="sys-cols">
+      <article class="sys s1">
+        <p class="sys-k">System 1</p>
+        <h3>Jev and its questions</h3>
+        <dl>
+          <dt>Runs</dt><dd>On every sentence</dd>
+          <dt>Takes</dt><dd>About 0.4–0.8 s</dd>
+          <dt>Costs</dt><dd>About $0.00004 a sentence</dd>
+          <dt>Returns</dt><dd>Is it a checkable claim? What kind? Is it about the public world? How much would listeners care? Is it a repeat?</dd>
+        </dl>
+      </article>
+      <article class="sys s2">
+        <p class="sys-k">System 2</p>
+        <h3>GPT-6 Luna, with web search</h3>
+        <dl>
+          <dt>Runs</dt><dd>Only when System 1 flags a claim</dd>
+          <dt>Takes</dt><dd>About 6–16 s</dd>
+          <dt>Costs</dt><dd>About $0.008 a claim</dd>
+          <dt>Returns</dt><dd>A verdict with its sources: supported, contradicted, misleading or unverifiable</dd>
+        </dl>
+      </article>
+    </div>
+
+    <!-- The two systems running on a stream of sentences. -->
+    <div class="flow" id="flow">
+      <div class="flow-col">
+        <p class="flow-h"><span class="dotc s1c"></span>System 1 · every line</p>
+        <ol class="flow-feed" id="flow-feed"></ol>
+      </div>
+      <div class="flow-col">
+        <p class="flow-h"><span class="dotc s2c"></span>System 2 · flagged claims only</p>
+        <ol class="flow-checks" id="flow-checks"></ol>
+      </div>
+      <div class="flow-tally">
+        <div><span class="n tab" id="ft-lines">0</span><span class="k">Lines judged</span></div>
+        <div><span class="n tab" id="ft-flags">0</span><span class="k">Claims flagged</span></div>
+        <div><span class="n tab" id="ft-s1">$0.0000</span><span class="k">System 1 cost</span></div>
+        <div><span class="n tab" id="ft-s2">$0.000</span><span class="k">System 2 cost</span></div>
+      </div>
+    </div>
+
+    <div class="sys-rule">
+      <p class="jc-label">The flag is decided by code, not by a model</p>
+      <code>claim ≥ 0.7 <i>and</i> claim_type ≠ none <i>and</i> public ≥ 0.6 <i>and</i> worth ≥ 1.5</code>
+    </div>
+
+    <h3 class="sys-h">System 2 makes System 1 better</h3>
+    <p class="sys-sub">Jev itself never changes. System 1 is Jev <em>plus its questions</em>, and each verdict grades the flag that caused it, so System 2 can improve the questions while the show runs.</p>
+    <div class="teach">
+      <article><p class="teach-k">Memory</p><p>Every flagged claim becomes a new question, so if someone repeats it, Jev spots the repeat in the next call and the earlier verdict comes back instantly, with no second research.</p></article>
+      <article><p class="teach-k">Criteria</p><p>After false alarms or missed claims, System 2 rewrites System 1's questions. A rewrite goes live only if replaying past lines shows it fixes the errors and keeps at least 90% of the good flags.</p></article>
+      <article><p class="teach-k">Attention</p><p>System 2 can add up to three questions that raise the priority of the kinds of claims that turned out to matter. Every five minutes it also audits the lines that weren't flagged, looking for misses.</p></article>
+    </div>
+    <p class="sys-foot">On the timeline, <b>you are System 2</b>: labels have no right or wrong answer to learn from, so the label set stays yours to edit, and no LLM changes it. <a href="https://github.com/nicolasdao/tattle/blob/master/docs/system1-system2.md">Read the full design</a></p>
+  </section>
+
+  <!-- 4. The cue card: keys, cost, privacy, trust. -->
+  <section class="sect" id="preshow" aria-labelledby="preshow-title">
+    <div class="sect-head">
+      <span class="tag tag-warn">Pre-show</span>
+      <div class="strap"><span class="eyebrow">The cue card</span><h2 class="name" id="preshow-title">Before you go live</h2></div>
+    </div>
+    <div class="cards">
+      <article class="card"><p class="big">2 <small>keys</small></p><p>Tattle uses your own OpenAI and OpenRouter accounts, with prepaid credit. The app walks you through setting up both.</p></article>
+      <article class="card"><p class="big">$1.60 <small>an hour</small></p><p>That's roughly what an hour of show costs on those accounts, or about $1.23 for a transcript only. Tattle itself is free.</p></article>
+      <article class="card"><p class="big">0 <small>servers</small></p><p>Tattle has no server of its own, no account and no analytics. Audio goes to OpenAI and text to OpenRouter, with your keys. Recordings and keys stay on your Mac.</p></article>
+      <article class="card"><p class="big">Signed</p><p>It's signed and notarized by Apple, and it updates itself, but never during a show.</p></article>
+    </div>
+  </section>
+
+  <!-- 5. The sign-off. -->
+  <section class="sect signoff" aria-labelledby="signoff-title">
+    <span class="ca-mark signoff-mark" style="--s:72px" aria-hidden="true"></span>
+    <h2 id="signoff-title">Your next show,<br><span>checked live.</span></h2>
+    <div class="dl" data-when="mac">
+      <a class="ca-download big" data-download href="https://github.com/nicolasdao/tattle/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+        Download for Mac
+      </a>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+    </div>
+    <div class="dl-other" data-when="other">
+      <p class="other-title">It's a Mac app.</p>
+      <p class="other-text">Open this page on your Mac to download it.</p>
+      <div class="other-row">
+        <button class="btn-copy" type="button" data-copy-link>Copy link</button>
+        <a href="https://github.com/nicolasdao/tattle">See it on GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- The fine print: license, responsible use, trademarks. -->
+<footer class="fine" aria-labelledby="fine-title">
+  <div class="fine-in">
+    <h2 id="fine-title" class="fine-h"><span class="ca-mark" style="--s:22px" aria-hidden="true"></span>Tattle</h2>
+    <nav class="fine-links" aria-label="Project links">
+      <a href="https://github.com/nicolasdao/tattle">Source code</a>
+      <a href="https://github.com/nicolasdao/tattle/releases">Releases</a>
+      <a href="https://github.com/nicolasdao/tattle/blob/master/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/nicolasdao/tattle/blob/master/LICENSE">License</a>
+      <a href="https://github.com/nicolasdao/tattle/blob/master/THIRD_PARTY_NOTICES.md">Third-party notices</a>
+      <a href="https://github.com/nicolasdao/tattle/blob/master/SECURITY.md">Security</a>
+    </nav>
+    <div class="fine-cols">
+      <p><b>License.</b> Tattle is free and open-source software under the <a href="https://github.com/nicolasdao/tattle/blob/master/LICENSE">BSD 3-Clause License</a>, © 2026 Cloudless Consulting Pty Ltd. It's provided as is, without warranty of any kind. The app includes third-party components under their own licenses, listed in its Help menu.</p>
+      <p><b>Record with consent.</b> Tattle records and transcribes everyone on a call. Many places require the consent of everyone recorded, so tell the people on the call and get their consent before you record. You're responsible for how you use the app and its recordings.</p>
+      <p><b>Verdicts can be wrong.</b> Fact-checks come from AI models. Treat them as leads to check, not as facts. The only official downloads are the project's <a href="https://github.com/nicolasdao/tattle/releases">GitHub Releases</a>; <a href="https://github.com/nicolasdao/tattle/blob/master/SECURITY.md">here's how to check a download is genuine</a>.</p>
+      <p><b>Trademarks.</b> Tattle is an independent project, not affiliated with, sponsored or endorsed by Apple, OpenAI, OpenRouter or TypeSafe AI. Jev is TypeSafe AI's, GPT-6 Luna is OpenAI's, and macOS is Apple's. These names are used only to say what the app works with.</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>
