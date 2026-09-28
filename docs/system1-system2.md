@@ -151,6 +151,7 @@ Length and count limits are kept out of the strict schema and enforced in code (
 2. `restated_claim` is truncated to 200 characters and `correction` to 25 words.
 3. `message.annotations[].url_citation` entries are merged into `sources`, deduplicated by URL, then the first 3 are kept.
 4. A `supported`, `contradicted`, or `misleading` verdict with no source becomes `unverifiable`, marked `downgraded: true`.
+5. While merging (step 3, so before the first 3 are kept and before step 4), only `http(s)` sources are kept: the links are shown on screen, so a `javascript:`, `data:`, or `file:` URL from the model is dropped (the page filters them again when it renders a recording's verdicts).
 
 If strict output were rejected together with the web plugin, the client retries once with `response_format: { type: "json_object" }` plus a zod parse, and keeps using it; so far strict output has worked with both the `exa` and `native` engines.
 

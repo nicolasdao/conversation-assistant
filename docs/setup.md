@@ -57,7 +57,7 @@ At startup, `load()` copies the file's keys into `process.env` wherever the envi
 
 Sessions pick keys up when they start. `CONVERSATION_ASSISTANT_CREDENTIALS` overrides the file's path (tests use it).
 
-Keys never appear in logs, session files, events, or exports. The API returns only a key's last 4 characters (`hint`).
+Keys never appear in logs, session files (the chat log included), events, or exports. The API returns only a key's last 4 characters (`hint`). Child processes, the capture helper and `afconvert`, get the environment without them (`childEnv` in `src/keys.ts`): none needs a key.
 
 ## Checking a key before saving
 

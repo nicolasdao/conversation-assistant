@@ -27,7 +27,7 @@ It exists to demonstrate, live on air, that software should call a decision mode
 
 For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2 or later, and two API accounts with prepaid credit (OpenAI and OpenRouter; the app walks through both).
 
-1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/conversation-assistant/releases/latest). (The first downloadable release is the first one signed with the project's Apple Developer ID; until then, build it with `npm run dist:mac`, below.)
+1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/conversation-assistant/releases/latest).
 2. Open it and drag **Conversation Assistant** into Applications.
 3. Open it from Applications. macOS asks once whether to open an app downloaded from the internet.
 4. Paste the two API keys: the app explains how to get each one (create the account, add prepaid credit, create the key) and checks each key before saving it.
@@ -124,7 +124,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - Chromium is the browser the page was built and tested in. A system web view (WebKit) would have needed a compatibility pass on the page's dialogs, popovers, and downloads.
 - A real app gets macOS's Microphone and System Audio Recording permissions under its own name, instead of the terminal's.
 - Not the Mac App Store: its sandbox would constrain the system-audio tap, the capture helper, and `afconvert`, for little gain over a notarized download.
-- The cost: an app of about 300 MB (a 144 MB DMG), mostly Electron's Chromium, and an Electron upgrade a few times a year.
+- The cost: an app of about 345 MB (a 146 MB DMG, at 0.6.2), mostly Electron's Chromium, and an Electron upgrade a few times a year.
 
 **Tier 2 capture and front end — decided 24 September 2026.**
 
@@ -181,7 +181,7 @@ A deployed version is final: GitHub keeps release tags and published releases fr
 /release-conversation-assistant unreleased # record work under [Unreleased] without releasing
 ```
 
-It does, in order:
+It does, in order (a summary of the skill's own steps):
 
 1. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
 2. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.

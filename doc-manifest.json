@@ -180,7 +180,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 171,
+      "line_count": 172,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -565,7 +565,7 @@
         "Events and files",
         "Measured so far"
       ],
-      "line_count": 262,
+      "line_count": 263,
       "links_to": [
         "docs/architecture.md",
         "docs/jev.md",
