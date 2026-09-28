@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversation Assistant: live transcripts and fact-checks for your Mac</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='28'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+<script src="../_shared/download.js" defer></script>
+<script src="main.js" defer></script>
+</head>
+<body>
+
+<main>
+  <section class="story" id="story" aria-label="Conversation Assistant, in three beats">
+    <div class="stage" data-beat="0">
+      <canvas class="gl" aria-hidden="true"></canvas>
+      <canvas class="fx" aria-hidden="true"></canvas>
+
+      <header class="top">
+        <div class="onair enter" aria-hidden="true"><i></i><span>On air</span></div>
+        <div class="strap">
+          <div class="id">
+            <p class="eyebrow"><span class="ca-mark" style="--s:16px"></span>Open-source Mac app</p>
+            <h1>Conversation Assistant</h1>
+            <p class="line">Transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.</p>
+          </div>
+          <div class="get" data-when="mac">
+            <a class="dl" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>
+              Download for Mac
+            </a>
+            <p class="meta">Apple Silicon · macOS 14.2 or later · Free and open source<span class="rel" hidden> · <span data-version></span> · <span data-size></span></span></p>
+          </div>
+          <div class="get other" data-when="other">
+            <p class="other-say">It's a Mac app. Open this page on your Mac to download it.</p>
+            <p class="other-row"><button type="button" class="copy" data-copy-link>Copy link</button><a href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a></p>
+            <p class="meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+          </div>
+        </div>
+      </header>
+
+      <div class="orb" id="orb" aria-hidden="true">
+        <div class="orb-label"><b>System 2</b><span>Researches the web</span></div>
+      </div>
+
+      <ol class="lts" aria-label="Fact-checks">
+        <li class="lt v-contradicted">
+          <div class="lt-v"><b>Contradicted</b><small>System 2</small></div>
+          <div class="lt-b"><span class="lt-who remote">Guest · 0:09</span><p class="lt-c">Lightning never strikes the same place twice.</p><p class="lt-n">The Empire State Building is hit about 20 to 25 times a year.</p></div>
+        </li>
+      </ol>
+
+      <div class="voice host" id="v-host" aria-hidden="true">
+        <div class="vl"><b>Host</b><span>Your microphone</span><span class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+      </div>
+      <div class="voice remote" id="v-remote" aria-hidden="true">
+        <div class="vl"><b>Guest</b><span>The call</span><span class="meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+      </div>
+
+      <div class="tx" aria-label="Transcript">
+        <p class="hint"><span class="fine">Steer the cyan lens over a claim as it streams</span><span class="coarse">Tap a claim as it streams to catch it</span></p>
+        <div class="lines">
+          <div class="ln open host"><div class="ln-in"><span class="who">Host<small>0:01</small></span><p><span class="w in">We're</span> <span class="w in">live.</span> <span class="w in">Say</span> <span class="w in">hi</span> <span class="w in">to</span> <span class="w in">everyone</span> <span class="w in">on</span> <span class="w in">the</span> <span class="w in">call.</span></p></div></div>
+          <div class="ln open host"><div class="ln-in"><span class="who">Host<small>0:04</small></span><p><span class="w in">Okay,</span> <span class="w in">enough</span> <span class="w in">about</span> <span class="w in">models,</span> <span class="w in">how</span> <span class="w in">was</span> <span class="w in">surfing</span> <span class="w in">in</span> <span class="w in">Sydney</span> <span class="w in">this</span> <span class="w in">weekend?</span></p></div></div>
+          <div class="ln open remote"><div class="ln-in"><span class="who">Guest<small>0:09</small></span><p><span class="w in">Freezing.</span> <span class="w in">A</span> <span class="w in">storm</span> <span class="w in">rolled</span> <span class="w in">in,</span> <span class="w in">and</span> <span class="claim v-contradicted" data-v="Contradicted"><span class="w in">lightning</span> <span class="w in">never</span> <span class="w in">strikes</span> <span class="w in">the</span> <span class="w in">same</span> <span class="w in">place</span> <span class="w in">twice</span></span><span class="w in">,</span> <span class="w in">right?</span></p></div></div>
+        </div>
+      </div>
+
+      <div class="lanes" aria-hidden="true">
+        <span class="lane-l">Topic</span>
+        <div class="track" data-track="topic">
+          <span class="seg" style="--l:0;--w:.16;--c:var(--s-the-show)" data-c="s-the-show">The show</span>
+          <span class="seg" style="--l:.16;--w:.3;--c:var(--s-personal-life)" data-c="s-personal-life">Personal life</span>
+          <span class="seg" style="--l:.46;--w:.54;--c:var(--s-other-topics)" data-c="s-other-topics">Other topics</span>
+        </div>
+        <span class="lane-l">Mode</span>
+        <div class="track" data-track="mode">
+          <span class="seg" style="--l:0;--w:.3;--c:var(--m-banter)" data-c="m-banter">Banter</span>
+          <span class="seg" style="--l:.3;--w:.2;--c:var(--m-personal-story)" data-c="m-personal-story">Personal story</span>
+          <span class="seg" style="--l:.5;--w:.28;--c:var(--m-explainer)" data-c="m-explainer">Explainer</span>
+          <span class="seg" style="--l:.78;--w:.22;--c:var(--m-analysis)" data-c="m-analysis">Analysis</span>
+        </div>
+        <span class="lane-l">Heat <em>·</em> <i>Hype</i></span>
+        <div class="track chart" data-track="chart"></div>
+        <span class="lane-l">Moments</span>
+        <div class="track pins">
+          <span class="pin" style="--l:.34">Disagreement</span>
+          <span class="pin" style="--l:.52">Hot take</span>
+          <span class="pin" style="--l:.7">Prediction</span>
+          <span class="pin" style="--l:.88">Clip</span>
+        </div>
+        <span class="nowline"></span>
+      </div>
+
+      <div class="lens" aria-hidden="true"><i></i><span>System 1</span></div>
+
+      <footer class="chyron">
+        <ol class="beats" aria-label="Beats">
+          <li><button type="button" data-go="0" aria-current="step"><b>01</b>Listen</button></li>
+          <li><button type="button" data-go="1"><b>02</b>Map</button></li>
+          <li><button type="button" data-go="2"><b>03</b>Check</button></li>
+        </ol>
+        <div class="copy-wrap">
+          <p class="beat-copy on" data-copy="0"><strong>Two voices, one transcript.</strong> Your microphone and the call your Mac plays, transcribed as they speak. Each voice becomes a speaker you can name. Works with any call app.</p>
+          <p class="beat-copy" data-copy="1"><strong>Every word lands on a timeline.</strong> Topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations and clip-worthy moments.</p>
+          <p class="beat-copy" data-copy="2"><strong>Claims checked as they're said.</strong> System 1 flags a checkable claim in about 0.4 s. System 2 researches the web and puts a sourced verdict on screen within seconds.</p>
+        </div>
+        <p class="rec" aria-hidden="true"><i></i><span class="clock">00:00:12</span></p>
+      </footer>
+    </div>
+  </section>
+
+  <section class="credits" aria-labelledby="credits-h">
+    <p class="credits-kick"><span class="offair"><i></i>Off air</span></p>
+    <h2 id="credits-h">Roll credits</h2>
+    <dl class="roll">
+      <div><dt>Transcript</dt><dd>Live, as people speak</dd></div>
+      <div><dt>Speakers</dt><dd>Each voice recognised, yours to name</dd></div>
+      <div><dt>Timeline</dt><dd>Topic, mode, heat, hype, hot takes, predictions, clips</dd></div>
+      <div><dt>Verdicts</dt><dd><span class="vc good">Supported</span> <span class="vc bad">Contradicted</span> <span class="vc warn">Misleading</span> <span class="vc neutral">Unverifiable</span></dd></div>
+      <div><dt>System 1</dt><dd>Jev, a fast decision model: about 0.4 s a judgment</dd></div>
+      <div><dt>System 2</dt><dd>A slower LLM that researches the web, and makes System 1 better</dd></div>
+      <div><dt>Chat</dt><dd>Ask about the transcript with ⌘K, live or afterwards</dd></div>
+      <div><dt>Library</dt><dd>Play back at up to 4×, export a recording as one file</dd></div>
+      <div class="gap"><dt>Server</dt><dd>None</dd></div>
+      <div><dt>Account</dt><dd>None</dd></div>
+      <div><dt>Analytics</dt><dd>None. Recordings and keys stay on your Mac</dd></div>
+      <div class="gap"><dt>Keys</dt><dd>OpenAI and OpenRouter, with prepaid credit. The app walks you through both</dd></div>
+      <div><dt>Running cost</dt><dd>About $1.60 per hour of show, or $1.23 for a transcript only</dd></div>
+      <div><dt>Signed</dt><dd>Notarized by Apple. It updates itself</dd></div>
+      <div><dt>License</dt><dd>BSD 3-Clause</dd></div>
+      <div><dt>Requires</dt><dd>Apple Silicon, macOS 14.2 or later</dd></div>
+    </dl>
+
+    <div class="finale">
+      <div class="onair" aria-hidden="true"><i></i><span>Your show</span></div>
+      <div class="strap">
+        <div class="id">
+          <p class="eyebrow"><span class="ca-mark" style="--s:16px"></span>Conversation Assistant</p>
+          <p class="finale-line">Two voices in. A transcript, a timeline and verdicts out.</p>
+        </div>
+        <div class="get" data-when="mac">
+          <a class="dl" data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg>
+            Download for Mac
+          </a>
+          <p class="meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+        </div>
+        <div class="get other" data-when="other">
+          <p class="other-say">It's a Mac app. Open this page on your Mac to download it.</p>
+          <p class="other-row"><button type="button" class="copy" data-copy-link>Copy link</button><a href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a></p>
+          <p class="meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<a class="ca-back" href="../">All experiments</a>
+</body>
+</html>

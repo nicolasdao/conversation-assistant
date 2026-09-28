@@ -45,7 +45,7 @@ body { padding-bottom: calc(var(--tk) + env(safe-area-inset-bottom, 0px)); overf
 .bug-tc { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 90px; }
 
 /* the header strap, at broadcast size */
-.strapline { grid-column: 1 / -1; display: flex; align-items: stretch; height: 100px; max-width: 100%; }
+.strapline { grid-column: 1 / -1; grid-row: 1; display: flex; align-items: stretch; height: 100px; max-width: 100%; }
 .onair {
   flex: none; position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; padding: 0 38px 0 26px;
   background: var(--live); color: var(--ink); clip-path: var(--cut);
@@ -67,13 +67,13 @@ body { padding-bottom: calc(var(--tk) + env(safe-area-inset-bottom, 0px)); overf
 .clock .t { font: 700 36px/1 var(--cond); font-variant-numeric: tabular-nums; margin-top: 5px; }
 
 .deckline {
-  grid-column: 1; justify-self: start; margin: 0; max-width: 760px;
+  grid-column: 1; grid-row: 2; justify-self: start; margin: 0; max-width: 760px;
   background: rgba(15, 32, 56, 0.92); border-left: 6px solid var(--accent); clip-path: var(--cut);
   padding: 14px 44px 14px 22px; font: 500 clamp(17px, 1.55vw, 22px)/1.35 var(--body); color: var(--ink);
 }
 
 /* the download: a breaking-news strap */
-.dl { grid-column: 1; margin-top: 34px; display: grid; gap: 16px; justify-items: start; min-width: 0; max-width: 100%; }
+.dl { grid-column: 1; grid-row: 3; margin-top: 34px; display: grid; gap: 16px; justify-items: start; min-width: 0; max-width: 100%; }
 .bn-dl { display: flex; align-items: stretch; height: 108px; text-decoration: none; color: var(--paper-ink); position: relative; max-width: 100%; }
 .bn-dl:hover { color: var(--paper-ink); }
 .bn-tag {
@@ -126,6 +126,14 @@ body { padding-bottom: calc(var(--tk) + env(safe-area-inset-bottom, 0px)); overf
 }
 .golive i { background: var(--live); }
 .golive:hover { color: var(--ink); border-color: var(--live); background: rgba(232, 38, 59, 0.14); }
+
+/* the rundown: what's up next on the channel */
+.rundown { grid-column: 1; grid-row: 4; align-self: center; display: flex; align-items: stretch; flex-wrap: wrap; gap: 6px; margin: 34px 0 0; }
+.rd-k { display: flex; align-items: center; padding: 0 24px 0 12px; background: var(--paper); color: var(--paper-ink); clip-path: var(--cut); font: 800 14px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; }
+.rundown a { display: flex; align-items: center; gap: 10px; padding: 10px 26px 10px 12px; background: rgba(21, 43, 74, 0.85); clip-path: var(--cut); text-decoration: none; color: var(--ink-2); font: 700 15px/1 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; }
+.rundown a b { color: var(--accent); font-weight: 800; }
+.rundown a:hover { background: var(--deck-3); color: var(--ink); }
+.hero.is-live .rundown { animation: fade 500ms ease-out 1600ms both; }
 
 /* the studio clock ident: the app's record dot as the channel's globe */
 .ident { grid-column: 2; grid-row: 2 / 6; align-self: center; justify-self: center; width: 100%; max-width: 430px; aspect-ratio: 1; position: relative; }
@@ -215,6 +223,10 @@ body { padding-bottom: calc(var(--tk) + env(safe-area-inset-bottom, 0px)); overf
 .hero.is-live .dl-row, .hero.is-live .bn-other-actions { animation: fade 500ms ease-out 1450ms both; }
 .hero.is-live .ident { animation: ident-in 1100ms var(--ease) 500ms both; }
 .hero.is-live .bug { animation: fade 400ms ease-out 1200ms both; }
+/* once the sequence has played, the package holds its final frame (and a still capture always shows it) */
+.hero.settled :is(.onair, .onair > *, .strap, .strap > *, .clock, .deckline, .bn-tag, .bn-main, .bn-other-strap p, .bn-go, .dl-row, .bn-other-actions, .ident, .bug, .rundown) { animation: none !important; }
+.hero.settled .onair::after { display: none; }
+.hero.settled .bn-dl:not(:hover) .bn-main::after { animation: none; }
 @keyframes onair-in { from { max-width: 0; padding-left: 0; padding-right: 0; } to { max-width: 320px; } }
 @keyframes onair-label { 0%, 35% { transform: translateX(-24px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes sweep { from { transform: translateX(-110%); } to { transform: translateX(110%); } }
@@ -412,15 +424,19 @@ body { padding-bottom: calc(var(--tk) + env(safe-area-inset-bottom, 0px)); overf
   .bn-other-strap .bn-tag { align-self: flex-start; height: 34px; font-size: 15px; }
   .bn-other-strap p { margin: 0; font-size: 21px; padding: 12px 30px 12px 14px; clip-path: var(--cut); }
   .dl-row { gap: 12px; }
+  .rundown { margin-top: 22px; gap: 5px; }
+  .rd-k { display: none; }
+  .rundown a { font-size: 13px; padding: 8px 20px 8px 9px; gap: 6px; }
+  .ca-back { top: 12px; left: 12px; bottom: auto; }
   .dl-row .ca-meta { font-size: 12px; }
   .onscreen { margin-top: 26px; flex: 1; align-content: end; }
   .captions { font-size: 16px; padding: 8px 12px 9px 10px; gap: 8px; min-height: 0; }
   .cap-who { font-size: 11px; }
   .lt-slot { min-height: 84px; }
-  .lt { grid-template-columns: 116px minmax(0, 1fr); }
-  .lt-v { padding: 10px 20px 10px 10px; }
-  .lt-v .vw { font-size: 19px; }
-  .v-researching .lt-v .vw { font-size: 18px; }
+  .lt { grid-template-columns: 132px minmax(0, 1fr); }
+  .lt-v { padding: 10px 18px 10px 10px; }
+  .lt-v .vw { font-size: 17px; letter-spacing: 0.01em; }
+  .v-researching .lt-v .vw { font-size: 17px; }
   .lt-v .vm { font-size: 10.5px; letter-spacing: 0.1em; }
   .lt-b { padding: 10px 12px 12px; }
   .lt-c { font-size: 15px; }

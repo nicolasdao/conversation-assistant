@@ -226,10 +226,10 @@ h2 { margin: 0 0 14px; }
   .mic-strap { flex: 1; padding: 0 22px 0 24px; }
   .mic-label { font-size: 23px; }
   .where { font-size: 14px; }
-  .third { grid-template-columns: 118px minmax(0, 1fr); min-height: 88px; }
-  .third-verdict { padding: 10px 18px 10px 10px; }
-  .vw { font-size: 21px; }
-  .third.v-supported .vw, .third.v-misleading .vw { font-size: 18px; }
+  .third { grid-template-columns: 140px minmax(0, 1fr); min-height: 88px; }
+  .third-verdict { padding: 10px 16px 10px 8px; }
+  .vw { font-size: 18px; }
+  .third.v-supported .vw, .third.v-misleading .vw { font-size: 17px; }
   .vm { font-size: 12px; }
   .third-body { padding: 10px 12px; }
   .third-claim { font-size: 16px; }

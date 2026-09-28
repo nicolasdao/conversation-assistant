@@ -16,8 +16,8 @@
   const repo = "nicolasdao/conversation-assistant";
   const releasesUrl = `https://github.com/${repo}/releases/latest`;
   const ua = navigator.userAgent;
-  // An iPad reports a Mac user agent; it also has a touch screen.
-  const isMac = /Macintosh|Mac OS X/.test(ua) && !(navigator.maxTouchPoints > 1);
+  // Only a Mac says "Macintosh" (an iPhone says "like Mac OS X"). An iPad also says it, but has a touch screen.
+  const isMac = /Macintosh/.test(ua) && !(navigator.maxTouchPoints > 1);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.documentElement.dataset.platform = isMac ? "mac" : "other";
 

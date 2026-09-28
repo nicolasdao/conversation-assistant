@@ -78,9 +78,9 @@ body { overflow-x: hidden; }
 .rundown { position: relative; align-self: stretch; min-height: 0; }
 .card {
   position: absolute; left: 0; right: 0; bottom: 0; opacity: 0; visibility: hidden; transform: translateY(18px);
-  transition: opacity 0.35s, transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), visibility 0s 0.45s;
+  transition: opacity 0.14s, transform 0.2s, visibility 0s 0.2s;
 }
-.card.is-on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.35s, transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1), visibility 0s; }
+.card.is-on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.35s 0.14s, transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.14s, visibility 0s; }
 .kicker { margin: 0 0 12px; display: flex; align-items: center; gap: 12px; font: 700 14px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
 .seg-chip {
   background: var(--c); color: #fff; padding: 6px 18px 5px 9px; font: 800 14px/1 var(--cond); letter-spacing: 0.14em;
@@ -195,6 +195,7 @@ h2 { font-size: clamp(34px, 3.6vw, 54px); }
 .chart polyline { fill: none; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
 .chart polyline.heat { stroke: var(--heat); }
 .chart polyline.hype { stroke: var(--hype); }
+.chart polyline.ghost { stroke-width: 1.5; stroke-dasharray: 2 5; opacity: 0.35; }
 .chart polygon.area.heat { fill: rgba(255, 107, 61, 0.12); }
 .pen { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; border: 2px solid var(--deck); z-index: 1; }
 .pen.heat { background: var(--heat); box-shadow: 0 0 0 4px rgba(255, 107, 61, 0.25); }
@@ -296,7 +297,9 @@ h2 { font-size: clamp(34px, 3.6vw, 54px); }
   .tc-t { font-size: 84px; margin: 6px 0 0; }
   .tc-of { font-size: 13px; padding-bottom: 6px; display: grid; gap: 4px; }
   .hint { top: 0; right: 0; left: auto; font-size: 11px; }
-  .rundown { grid-row: 2; height: 300px; }
+  .hero { flex: none; }
+  .rundown { grid-row: 2; height: 292px; }
+  .tl { flex: 1 1 auto; }
   h1 { font-size: 38px; }
   h2 { font-size: 30px; }
   .kicker { font-size: 12px; margin-bottom: 9px; gap: 8px; }
@@ -316,7 +319,7 @@ h2 { font-size: clamp(34px, 3.6vw, 54px); }
   .steps li { min-width: 52px; font-size: 10.5px; }
   .outro-dl .ca-download { font-size: 19px; }
 
-  .tl { --rows: 60px 4px 32px 20px minmax(56px, 1fr) 26px 24px 18px; height: 300px; padding: 6px 0 6px 10px; margin-bottom: -18px; }
+  .tl { --rows: 60px 4px 32px 20px minmax(56px, 1fr) 26px 24px 18px; height: auto; min-height: 300px; padding: 6px 0 6px 10px; margin-bottom: -18px; }
   .lbl { font-size: 9.5px; letter-spacing: 0.1em; }
   .lbl-chart { gap: 5px; }
   .ln { width: 10px; }

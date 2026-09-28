@@ -139,6 +139,8 @@
   $("heat-line").setAttribute("points", pts(heatPts));
   $("hype-line").setAttribute("points", pts(hypePts));
   $("heat-area").setAttribute("points", `0,100 ${pts(heatPts)} 600,100`);
+  $("heat-ghost").setAttribute("points", pts(heatPts));
+  $("hype-ghost").setAttribute("points", pts(hypePts));
   const valueAt = (arr, m) => {
     for (let i = 1; i < arr.length; i++) if (arr[i][0] >= m) { const [m0, v0] = arr[i - 1], [m1, v1] = arr[i]; return v0 + ((v1 - v0) * (m - m0)) / (m1 - m0 || 1); }
     return arr[arr.length - 1][1];
@@ -262,7 +264,7 @@
 
   function coldOpen() {
     if (auto === null) return;
-    const start = performance.now() + 500, dur = 3600;
+    const start = performance.now() + 250, dur = 2400;
     const step = (now) => {
       if (auto === null) return;
       const k = Math.min(1, Math.max(0, (now - start) / dur));
@@ -332,6 +334,16 @@
 
   // ---------- go ----------
   measure();
+  // a deep link to a moment: ?t=24 opens the episode at 24:00
+  const deep = /[?&]t=(\d+(?:\.\d+)?)/.exec(location.search);
+  if (deep) {
+    auto = null;
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const go = () => { seekTo(Math.min(TOTAL, +deep[1]), false); lastT = -1; request(); };
+    go();
+    if (document.readyState !== "complete") addEventListener("load", go);
+    setTimeout(go, 300);
+  }
   render(currentTime());
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); lastT = -1; request(); });
   coldOpen();

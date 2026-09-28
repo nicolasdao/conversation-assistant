@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversation Assistant · Departures</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Download it for Mac.">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='0.35' stroke-width='28'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@600;700&display=swap">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="brand"><span class="ca-mark"></span>Conversation Assistant</span>
+    <nav class="top-links">
+      <a class="top-link" href="https://github.com/nicolasdao/conversation-assistant">Source on GitHub</a>
+      <button class="snd" id="snd" type="button" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="w" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="x" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span id="sndLabel">Sound off</span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="gate housing">
+        <div class="gate-top">
+          <i class="lamp chk" id="gateLamp"></i>
+          <span class="flaps" id="gateLabel" aria-hidden="true"></span>
+          <span class="gate-no">Gate&nbsp;Mac</span>
+        </div>
+
+        <a class="dl" data-download data-when="mac" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+          <span class="sr">Download for Mac</span>
+          <span class="dl-flaps" aria-hidden="true"><span class="flaps" id="dlFlaps"></span></span>
+          <span class="dl-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5v12.5M5.5 10.5 12 17l6.5-6.5M4.5 20.5h15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg></span>
+        </a>
+        <p class="ca-meta gate-meta" data-when="mac">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+        <p class="ca-meta gate-rel" data-when="mac" id="rel" hidden><span data-version></span> · <span data-size></span> disk image</p>
+
+        <div class="other" data-when="other">
+          <p>It's a Mac app. Open this page on your Mac to download it.</p>
+          <div class="other-actions">
+            <button class="tile-btn" type="button" data-copy-link>Copy link</button>
+            <a href="https://github.com/nicolasdao/conversation-assistant">See it on GitHub</a>
+          </div>
+          <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+        </div>
+      </div>
+
+      <div class="title">
+        <p class="eyebrow">Open-source Mac app</p>
+        <h1><span class="sr">Conversation Assistant</span><span class="flaps" id="hl" aria-hidden="true"></span></h1>
+      </div>
+
+      <p class="oneline">It <b>transcribes live conversations</b>, your microphone and the call your Mac plays, <b>maps them on a timeline</b>, and <b>fact-checks claims as they're said</b>.</p>
+    </section>
+
+    <section class="board" id="board" aria-labelledby="board-name">
+      <div class="board-bar">
+        <div class="onair" id="onair"><i></i><span>On air</span></div>
+        <div class="strap">
+          <span class="eyebrow">Departures<span class="long"> · live fact-check</span></span>
+          <span class="name" id="board-name">Claims <span class="long">leaving the conversation</span><span class="short">departing</span></span>
+        </div>
+        <div class="clock"><span class="k">Show time</span><span class="flaps" id="showClock" aria-hidden="true"></span></div>
+        <p class="bar-hint">Click a row to flip it</p>
+      </div>
+
+      <div class="housing board-body" id="boardBody">
+        <div class="row-grid colh" aria-hidden="true">
+          <span class="c-time">Said at</span><span class="c-spk">Speaker</span><span class="c-claim">Claim</span><span class="c-stat">Status</span><span class="c-lamp"></span>
+        </div>
+        <div class="rows" id="rows"></div>
+
+        <div class="row you" id="you">
+          <div class="row-grid">
+            <span class="grp g-time" data-g="time"></span>
+            <span class="grp g-spk" data-g="spk"></span>
+            <label class="grp g-claim claim-wrap">
+              <span class="sr">Type a claim for the board</span>
+              <span data-g="claim"></span>
+              <input id="youInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="send">
+            </label>
+            <button class="grp g-stat board-it" id="boardIt" type="button"><span class="sr">Put it on the board</span><span data-g="stat" aria-hidden="true"></span></button>
+            <i class="lamp you-lamp"></i>
+          </div>
+        </div>
+      </div>
+      <p class="board-note">Your line goes to the top of the board. This board knows ten demo claims; the app checks what's said on your show.</p>
+    </section>
+
+    <section class="platforms" aria-labelledby="pl-title">
+      <h2 class="sec-title" id="pl-title"><span class="sr">Three platforms, one conversation</span><span class="flaps" data-flap="THREE PLATFORMS" aria-hidden="true"></span></h2>
+      <div class="pl-grid">
+        <article class="pl housing">
+          <header class="pl-head"><span class="pl-no">1</span><h3>Transcribe</h3></header>
+          <div class="pl-flaps"><span class="flaps" data-cycle="HOST · YOUR MIC|GUEST · THE CALL" data-tones="host|remote" data-cols="16"></span></div>
+          <p>The transcript streams as people speak. Each voice is recognised as a speaker, and you can name them. It works with any call app, because it listens to the Mac's own audio.</p>
+        </article>
+        <article class="pl housing">
+          <header class="pl-head"><span class="pl-no">2</span><h3>Map</h3></header>
+          <div class="pl-flaps"><span class="flaps" data-cycle="NEWS|ANALYSIS|PERSONAL STORY|EXPLAINER|BANTER" data-tones="news|analysis|story|explainer|banter" data-cols="16"></span></div>
+          <div class="lanes" aria-hidden="true"><i style="--c:var(--m-news);--w:18"></i><i style="--c:var(--m-analysis);--w:26"></i><i style="--c:var(--m-banter);--w:9"></i><i style="--c:var(--m-personal-story);--w:15"></i><i style="--c:var(--m-explainer);--w:20"></i><i style="--c:var(--m-news);--w:12"></i></div>
+          <p>A timeline lane for each: topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments.</p>
+        </article>
+        <article class="pl housing">
+          <header class="pl-head"><span class="pl-no">3</span><h3>Fact-check</h3></header>
+          <div class="pl-flaps"><span class="flaps" data-cycle="SYSTEM 1 · FLAG|SYSTEM 2 · CHECK" data-tones="|chk" data-cols="16"></span></div>
+          <p>System 1 (Jev, a fast decision model) flags checkable claims in about 0.4&nbsp;s each, some 2,000 judgments an hour for cents. System 2, a slower model that researches the web, puts a sourced verdict on screen within seconds, and makes System 1 better.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="pass" aria-labelledby="ps-title">
+      <h2 class="sec-title" id="ps-title"><span class="sr">Before you board</span><span class="flaps" data-flap="BEFORE YOU BOARD" aria-hidden="true"></span></h2>
+      <div class="ticket">
+        <div class="tk-main">
+          <div class="tk-head"><span class="ca-mark"></span><span>Conversation Assistant</span><span class="tk-class">Boarding pass</span></div>
+          <dl class="tk-fields">
+            <div><dt>Aircraft</dt><dd><b>Apple Silicon · macOS 14.2+</b></dd></div>
+            <div><dt>Carrier</dt><dd><b>Open source · BSD 3-Clause</b></dd></div>
+            <div class="wide"><dt>Fare</dt><dd><b>About $1.60 per hour of show</b> ($1.23 for a transcript only). You bring two API keys, from OpenAI and OpenRouter, with prepaid credit. The app walks you through both.</dd></div>
+            <div class="wide"><dt>Baggage</dt><dd><b>No server, no account, no analytics.</b> Recordings and keys stay on your Mac.</dd></div>
+            <div><dt>Check-in</dt><dd>Signed and notarized by Apple. It updates itself.</dd></div>
+            <div><dt>In flight</dt><dd>Chat about the transcript (⌘K), live or afterwards. Play recordings back at up to 4×, and export one as a single file to send.</dd></div>
+          </dl>
+        </div>
+        <div class="tk-stub">
+          <span class="stub-k">Gate</span>
+          <span class="stub-gate">MAC</span>
+          <a class="ca-download stub-dl" data-download data-when="mac" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v12.5M5.5 10.5 12 17l6.5-6.5M4.5 20.5h15" fill="none" stroke="currentColor" stroke-width="2.6"/></svg>Download for Mac</a>
+          <p class="stub-other" data-when="other">Open this page on your Mac to download it. <button class="tile-btn dark" type="button" data-copy-link>Copy link</button></p>
+          <span class="barcode" aria-hidden="true"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="ca-mark"></span>
+    <span>Conversation Assistant · BSD 3-Clause · <a href="https://github.com/nicolasdao/conversation-assistant">Source on GitHub</a></span>
+  </footer>
+</div>
+
+<a class="ca-back" href="../">All experiments</a>
+<script src="../_shared/download.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

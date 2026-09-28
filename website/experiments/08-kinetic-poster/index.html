@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversation Assistant — Transcribe. Map. Fact-check.</title>
+<meta name="description" content="Conversation Assistant is an open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said. Download it for Mac.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1024 1024%22%3E%3Crect x=%22100%22 y=%22100%22 width=%22824%22 height=%22824%22 rx=%22185%22 fill=%22%23e02a3e%22/%3E%3Ccircle cx=%22512%22 cy=%22512%22 r=%22190%22 fill=%22%23fff%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap">
+<link rel="stylesheet" href="../_shared/theme.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="poster">
+
+  <!-- The download slab: the first thing on the page. -->
+  <header class="masthead">
+    <div data-when="mac">
+      <a class="slab dl" data-download data-max="0.14" data-maxpx="150" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+        <span class="half"><span class="face">
+          <span class="line">Download for Mac</span>
+          <span class="side">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m0 0-6-6m6 6 6-6M4 21h16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/></svg>
+            <span class="side-txt"><span data-version>Latest</span><span data-size>DMG</span></span>
+          </span>
+        </span></span>
+      </a>
+    </div>
+    <div data-when="other" class="other">
+      <div class="slab dl dl-other" data-max="0.12" data-maxpx="130">
+        <span class="half"><span class="face"><span class="line">It's a Mac app</span></span></span>
+      </div>
+      <div class="other-row">
+        <p>Open this page on your Mac to download it.</p>
+        <button type="button" class="btn" data-copy-link>Copy link</button>
+        <a class="btn ghost" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">GitHub</a>
+      </div>
+    </div>
+    <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source</p>
+  </header>
+
+  <main>
+    <section class="hero" aria-label="What it does">
+      <div class="ident">
+        <div class="namestrap">
+          <span class="ca-mark" aria-hidden="true"></span>
+          <span><span class="eyebrow">Open-source Mac app</span><h1 class="name">Conversation Assistant</h1></span>
+        </div>
+        <p class="oneliner">Transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.</p>
+      </div>
+
+      <h2 class="slab word" data-rest="0.62"><span class="half"><span class="face"><span class="line">Transcribe<i class="dot"></i></span></span></span></h2>
+      <div class="cap">
+        <b>01</b>
+        <p>Your microphone and the call your Mac plays, written down as people speak. Each voice becomes a speaker you can name. Any call app works.</p>
+      </div>
+
+      <h2 class="slab word" data-rest="0.38"><span class="half"><span class="face"><span class="line">Map<i class="dot"></i></span></span></span></h2>
+      <div class="cap">
+        <b>02</b>
+        <p>The conversation laid out on a timeline: topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations, clip-worthy moments.</p>
+        <div class="lanes" aria-hidden="true">
+          <span style="--c:var(--s-ai-models);--w:34"></span><span style="--c:var(--s-personal-life);--w:18"></span><span style="--c:var(--s-tech);--w:28"></span><span style="--c:var(--s-marketing);--w:20"></span>
+          <span style="--c:var(--m-news);--w:22"></span><span style="--c:var(--m-analysis);--w:30"></span><span style="--c:var(--m-banter);--w:16"></span><span style="--c:var(--m-explainer);--w:32"></span>
+          <span style="--c:var(--heat);--w:12"></span><span style="--c:transparent;--w:26"></span><span style="--c:var(--hype);--w:20"></span><span style="--c:var(--heat);--w:42"></span>
+        </div>
+      </div>
+
+      <h2 class="slab word" data-rest="0.55"><span class="half"><span class="face"><span class="line">Fact-check<i class="dot"></i></span></span></span></h2>
+      <div class="cap">
+        <b>03</b>
+        <p>Checkable claims get sourced verdicts on screen within seconds. Keep scrolling: one is being checked right now.</p>
+      </div>
+    </section>
+
+    <!-- The stamp: a verdict slams onto a claim, then the poster peels to reveal the next one. -->
+    <section class="verdicts" aria-label="Fact-checks">
+      <div class="track">
+        <div class="panel">
+          <div class="sheet sheet-2">
+            <p class="said"><span class="who host">Host</span> on air</p>
+            <blockquote class="claim">“Bananas are berries.”</blockquote>
+            <div class="stamp good" aria-label="Verdict: Supported. Botanically, yes.">
+              <span class="face"><span class="line sw">Supported</span></span>
+              <span class="sn">Botanically, yes.</span>
+            </div>
+            <div class="foot">
+              <p>Sourced verdicts, on screen within seconds.</p>
+              <ul class="chips" aria-label="The four verdicts">
+                <li class="c-good">Supported</li><li class="c-bad">Contradicted</li><li class="c-warn">Misleading</li><li class="c-neutral">Unverifiable</li>
+              </ul>
+            </div>
+          </div>
+          <div class="sheet sheet-1">
+            <p class="said"><span class="who remote">Guest</span> on air</p>
+            <blockquote class="claim">“The Great Wall of China is visible from space with the naked eye.”</blockquote>
+            <p class="research"><span>System 2</span> Researching the web</p>
+            <div class="stamp bad" aria-label="Verdict: Contradicted. Astronauts report it isn't.">
+              <span class="face"><span class="line sw">Contradicted</span></span>
+              <span class="sn">Astronauts report it isn't.</span>
+            </div>
+            <div class="foot">
+              <p><b>System 1</b> flags checkable claims in about 0.4 s. <b>System 2</b>, a slower model, researches the web, checks them, and makes System 1 better.</p>
+            </div>
+          </div>
+          <div class="flapwrap" aria-hidden="true"><div class="flap"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="private" aria-label="Privacy and requirements">
+      <h2 class="slab word deck" data-rest="0.5"><span class="half"><span class="face"><span class="line">No server<i class="dot"></i></span></span></span></h2>
+      <h2 class="slab word deck" data-rest="0.42"><span class="half"><span class="face"><span class="line">No account<i class="dot"></i></span></span></span></h2>
+      <h2 class="slab word deck" data-rest="0.66"><span class="half"><span class="face"><span class="line">No analytics<i class="dot"></i></span></span></span></h2>
+
+      <dl class="spec">
+        <div><dt>Listens to</dt><dd>Your microphone and the call your Mac plays, in any call app. Ask the transcript anything with ⌘K, live or afterwards.</dd></div>
+        <div><dt>Keeps</dt><dd>Recordings and keys stay on your Mac. A recordings library, playback at up to 4×, and one-file exports to send.</dd></div>
+        <div><dt>Costs</dt><dd>Two API keys, from OpenAI and OpenRouter, with prepaid credit; the app walks you through both. About $1.60 per hour of show, or $1.23 for a transcript only.</dd></div>
+        <div><dt>Runs on</dt><dd>Apple Silicon, macOS 14.2 or later. Signed and notarized by Apple. It updates itself. BSD 3-Clause.</dd></div>
+      </dl>
+
+      <div class="closer">
+        <div data-when="mac">
+          <a class="slab dl" data-download data-max="0.14" data-maxpx="150" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">
+            <span class="half"><span class="face">
+              <span class="line">Download for Mac</span>
+              <span class="side">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m0 0-6-6m6 6 6-6M4 21h16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/></svg>
+                <span class="side-txt"><span data-version>Latest</span><span data-size>DMG</span></span>
+              </span>
+            </span></span>
+          </a>
+        </div>
+        <div data-when="other" class="other-row end">
+          <p>It's a Mac app. Open this page on your Mac to download it.</p>
+          <button type="button" class="btn" data-copy-link>Copy link</button>
+          <a class="btn ghost" href="https://github.com/nicolasdao/conversation-assistant/releases/latest">GitHub</a>
+        </div>
+        <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source · <a href="https://github.com/nicolasdao/conversation-assistant">Source on GitHub</a></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<a class="ca-back" href="../">All experiments</a>
+<script src="../_shared/download.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

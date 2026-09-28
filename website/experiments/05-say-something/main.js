@@ -151,6 +151,7 @@
     void third.offsetWidth; third.classList.add("slam");
     if (!reduced) { stage.classList.remove("jolt"); void stage.offsetWidth; stage.classList.add("jolt"); }
   }
+  let instant = false; // true while the demo pre-rolls: that verdict is already on screen when the page appears
   function onClaim(c) {
     const now = performance.now();
     if (c.id === lastClaim.id && now - lastClaim.at < 9000) return;
@@ -158,13 +159,15 @@
     clearTimeout(thirdTimer); clearTimeout(researchTimer);
     document.querySelectorAll(".chip.hit").forEach((b) => b.classList.remove("hit"));
     const chip = chipsEl.querySelector(`[data-id="${c.id}"]`); if (chip) chip.classList.add("hit");
-    setThird("researching", "Checking", "System 2", "Claim flagged", c.claim, "Researching…");
-    researchTimer = setTimeout(() => {
+    const land = () => {
       const word = c.v[0].toUpperCase() + c.v.slice(1);
-      slam("v-" + c.v, word, "Fact-check", "Easter egg · verdict written for this page", c.claim, c.note);
+      (instant ? setThird : slam)("v-" + c.v, word, "Fact-check", "Easter egg · verdict written for this page", c.claim, c.note);
       announce.textContent = `${word}: ${c.claim} ${c.note}`;
       thirdTimer = setTimeout(() => { idleThird(); if (chip) chip.classList.remove("hit"); }, 8000);
-    }, reduced ? 250 : 750);
+    };
+    if (instant) { land(); return; }
+    setThird("researching", "Checking", "System 2", "Claim flagged", c.claim, "Researching…");
+    researchTimer = setTimeout(land, reduced ? 250 : 750);
   }
   window.addEventListener("ca:download", () => {
     clearTimeout(thirdTimer); clearTimeout(researchTimer);
@@ -373,6 +376,9 @@
   buildSegs(); sizeRibbon(); idleThird();
   // start mid-sentence, so the very first frame (and a still screenshot) is already talking
   const t0 = performance.now();
+  lines.push("I don't buy that at all, cheap is not the same as good.");
+  instant = true;
   for (let t = 0; t < 2.5; t += 1 / 60) { clock += 1 / 60; advance(1 / 60, simStep(1 / 60), t0 - (2.5 - t) * 1000); }
+  instant = false;
   paintMeter(); drawRibbon(shown); renderCaps(); schedule();
 })();

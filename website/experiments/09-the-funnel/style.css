@@ -95,9 +95,10 @@ kbd { font: 700 12px/1 var(--cond); border: 1px solid currentColor; border-radiu
 .fc { display: grid; grid-template-columns: 138px minmax(0, 1fr); background: var(--deck); min-height: 88px; }
 .fc-verdict { color: #fff; padding: 12px 18px 12px 13px; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: var(--neutral);
   clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); }
-.fc-verdict .vw { font: 800 23px/0.95 var(--cond); letter-spacing: 0.02em; text-transform: uppercase; overflow-wrap: break-word; }
-.v-contradicted .vw { font-size: 20px; }
+.fc-verdict .vw { font: 800 23px/0.95 var(--cond); letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; }
+.v-contradicted .vw, .v-supported .vw, .v-misleading .vw { font-size: 20px; }
 .v-unverifiable .vw { font-size: 19px; }
+.v-researching .vw { font-size: 18px; }
 .fc-verdict .vm { font: 600 13px/1.2 var(--cond); letter-spacing: 0.04em; opacity: 0.92; }
 .v-contradicted .fc-verdict { background: var(--bad); }
 .v-supported .fc-verdict { background: var(--good); }
@@ -125,7 +126,7 @@ kbd { font: 700 12px/1 var(--cond); border: 1px solid currentColor; border-radiu
 .m-strap { display: flex; align-items: baseline; gap: 10px; padding: 9px 14px 8px; border-bottom: 1px solid var(--rule); background: var(--deck-2); white-space: nowrap; overflow: hidden; }
 .m-strap span { font: 800 15px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
 .m-strap em { font: 600 13px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; font-style: normal; color: var(--mute); overflow: hidden; text-overflow: ellipsis; }
-.stage { position: relative; cursor: grab; }
+.stage { position: relative; cursor: move; }
 .stage.dragging { cursor: grabbing; }
 .stage.over-pill { cursor: grab; }
 canvas { display: block; width: 100%; height: 100%; }
@@ -149,11 +150,12 @@ canvas { display: block; width: 100%; height: 100%; }
 .tag.heard b { font-weight: 800; font-size: 13px; color: var(--ink); letter-spacing: 0.16em; }
 .tag.heard span { color: var(--mute); font-weight: 600; }
 
-.bin { display: grid; justify-items: start; gap: 1px; padding: 5px 12px 5px 7px; color: #fff; background: var(--neutral);
+.bin { display: grid; justify-items: start; gap: 1px; padding: 5px 11px 5px 6px; color: #fff; background: var(--neutral);
   clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
 .bin b { font: 800 22px/1 var(--cond); font-variant-numeric: tabular-nums; display: inline-block; transform-origin: left center; }
 .bin b.tick { animation: tick 380ms cubic-bezier(0.2, 0.9, 0.25, 1); }
-.bin span { font: 800 10.5px/1 var(--cond); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.bin span { font: 800 9.5px/1 var(--cond); letter-spacing: 0; text-transform: uppercase; white-space: nowrap; }
+.bin.heard { background: var(--paper); color: var(--paper-ink); }
 .bin.v-supported { background: var(--good); }
 .bin.v-misleading { background: var(--warn); color: var(--paper-ink); }
 .bin.v-contradicted { background: var(--bad); }
@@ -213,9 +215,9 @@ main > section:not(.hero) { max-width: 1180px; margin: 0 auto; padding: 72px 32p
   .clock { display: none; }
 }
 @media (max-width: 980px) {
-  .hero { grid-template-columns: minmax(0, 1fr); padding: 22px 20px 36px; }
-  .pitch { max-width: none; }
-  .machine-wrap { order: 3; justify-self: center; }
+  .hero { grid-template-columns: minmax(0, 1fr); padding: 22px 20px 36px; gap: 22px; }
+  .pitch { display: contents; }
+  .hero h1 { order: 1; } .lede { order: 2; } .machine-wrap { order: 3; justify-self: center; } .funnel { order: 4; } .controls { order: 5; } .lastword { order: 6; }
   .top { flex-direction: column; gap: 0; }
   .brand { min-height: 64px; }
   .get { padding: 14px 16px 14px; background: var(--ground); border-top: 1px solid var(--rule); }
@@ -233,24 +235,26 @@ main > section:not(.hero) { max-width: 1180px; margin: 0 auto; padding: 72px 32p
   .brand { min-height: 60px; }
   .ca-download.big { font-size: 24px; padding: 18px calc(24px + var(--slant)) 18px 20px; }
   .other-actions { justify-content: space-between; }
-  .hero { padding: 20px 16px 30px; gap: 22px; }
-  .pitch { gap: 18px; padding-top: 0; }
-  h1 { font-size: 46px; }
+  .hero { padding: 18px 16px 30px; gap: 16px; }
+  h1 { font-size: 42px; }
+  .machine-wrap { margin: 4px 0 6px; }
   .lede { font-size: 16.5px; }
   .funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step b { font-size: 28px; }
   .step .sub { display: none; }
   .controls .btn { flex: 1 1 auto; justify-content: center; height: 48px; }
   .hint { flex-basis: 100%; font-size: 13.5px; }
-  .fc { grid-template-columns: 112px minmax(0, 1fr); }
-  .fc-verdict .vw { font-size: 19px; }
-  .v-contradicted .vw, .v-unverifiable .vw { font-size: 15.5px; }
+  .fc { grid-template-columns: 118px minmax(0, 1fr); }
+  .fc-verdict { padding: 10px 16px 10px 10px; }
+  .fc-verdict .vw, .v-supported .vw, .v-misleading .vw { font-size: 17px; }
+  .v-contradicted .vw, .v-unverifiable .vw { font-size: 15px; }
   .fc blockquote { font-size: 14px; }
   .fc-body { padding: 10px 12px; }
   .tag { font-size: 10.5px; }
   .bin { padding: 4px 9px 4px 5px; }
   .bin b { font-size: 18px; }
   .bin span { font-size: 8.5px; letter-spacing: 0; }
+  .v-researching .vw { font-size: 15px; }
   .m-strap em { display: none; }
   main > section:not(.hero) { padding: 52px 16px; }
   .systems { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 44px auto; }
