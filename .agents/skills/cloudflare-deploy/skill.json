@@ -1,0 +1,52 @@
+{
+	"name": "cloudflare-deploy",
+	"version": "0.1.2",
+	"description": "Deploy Cloudflare Workers and set up CI/CD: wrangler deploy, build-on-push via GitHub Actions or the native Workers Builds REST API, and Deploy Hooks. Cloudflare constellation satellite.",
+	"type": "skill",
+	"authors": [
+		"Nicolas Dao <nicolas.dao@gmail.com>"
+	],
+	"license": "BSD-3-Clause",
+	"dependencies": {},
+	"env": {
+		"CLOUDFLARE_API_TOKEN": {
+			"required": true,
+			"secret": true,
+			"description": "Scoped Cloudflare API token with Workers Scripts Edit and Workers Routes Edit"
+		},
+		"CLOUDFLARE_ACCOUNT_ID": {
+			"required": false,
+			"secret": false,
+			"description": "Account ID wrangler deploys to (or set account_id in wrangler config)"
+		}
+	},
+	"systemDependencies": {
+		"node": {
+			"description": "Node.js runtime — provides npx to run wrangler.",
+			"check": "node --version",
+			"install": {
+				"darwin": "brew install node",
+				"linux": "sudo apt-get install -y nodejs",
+				"win32": "winget install OpenJS.NodeJS"
+			}
+		},
+		"npx": {
+			"description": "npx — runs wrangler (npx wrangler deploy) without a global install.",
+			"check": "npx --version",
+			"install": {
+				"darwin": "brew install node",
+				"linux": "sudo apt-get install -y nodejs",
+				"win32": "winget install OpenJS.NodeJS"
+			}
+		},
+		"curl": {
+			"description": "curl — POSTs to Workers Builds Deploy Hooks and calls the Builds REST API.",
+			"check": "curl --version",
+			"install": {
+				"darwin": "brew install curl",
+				"linux": "sudo apt-get install -y curl",
+				"win32": "winget install curl.curl"
+			}
+		}
+	}
+}

@@ -110,3 +110,4 @@ temp/
 .apdisk
 Network Trash Folder
 Temporary Items
+secrets/*.env

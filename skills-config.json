@@ -1,0 +1,11 @@
+{
+	"nicolasdao/cloudflare": {
+		"envFile": "./secrets/cloudflare.env"
+	},
+	"nicolasdao/cloudflare-config": {
+		"envFile": "./secrets/cloudflare.env"
+	},
+	"nicolasdao/cloudflare-deploy": {
+		"envFile": "./secrets/cloudflare.env"
+	}
+}

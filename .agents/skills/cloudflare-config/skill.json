@@ -1,0 +1,23 @@
+{
+	"name": "cloudflare-config",
+	"version": "0.1.0",
+	"description": "Configure Cloudflare via REST: DNS records, WAF rules, rate limiting, zone/SSL settings, Bot Fight Mode, Page Shield, with read-then-confirm write discipline. Cloudflare constellation satellite.",
+	"type": "skill",
+	"authors": ["Nicolas Dao <nicolas.dao@gmail.com>"],
+	"license": "BSD-3-Clause",
+	"dependencies": {},
+	"env": {
+		"CLOUDFLARE_API_TOKEN": { "required": true, "secret": true, "description": "Scoped Cloudflare API token with the Edit scopes for what you configure (DNS, WAF, zone settings)" }
+	},
+	"systemDependencies": {
+		"curl": {
+			"description": "curl — issues the Cloudflare REST write calls (POST/PUT/PATCH/DELETE).",
+			"check": "curl --version",
+			"install": {
+				"darwin": "brew install curl",
+				"linux": "sudo apt-get install -y curl",
+				"win32": "winget install curl.curl"
+			}
+		}
+	}
+}

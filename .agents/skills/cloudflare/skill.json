@@ -1,0 +1,35 @@
+{
+	"name": "cloudflare",
+	"version": "0.4.3",
+	"description": "Read-only Cloudflare operations: audit traffic and Workers usage via GraphQL, monitor Workers cost, verify token scopes, read DNS/zone config through a token-hiding cf.js wrapper. Constellation core.",
+	"type": "skill",
+	"authors": [
+		"Nicolas Dao <nicolas.dao@gmail.com>"
+	],
+	"license": "BSD-3-Clause",
+	"sharedEnv": true,
+	"dependencies": {
+		"nicolasdao/cloudflare-deploy": "^0.1.0",
+		"nicolasdao/cloudflare-config": "^0.1.0"
+	},
+	"env": {
+		"CLOUDFLARE_API_TOKEN": {
+			"required": true,
+			"secret": true,
+			"description": "Scoped Cloudflare API token (Bearer) — see the setup guide for the exact permissions",
+			"setupGuide": "references/token-model.md",
+			"verify": "node scripts/cf.js rest GET /user/tokens/verify"
+		}
+	},
+	"systemDependencies": {
+		"node": {
+			"description": "Node.js runtime — runs the read-only cf.js access wrapper.",
+			"check": "node --version",
+			"install": {
+				"darwin": "brew install node",
+				"linux": "sudo apt-get install -y nodejs",
+				"win32": "winget install OpenJS.NodeJS"
+			}
+		}
+	}
+}
