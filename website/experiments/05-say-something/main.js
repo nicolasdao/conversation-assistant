@@ -171,7 +171,7 @@
   }
   window.addEventListener("ca:download", () => {
     clearTimeout(thirdTimer); clearTimeout(researchTimer);
-    slam("v-supported", "Supported", "Good call", "Download started", "Conversation Assistant is on its way to your Mac.", "Open the DMG and drag it to Applications.");
+    slam("v-supported", "Supported", "Good call", "Download started", "Tattle is on its way to your Mac.", "Open the DMG and drag it to Applications.");
     thirdTimer = setTimeout(idleThird, 9000);
   });
 

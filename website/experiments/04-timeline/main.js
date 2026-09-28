@@ -28,7 +28,7 @@
     [0, "host", "We're live. Welcome back to the show."],
     [1.3, "guest", "Okay, enough about models, how was surfing in Sydney this weekend?"],
     [2.6, "host", "Cold. Anyway. Today: the app drawing this timeline."],
-    [5, "host", "Conversation Assistant. An open-source Mac app."],
+    [5, "host", "Tattle. An open-source Mac app."],
     [6.2, "guest", "So what does it actually do?"],
     [7, "host", "It transcribes us live. My mic, and the call my Mac plays."],
     [9, "guest", "Which call app?"],

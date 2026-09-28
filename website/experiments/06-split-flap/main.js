@@ -225,8 +225,8 @@
   /* ---------- the headline ---------- */
   const hlEl = $("#hl"), titleEl = $(".title");
   const HL = {
-    wide: { cols: 18, rows: 2, msgs: [["CONVERSATION", "ASSISTANT"], ["TRANSCRIBE · MAP ·", "FACT-CHECK"]], bye: ["ENJOY THE SHOW", ""] },
-    narrow: { cols: 12, rows: 3, msgs: [["CONVERSATION", "ASSISTANT", ""], ["TRANSCRIBE ·", "MAP ·", "FACT-CHECK"]], bye: ["ENJOY", "THE SHOW", ""] },
+    wide: { cols: 18, rows: 2, msgs: [["TATTLE", "FOR YOUR MAC"], ["TRANSCRIBE · MAP ·", "FACT-CHECK"]], bye: ["ENJOY THE SHOW", ""] },
+    narrow: { cols: 12, rows: 3, msgs: [["TATTLE", "FOR YOUR MAC", ""], ["TRANSCRIBE ·", "MAP ·", "FACT-CHECK"]], bye: ["ENJOY", "THE SHOW", ""] },
   };
   let hlMode = null, hl = null, hlIdx = 0, hlHoldUntil = 0;
   function buildHeadline(first) {

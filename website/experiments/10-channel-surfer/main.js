@@ -112,9 +112,9 @@
     }
     text(word, x + (dot ? 42 : 18), y + 38, { color: ink, s: 28, ls: 2 });
     const sx = x + bw - 14;
-    const sw = Math.max(measure(label, 800, 28, "cond", 1.5), measure("CONVERSATION ASSISTANT", 700, 13, "cond", 2.5)) + 64;
+    const sw = Math.max(measure(label, 800, 28, "cond", 1.5), measure("TATTLE", 700, 13, "cond", 2.5)) + 64;
     ctx.fillStyle = K.paper; slant(sx, y, sw, h, 14, 14); ctx.fill();
-    text("CONVERSATION ASSISTANT", sx + 30, y + 20, { color: K["strap-eyebrow"], w: 700, s: 13, ls: 2.5 });
+    text("TATTLE", sx + 30, y + 20, { color: K["strap-eyebrow"], w: 700, s: 13, ls: 2.5 });
     text(label, sx + 30, y + 46, { color: K["paper-ink"], s: 28, ls: 1.5 });
   }
   const CRAWL = "TRANSCRIBES LIVE CONVERSATIONS   /   MAPS THEM ON A TIMELINE   /   FACT-CHECKS CLAIMS AS THEY'RE SAID   /   WORKS WITH ANY CALL APP   /   NO SERVER, NO ACCOUNT, NO ANALYTICS   /   SIGNED AND NOTARIZED BY APPLE   /   BSD 3-CLAUSE   /   ";
@@ -161,7 +161,7 @@
     ctx.fillStyle = K.ground; ctx.fillRect(cx - R, 312, 2 * R, 92);
     ctx.fillStyle = K.paper; slant(cx - 300, 322, 600, 72, 18, 18); ctx.fill();
     ctx.fillStyle = K.live; slant(cx - 318, 322, 58, 72, 18); ctx.fill();
-    text("CONVERSATION ASSISTANT", cx + 12, 378, { align: "center", color: K["paper-ink"], s: 50, ls: 3 });
+    text("TATTLE", cx + 12, 378, { align: "center", color: K["paper-ink"], s: 50, ls: 3 });
     // greyscale
     const gw = (2 * R) / GREYS.length;
     GREYS.forEach((c, i) => { ctx.fillStyle = K[c]; ctx.fillRect(cx - R + i * gw, 404, gw + 1, 64); });
@@ -563,7 +563,7 @@
   }
 
   const CH = [
-    { osd: "TEST CARD", draw: drawTest, glow: "accent", sr: "Test card: colour bars in the app's palette and the station ident, Conversation Assistant." },
+    { osd: "TEST CARD", draw: drawTest, glow: "accent", sr: "Test card: colour bars in the app's palette and the station ident, Tattle." },
     { osd: "LIVE TRANSCRIPT", draw: drawTranscript, glow: "host", sr: "Channel 1, live transcript: captions stream as the host and a guest speak. Each voice is a speaker you can name, and claims get flagged for fact-checking." },
     { osd: "TIMELINE", draw: drawTimeline, glow: "hype", sr: "Channel 2, timeline: lanes for topic, mode, heat and hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments fill in as the show runs." },
     { osd: "FACT-CHECK", draw: drawFactcheck, glow: "good", sr: "Channel 3, fact-check: claims appear as lower thirds with sourced verdicts: supported, contradicted, misleading, or unverifiable." },

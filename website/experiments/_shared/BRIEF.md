@@ -1,6 +1,6 @@
 # Website experiments: the shared brief
 
-Ten design experiments for a one-page website for **Conversation Assistant**. Each explores a different way to make the page fun, interactive, and memorable. All of them share the app's theme. This brief is what every experiment was built from.
+Ten design experiments for a one-page website for **Tattle**. Each explores a different way to make the page fun, interactive, and memorable. All of them share the app's theme. This brief is what every experiment was built from.
 
 ## The page's job
 
@@ -27,11 +27,11 @@ Use `_shared/theme.css`, which carries the app's tokens from `web/styles.css` ("
 
 ## The download (fixed)
 
-Include `_shared/theme.css` and `_shared/download.js`. Every download link is `<a data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">`. The script points it at the DMG, fills `[data-version]` and `[data-size]`, and dispatches `ca:download` on click. On a phone or PC, `[data-when="other"]` shows instead of `[data-when="mac"]`: "It's a Mac app. Open this page on your Mac to download it", with a `[data-copy-link]` button and a link to GitHub. Under the button, a meta line: *Apple Silicon · macOS 14.2 or later · Free and open source*.
+Include `_shared/theme.css` and `_shared/download.js`. Every download link is `<a data-download href="https://github.com/nicolasdao/tattle/releases/latest">`. The script points it at the DMG, fills `[data-version]` and `[data-size]`, and dispatches `ca:download` on click. On a phone or PC, `[data-when="other"]` shows instead of `[data-when="mac"]`: "It's a Mac app. Open this page on your Mac to download it", with a `[data-copy-link]` button and a link to GitHub. Under the button, a meta line: *Apple Silicon · macOS 14.2 or later · Free and open source*.
 
 ## What's true about the app (use only this)
 
-- **Conversation Assistant** is an open-source Mac app that **transcribes live conversations** (your microphone and the call your Mac plays), **maps them on a timeline**, and **fact-checks claims as they're said**.
+- **Tattle** is an open-source Mac app that **transcribes live conversations** (your microphone and the call your Mac plays), **maps them on a timeline**, and **fact-checks claims as they're said**.
 - It was built for a live podcast: the host's microphone plus the guests on the call. It works with any call app, because it listens to the Mac's own audio.
 - The transcript streams as people speak. Each voice is recognised as a speaker, whom you can name.
 - The timeline lanes: topic, mode (news, analysis, personal story, explainer, banter), heat and hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments.

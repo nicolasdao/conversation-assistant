@@ -1,7 +1,7 @@
 // Download for Mac, shared by every experiment.
 //
 // Markup:
-//   <a data-download href="https://github.com/nicolasdao/conversation-assistant/releases/latest">Download for Mac</a>
+//   <a data-download href="https://github.com/nicolasdao/tattle/releases/latest">Download for Mac</a>
 //   <span data-version></span>  -> "v0.6.2"      <span data-size></span> -> "146 MB"
 //   [data-when="mac"] / [data-when="other"]      -> shown only on a Mac / only elsewhere (theme.css)
 //   <button data-copy-link>Copy link</button>     -> copies the page's URL, says "Copied"
@@ -13,7 +13,7 @@
 // A click on a download link also dispatches `ca:download` on window (detail: { url, el }) before navigating,
 // for a celebration; never cancel it.
 (function () {
-  const repo = "nicolasdao/conversation-assistant";
+  const repo = "nicolasdao/tattle";
   const releasesUrl = `https://github.com/${repo}/releases/latest`;
   const ua = navigator.userAgent;
   // Only a Mac says "Macintosh" (an iPhone says "like Mac OS X"). An iPad also says it, but has a touch screen.
