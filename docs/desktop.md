@@ -98,7 +98,7 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 
 - It needs a signed app: macOS refuses to update an ad-hoc build.
 - It reads `latest-mac.yml` from the newest published (not draft, not pre-release) GitHub Release.
-- Installed copies look for updates in the repository they were built with. The project moved to `nicolasdao/conversation-assistant` on 27 September 2026, before its first published app, so no installed copy points at the old `podcast-ai-assistant` repository. If it moves again, change `publish` in `electron-builder.yml` and the `REPO` link in `desktop/main.ts`, and keep publishing to the old repository until installed copies have updated.
+- Installed copies look for updates in the repository they were built with, `nicolasdao/conversation-assistant`. On 28 September 2026 that repository was recreated with a rewritten history (private details removed from old commits; the first public one had been renamed and made private), under the same name, so copies installed before still find new releases. GitHub keeps the tag name of an immutable release reserved even across such a move, so the rewritten `v0.6.0` could not be pushed: 0.6.0 has a changelog entry but no tag or release page there, and 0.6.1 is the first published release. If it moves again, change `publish` in `electron-builder.yml` and the `REPO` link in `desktop/main.ts`, and keep publishing to the old repository until installed copies have updated.
 
 ## Building
 
