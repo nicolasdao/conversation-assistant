@@ -14,7 +14,7 @@ source:
 
 # Architecture
 
-Conversation Assistant has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+Conversation Assistant is an open-source Mac app: people download a signed, notarized build and it updates itself (see [The Mac app](desktop.md)); developers run the same engine and page from the project folder with `npm run serve` or `npm run app`. Either way, it has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
 
 The engine runs in one of two hosts, with the same start-up (`bootEngine()` in `src/server/main.ts`) and the same router: **`npm run serve`**, a server on http://127.0.0.1:4317 for development and the command-line tools, or **the Mac app**, where it runs inside Electron's main process and the app's window reaches the router in-process, with no port (see [The Mac app](desktop.md)). Where the engine finds its files — the page, config, models, recordings, the helper — comes from `src/paths.ts`: the project folder by default, the app bundle and Application Support in the Mac app.
 

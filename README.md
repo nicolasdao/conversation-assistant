@@ -1,5 +1,11 @@
 # Conversation Assistant
 
+**An open-source Mac app** that transcribes live conversations (your microphone and the call your Mac plays), maps them on a timeline, and fact-checks claims as they're said.
+
+**[Download for Mac](https://github.com/nicolasdao/conversation-assistant/releases/latest)** · Apple Silicon, macOS 14.2 or later · signed and notarized by Apple · updates itself · free and open source ([BSD 3-Clause](LICENSE))
+
+It was built for a podcast recorded over Riverside: the host's microphone plus the Mac's system audio, transcribed live, labelled on a timeline with Jev, and fact-checked with a System 1 / System 2 loop. It exists to demonstrate, live on air, that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 that improves it. Start with the [Mission](docs/mission.md), then [Architecture](docs/architecture.md), [Jev](docs/jev.md), and [System 1 and System 2](docs/system1-system2.md).
+
 ## Table of Contents
 
 <!-- BEGIN toc -->
@@ -17,11 +23,6 @@
 - [License](#license)
 - [Versioning](#versioning)
 <!-- END toc -->
-
-
-A Mac app that listens to a remote podcast recording (the host's microphone plus the Mac's system audio), transcribes it live, labels the conversation on a timeline with Jev, and fact-checks claims with a System 1 / System 2 loop.
-
-It exists to demonstrate, live on air, that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 that improves it. Start with the [Mission](docs/mission.md), then [Architecture](docs/architecture.md), [Jev](docs/jev.md), and [System 1 and System 2](docs/system1-system2.md).
 
 ## Install
 
