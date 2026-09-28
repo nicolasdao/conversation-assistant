@@ -36,7 +36,7 @@ The page was chosen from experiment `02-record-button`. Its sections, top to bot
 
 Every figure on the page comes from the docs (`jev.md`, `system1-system2.md`, `mission.md`). Change the page's claims only from there: it must not say Tattle is free to run or needs no keys while that is untrue.
 
-**The download button and the release line.** `assets/download.js` asks GitHub's API for the latest release (`api.github.com/repos/nicolasdao/tattle/releases/latest`), points every `[data-download]` link at its `-arm64.dmg` asset, and fills the version, size, date, and release-notes link (the footer's "Latest release" line). The DMG's file name carries the version, so it cannot be a fixed URL. If the API cannot be reached (offline, rate limit of 60 requests an hour per visitor), the links stay on the release page. On anything but a Mac (an iPad counts as not a Mac), the page shows "It's a Mac app" with a Copy link button instead of the download.
+**The download button and the release line.** The page names the latest published release in its HTML: the two Download for Mac links go to that release's DMG, the line under the button gives its version and size, the footer's "Latest release" line its version, date, and release notes, and the JSON-LD its `softwareVersion` and `downloadUrl`. Each release writes these (see [Releases update the site](#releases-update-the-site)), so the page is right without JavaScript and for search engines. On top of that, `assets/download.js` asks GitHub's API for the latest release (`api.github.com/repos/nicolasdao/tattle/releases/latest`), points every `[data-download]` link at its `-arm64.dmg` asset, and fills the version, size, date, and release-notes link (the footer's "Latest release" line). The DMG's file name carries the version, so it cannot be a fixed URL. If the API cannot be reached (offline, rate limit of 60 requests an hour per visitor), the page keeps what its HTML says. On anything but a Mac (an iPad counts as not a Mac), the page shows "It's a Mac app" with a Copy link button instead of the download.
 
 ## Hosting
 
@@ -121,6 +121,13 @@ The `cloudflare` skill's `cf.js` needs a workaround in this repository (see [Got
 2. If the import map or a Three.js version changed, recompute the hashes ([Security](#security)).
 3. Commit and push to `master`. Cloudflare redeploys within minutes; check **Deployments** in the dashboard, or https://hey-tattle.com.
 
-A new app release needs no website change: the download button and the release line read the latest release from GitHub.
+### Releases update the site
+
+The release skill (`release-tattle`, Step 11) finishes every deployed release by pointing the page at it, after production is verified:
+
+1. `update-website.sh <version>` reads the **published** GitHub Release (it refuses one that is not published) and writes its version, DMG link, size, date, and release-notes link into `website/index.html`. It checks that each element it edits is still on the page, and fails if the page changed shape: update the script with the page, never by hand around it.
+2. `deploy-website.sh <version>` commits `website/index.html` alone (`chore(website): point the download and release line at v<version>`), pushes `master`, and waits until https://hey-tattle.com links the new DMG.
+
+Both are in `.agents/skills/release-tattle/scripts/` and run from the project root. Between a release and that commit, visitors with JavaScript already see the new release, because `download.js` reads it from GitHub.
 
 Related: [The Mac app](desktop.md) (the DMG the page downloads), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Mission](mission.md).

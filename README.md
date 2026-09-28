@@ -177,7 +177,7 @@ Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.
 
 ## Website
 
-The official website is **[hey-tattle.com](https://hey-tattle.com)** (`www.hey-tattle.com` redirects to it). It is the static page in `website/`, hosted on Cloudflare as the Worker `tattle-website`, and it redeploys by itself about three minutes after any push to `master` that changes `website/`; pushes that only touch the app do not deploy it. Its Download for Mac button always points at the latest release's DMG, read from GitHub, so an app release needs no website change. How it is hosted, deployed, secured, and changed: [Website](docs/website.md).
+The official website is **[hey-tattle.com](https://hey-tattle.com)** (`www.hey-tattle.com` redirects to it). It is the static page in `website/`, hosted on Cloudflare as the Worker `tattle-website`, and it redeploys by itself about three minutes after any push to `master` that changes `website/`; pushes that only touch the app do not deploy it. Its Download for Mac button links the latest release's DMG: each release writes it into the page (step 9 of [Releasing](#releasing)), and the page also reads the newest release from GitHub when it loads. How it is hosted, deployed, secured, and changed: [Website](docs/website.md).
 
 ## Releasing
 
@@ -203,6 +203,7 @@ It does, in order (a summary of the skill's own steps):
 6. Builds and verifies the app, still on this Mac: the locked dependencies (`npm ci`), their registry signatures, no high-severity advisory in what ships, the notices, the build, Apple's notarization, and Gatekeeper. If anything fails, it undoes the local tag and commit, so the same version can be released after the fix.
 7. Asks once before **deploying**: it pushes `master` and the tag, and publishes the GitHub Release with the DMG, the update files, an SBOM, the GPL sources, and SHA-256 checksums.
 8. Verifies production from the outside: the update feed names the new version, the published DMG is the one that was built, and a downloaded copy passes Gatekeeper.
+9. Points the website at the new release: writes its version and DMG link into `website/index.html`, commits that file alone, pushes `master`, and waits until [hey-tattle.com](https://hey-tattle.com) links the new DMG (Cloudflare redeploys the site on the push).
 
 **Without Claude Code**, the same steps are plain shell scripts, run from the project root:
 
@@ -217,6 +218,8 @@ sh $S/apply-release.sh x.y.z            # npm version, release commit, tag vx.y.
 sh $S/build-app.sh x.y.z                # build, notarize, verify (local); if it fails: sh $S/undo-local-release.sh x.y.z
 sh $S/deploy.sh x.y.z notes.md          # push, and publish the GitHub Release (final)
 sh $S/verify-release.sh x.y.z           # check production from the outside
+sh $S/update-website.sh x.y.z           # write the published release into website/index.html
+sh $S/deploy-website.sh x.y.z           # commit it, push master, wait until hey-tattle.com links it
 ```
 
 After a release, installed apps offer the new version within about 4 hours, or at their next launch, and **Tattle → Check for Updates…** finds it at once; **About Tattle** shows the version (in a browser, the settings menu does). In development, reload the page.

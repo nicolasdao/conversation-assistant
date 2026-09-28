@@ -1,6 +1,6 @@
 ---
 name: release-tattle
-description: Release — cut a Tattle version and deploy it to production (the signed Mac app on GitHub Releases, which installed copies update to), after bumping package.json, updating CHANGELOG.md, and tagging. Use when asked to release, ship, deploy, bump the version, or record unreleased changes. Not for running the app.
+description: Release — cut a Tattle version and deploy it to production (the signed Mac app on GitHub Releases, which installed copies update to, and hey-tattle.com's download link), after bumping package.json, updating CHANGELOG.md, and tagging. Use when asked to release, ship, deploy, bump the version, or record unreleased changes. Not for running the app.
 argument-hint: "[patch|minor|major|unreleased|auto] [description]"
 arguments: [action, note]
 allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
@@ -8,18 +8,19 @@ allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
 
 # Release Tattle
 
-Cuts a release of this project and deploys it: bring the docs up to date and commit everything, analyse what changed, write the changelog, bump the version, commit and tag **locally**, build and verify the Mac app **locally**, then deploy to production (push, and publish the GitHub Release), and verify production from the outside. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
+Cuts a release of this project and deploys it: bring the docs up to date and commit everything, analyse what changed, write the changelog, bump the version, commit and tag **locally**, build and verify the Mac app **locally**, then deploy to production (push, and publish the GitHub Release), verify production from the outside, and point the website (hey-tattle.com) at the new release. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
 
 **Project facts** (standalone repo, branch `master`, remote `origin`):
 
 | | |
 |---|---|
-| Version | `version` in the root `package.json` — the **only** place it lives. The server reads it (`GET /api/about`) and the app shows it in the settings menu footer. Never write it anywhere else. `package-lock.json` follows via `npm version`. |
+| Version | `version` in the root `package.json` — the **only** source of it. The server reads it (`GET /api/about`) and the app shows it in the settings menu footer. `package-lock.json` follows via `npm version`. The one other place a version appears is the website, which names the latest **published** release; only `update-website.sh` writes it, after deployment (Step 11). |
 | Tag | `v<version>`, annotated |
 | Changelog | `CHANGELOG.md` in the project root, Keep a Changelog — rules in [references/changelog.md](references/changelog.md) |
 | Gates | `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, and the third-party notices check (`checks.sh`) — no API spend; offline, except that right after a clean install the notices check downloads Electron's binary once |
 | First release | No `v*` tag yet → release the current `0.1.0` as-is (no bump), analysing the whole history |
 | Production | There is no server: production is the GitHub Release `v<version>` — the DMG new users download, and the update every installed copy offers within about 4 hours or at its next launch (`docs/desktop.md`). Never npm. |
+| Website | https://hey-tattle.com, the page in `website/` (`docs/website.md`). Its Download for Mac links, the version under the button, the footer's "Latest release" line, and its JSON-LD name the latest published release. Cloudflare redeploys the site by itself on any push to `master` that changes `website/`. |
 | Final | A pushed tag and a published release can never be moved, replaced, or deleted (tag rules, immutable releases). A mistake found after the push is fixed forward, with a new version. That is why the app is built and verified **before** anything is pushed. |
 
 Run every script from the project root: `sh "${CLAUDE_SKILL_DIR}/scripts/<script>"`.
@@ -93,16 +94,25 @@ AskUserQuestion, presenting: current → new version, the bump and why, the full
 
 ## Step 9 — Deploy to production (the one outward-facing confirmation)
 
-AskUserQuestion, stating plainly: deploying pushes `master` and the tag `v<version>` to `origin` and publishes the GitHub Release, which new users download and **every installed copy will install**; it cannot be undone or replaced (a problem found later means a new version). Options: **Deploy**, **Not now**.
+AskUserQuestion, stating plainly: deploying pushes `master` and the tag `v<version>` to `origin` and publishes the GitHub Release, which new users download and **every installed copy will install**; it cannot be undone or replaced (a problem found later means a new version). Say too that once production is verified, the website is updated to link the new DMG (a commit to `website/index.html` only, pushed to `master`, which Cloudflare deploys). Options: **Deploy**, **Not now**.
 
 - **Deploy:** write the version's changelog entry (its bullets, without the `## [x.y.z]` heading; include earlier versions' entries that were tagged but never deployed) plus an **Install** paragraph to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/deploy.sh" <version> <notes-file>`. It refuses unless `build-app.sh` verified a build of exactly this commit and the built files are unchanged; then it pushes, and creates the release with the DMG, the zip, their blockmaps, `latest-mac.yml`, the SBOM, the GPL sources, and the checksums in the notes. If the push succeeded but publishing failed, rerun `deploy.sh`: it skips what is done.
-- **Not now:** everything stays on this Mac. Remind: deploy later with `sh .claude/skills/release-tattle/scripts/deploy.sh <version> <notes-file>` (from the same commit, with `out/` intact), or drop the release with `undo-local-release.sh <version>`.
+- **Not now:** everything stays on this Mac, and the website is not touched. Remind: deploy later with `sh .claude/skills/release-tattle/scripts/deploy.sh <version> <notes-file>` (from the same commit, with `out/` intact), or drop the release with `undo-local-release.sh <version>`.
 
 ## Step 10 — Verify production
 
 `sh "${CLAUDE_SKILL_DIR}/scripts/verify-release.sh" <version>`: without logging in, the update feed installed apps read names `<version>`, the published DMG matches the build, and a downloaded copy, flagged as from the internet, passes Gatekeeper as notarized. If it fails, show it and say that the release is live but unverified.
 
-Finish with: the version, the tag, the changelog entry, whether it was deployed (with the release URL) and verified, and any credentials warning from Step 3. Installed apps offer the new version within about 4 hours, or at their next launch.
+## Step 11 — Point the website at the release
+
+Runs after a deployment (Step 9), without a further confirmation: Step 9's confirmation covered it. If Step 10 failed, ask with AskUserQuestion first (**Update the website**, **Leave it**): the site would link a release that did not pass verification.
+
+1. `sh "${CLAUDE_SKILL_DIR}/scripts/update-website.sh" <version>`. It reads the **published** release from GitHub (so it refuses a version that is not published) and writes its version, DMG link, size, date, and release-notes link into `website/index.html`: the two Download for Mac links, the line under the button, the footer's "Latest release" line, and the JSON-LD `softwareVersion` and `downloadUrl`. It changes no other file and can be run again. If it reports that the page no longer has the elements it expects, stop and say so: the page changed and the script must be updated to match, not worked around by hand.
+2. `sh "${CLAUDE_SKILL_DIR}/scripts/deploy-website.sh" <version> "<attribution>"`. It commits `website/index.html` alone (`chore(website): point the download and release line at v<version>`), pushes `master`, and waits until https://hey-tattle.com links the new DMG (usually about 3 minutes, at most 10). If it times out, the push is done: say so and point to the build under **Workers & Pages → tattle-website → Deployments** in the Cloudflare dashboard.
+
+The page's own script also reads the latest release from GitHub when it loads, so visitors see a new release even before this step lands; this step makes the page right without JavaScript, for search engines, and when GitHub's API limit is reached.
+
+Finish with: the version, the tag, the changelog entry, whether it was deployed (with the release URL) and verified, whether hey-tattle.com links it, and any credentials warning from Step 3. Installed apps offer the new version within about 4 hours, or at their next launch.
 
 ## Mode C — Record unreleased changes (the ledger)
 
@@ -119,8 +129,9 @@ For recording work between releases. **No version bump, no tag, `package.json` u
 
 - **Always** run Step 2 first in Modes A and B: `update-doc`, then `git-commit` committing everything (secrets and ignored files excepted). Mode C does neither.
 - **Never** release with uncommitted changes (Modes A and B), and never offer to.
-- **Never** put anything but `package.json`, `package-lock.json` and `CHANGELOG.md` in the release commit itself (Mode C: only `CHANGELOG.md`); every other change goes in Step 2's commits.
-- **Never** write the version anywhere but `package.json` (via `npm version`).
+- **Never** put anything but `package.json`, `package-lock.json` and `CHANGELOG.md` in the release commit itself (Mode C: only `CHANGELOG.md`); every other change goes in Step 2's commits. The website commit (Step 11) contains only `website/index.html`.
+- **Never** point the website at a version before its GitHub Release is published: the links would lead to a missing DMG. `update-website.sh` refuses, and nothing is to be done around it.
+- **Never** write the version anywhere but `package.json` (via `npm version`), except the website's record of the published release, which only `update-website.sh` writes, after deployment (Step 11).
 - **Always** confirm before the local commit and tag (Step 6), and separately before deploying (Step 9), which is the only step that sends anything out.
 - **Never** push a release tag before `build-app.sh` has verified the app for that exact commit: a pushed tag is permanent, so a failed build after it would spend the version number.
 - **Never** try to move, delete, or replace a pushed tag or a published release: fix forward with a new version.

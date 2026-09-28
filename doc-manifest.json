@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 240,
+      "line_count": 243,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -667,9 +667,10 @@
         "Deploying",
         "Security",
         "The Cloudflare skills and the token",
-        "Changing the site"
+        "Changing the site",
+        "Releases update the site"
       ],
-      "line_count": 126,
+      "line_count": 133,
       "links_to": [
         "docs/desktop.md",
         "docs/gotchas.md",
