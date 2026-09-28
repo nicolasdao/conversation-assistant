@@ -110,4 +110,6 @@ temp/
 .apdisk
 Network Trash Folder
 Temporary Items
-secrets/*.env
+
+# Local secrets for the project's skills (the Cloudflare API token)
+secrets/
