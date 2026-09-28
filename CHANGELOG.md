@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-28
+
+### Added
+- A native Mac app menu: Conversation Assistant → Check for Updates… shows your version and whether a newer one exists, with Download and Install and Release Notes; the download's progress shows on the Dock icon, and nothing is checked or downloaded while a session is on air
+- Conversation Assistant → Settings… (⌘,) opens the API keys
+- Help → Licenses and Acknowledgements: every license in the app in one searchable window, with each component's notice and full license text (it replaces License, Third-Party Notices, and Chromium Licenses, which opened other apps)
+
+### Changed
+- Stats, System 1, and Log are now one Insights window with three tabs: Overview, Fact-checker, and Log (with the error count); the fact-check totals appear once instead of in two windows, and old links to the three windows open the matching tab
+- The settings cog is shorter in the Mac app: API keys, the version and license footer, and the Replay-a-folder button (a developer tool) leave it, since the menu bar has them; in a browser the cog keeps them all
+- Speakers and Labels are greyed out in the cog when nothing is on air and no recording is open, since there is nothing for them to act on
+
 ## [0.6.2] - 2026-09-28
 
 The first published release since 0.6.0: it ships everything listed under 0.6.1, which was tagged but never published because the release checks caught the error fixed below.
