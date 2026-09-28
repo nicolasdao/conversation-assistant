@@ -182,4 +182,30 @@ describe("export and import", () => {
     expect(existsSync(join(dest, id, "notes.txt"))).toBe(false);
     expect(TransferError).toBeTruthy();
   });
+
+  test("a crafted manifest cannot make an import write gigabytes of silence", async () => {
+    const src = mkdtempSync(join(tmpdir(), "src-"));
+    const dest = mkdtempSync(join(tmpdir(), "dest-"));
+    const good = await exportRecording(recording(src), "20260925-120000", { audio: "original", chats: false, app: { name: "p", version: "0.6.0" } });
+    const work = mkdtempSync(join(tmpdir(), "craft-"));
+    const inputs = await Promise.all((await readZipEntries(good.path)).map(async (e) => {
+      const data = await readZipEntry(good.path, e, 1 << 26);
+      if (e.name === "manifest.json") {
+        const m = JSON.parse(data.toString("utf8"));
+        for (const s of m.audio.streams) s.samples = 2_000_000_000; // about 4 GB of padding per stream, if believed
+        return { name: e.name, data: Buffer.from(JSON.stringify(m)) };
+      }
+      if (e.name.startsWith("audio/")) { // audio is stored, not deflated, as the app writes it
+        const p = join(work, e.name.replace("/", "-"));
+        writeFileSync(p, data);
+        return { name: e.name, path: p };
+      }
+      return { name: e.name, data };
+    }));
+    const crafted = join(work, "crafted.zip");
+    await writeZip(crafted, inputs);
+    const { id } = await importRecording(crafted, dest, null);
+    const size = statSync(join(dest, id, "host.wav")).size;
+    expect(size).toBeLessThanOrEqual(44 + 3 * 32_000 + 32_000); // the real 3 s, plus at most 1 s of padding
+  });
 });

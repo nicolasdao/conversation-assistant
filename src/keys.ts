@@ -10,6 +10,13 @@ export const KEY_ENV = { openai: "OPENAI_API_KEY", openrouter: "OPENROUTER_API_K
 export type KeyName = keyof typeof KEY_ENV;
 export const KEY_NAMES = Object.keys(KEY_ENV) as KeyName[];
 
+/** The environment for a child process (the capture helper, afconvert): everything but the API keys, which none needs. */
+export function childEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const out = { ...env };
+  for (const name of Object.values(KEY_ENV)) delete out[name];
+  return out;
+}
+
 /** Where the page saves the keys: ~/Library/Application Support/Conversation Assistant/credentials.json (tests override it). */
 export function credentialsPath(env: NodeJS.ProcessEnv = process.env): string {
   return env.CONVERSATION_ASSISTANT_CREDENTIALS || join(appSupportDir(), "credentials.json");

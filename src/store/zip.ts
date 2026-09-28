@@ -1,10 +1,12 @@
 import { open, stat } from "node:fs/promises";
-import { crc32, deflateRawSync, inflateRawSync } from "node:zlib";
+import { promisify } from "node:util";
+import { crc32, deflateRawSync, inflateRaw } from "node:zlib";
 
 // A minimal ZIP writer and reader for recording exports: stored (audio) and deflated (JSON) entries, UTF-8 names, no
 // ZIP64 (every entry and the whole file stay under 4 GB). Large files are copied in chunks, never held in memory.
 
 const CHUNK = 1 << 20;
+const inflate = promisify(inflateRaw);
 const MAX32 = 0xffffffff;
 
 export interface ZipInput {
@@ -162,11 +164,14 @@ export async function readZipEntry(path: string, e: ZipEntry, maxBytes: number):
   const fh = await open(path, "r");
   try {
     const start = await dataStart(fh, e);
+    // the sizes come from the file, which may be crafted: check them before allocating anything
+    if (e.compressedSize > maxBytes || start + e.compressedSize > (await fh.stat()).size) throw new ZipError(`${e.name}: damaged entry`);
     const raw = Buffer.alloc(e.compressedSize);
     await fh.read(raw, 0, e.compressedSize, start);
     let data: Buffer;
     if (e.method === 0) data = raw;
-    else if (e.method === 8) data = inflateRawSync(raw, { maxOutputLength: Math.max(1, e.size) });
+    // inflated off the main thread, so a large import never stalls a show on air
+    else if (e.method === 8) data = await inflate(raw, { maxOutputLength: Math.max(1, e.size) });
     else throw new ZipError(`${e.name}: unsupported compression`);
     if (data.length !== e.size || (crc32(data) >>> 0) !== e.crc) throw new ZipError(`${e.name} is damaged (checksum)`);
     return data;

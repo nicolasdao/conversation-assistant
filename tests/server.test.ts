@@ -208,6 +208,32 @@ describe("HTTP API", () => {
     expect(engineStale(src, Date.now() - 60_000)).toBe(true);
   });
 
+  test("every route answers only its own page: another website or a rebound host is refused", async () => {
+    const raw = (method: string, path: string, headers: Record<string, string>, body?: string) => new Promise<number>((resolve, reject) => {
+      const req = request(base + path, { method, headers }, (res) => { res.resume(); resolve(res.statusCode!); });
+      req.on("error", reject);
+      req.end(body);
+    });
+    const before = engine.calls.length;
+    // a "simple" cross-site POST (text/plain, no preflight) that would start a recording
+    expect(await raw("POST", "/api/session/start", { origin: "https://evil.example", "content-type": "text/plain" }, '{"mode":"live"}')).toBe(403);
+    // DNS rebinding: evil.example resolves to 127.0.0.1, so the browser sends its own Host
+    expect(await raw("GET", "/api/state", { host: "evil.example:4317" })).toBe(403);
+    expect(await raw("GET", "/", { host: "evil.example:4317" })).toBe(403);
+    expect(engine.calls.length).toBe(before); // nothing reached the engine
+    // the page itself, by either name, and tools without an Origin
+    const port = new URL(base).port;
+    expect(await raw("GET", "/api/state", { origin: `http://127.0.0.1:${port}` })).toBe(200);
+    expect(await raw("GET", "/api/state", { host: `localhost:${port}`, origin: `http://localhost:${port}` })).toBe(200);
+    expect(await raw("GET", "/api/state", {})).toBe(200);
+  });
+
+  test("the page is served with its Content-Security-Policy", async () => {
+    const page = await bytes("/");
+    expect(String(page.headers["content-security-policy"])).toMatch(/default-src 'self'; script-src 'self'/);
+    expect(page.headers["content-security-policy"]).toBe((await import("../src/server/main.ts")).PAGE_CSP);
+  });
+
   test("static files are served from web/ only", async () => {
     const index = await call("GET", "/");
     expect(index.status).toBe(200);

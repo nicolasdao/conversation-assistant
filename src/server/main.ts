@@ -188,6 +188,7 @@ export class Engine implements EngineApi {
       return f;
     },
     importFile: async (body, fileName) => {
+      this.notOnAir();
       const tmp = await this.transferCall(() => saveUpload(body, MAX_UPLOAD_BYTES));
       let keep = false;
       try {
@@ -209,6 +210,7 @@ export class Engine implements EngineApi {
       }
     },
     importCopy: async (token, name) => {
+      this.notOnAir();
       const up = this.uploads.get(token);
       if (!up) throw new ApiError(404, "the upload has expired: import the file again");
       if (typeof name !== "string" || !name.trim()) throw new ApiError(400, "a name is required for the copy");
@@ -262,6 +264,11 @@ export class Engine implements EngineApi {
 
   get current(): Session | null {
     return this.session;
+  }
+
+  /** Imports wait for the show to end: unpacking and decoding a recording competes with live capture. */
+  private notOnAir() {
+    if (this.session?.status === "running") throw new ApiError(409, "a session is on air: import the recording after it ends");
   }
 
   private need(): Session {
@@ -540,6 +547,13 @@ export class Engine implements EngineApi {
 const BOOTED_AT = Date.now();
 
 /**
+ * The page may load only from its own origin; styles may be inline because the page sets them from code. Sent with
+ * the page by `npm run serve` and, through the same router, by the Mac app.
+ */
+export const PAGE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+  + "media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+
+/**
  * The project's version and license, for the page's menu footer. The version lives only in the root package.json;
  * both files are read on each request, so a release shows without restarting.
  */
@@ -625,7 +639,11 @@ function serveStatic(webRoot: string, path: string, res: ServerResponse): boolea
   const root = resolve(webRoot);
   const file = resolve(root, decoded);
   if (!file.startsWith(root + sep) || !existsSync(file) || !statSync(file).isFile()) return false;
-  res.writeHead(200, { "Content-Type": CONTENT_TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache" });
+  const html = extname(file) === ".html";
+  res.writeHead(200, {
+    "Content-Type": CONTENT_TYPES[extname(file)] ?? "application/octet-stream", "Cache-Control": "no-cache",
+    ...(html ? { "Content-Security-Policy": PAGE_CSP } : {}),
+  });
   createReadStream(file).pipe(res);
   return true;
 }
@@ -637,8 +655,10 @@ export interface SetupApi {
 }
 
 /**
- * The setup routes accept only the page itself: the Host must be this machine (no DNS rebinding) and a browser's
- * Origin must match it, so another website open in the browser can neither read the hints nor replace the keys.
+ * Every route answers only the page itself: the Host must be this machine (no DNS rebinding) and a browser's Origin
+ * must match it, so another website open in the browser can neither read anything (recordings, transcripts, the key
+ * hints) nor act (start a recording, spend on the API, import, replace the keys), not even with the "simple" requests
+ * that skip CORS. The Mac app's in-process connection presents its requests the same way (src/server/inProcess.ts).
  */
 function fromThisPage(req: IncomingMessage): boolean {
   const host = req.headers.host ?? "";
@@ -658,8 +678,8 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
     const path = url.pathname;
     const m = req.method ?? "GET";
     try {
+      if (!fromThisPage(req)) throw new ApiError(403, "this server answers only its own page at 127.0.0.1");
       if (setup && path.startsWith("/api/setup")) {
-        if (!fromThisPage(req)) throw new ApiError(403, "the setup routes answer only the page at 127.0.0.1");
         if (m === "GET" && path === "/api/setup") return send(res, 200, setup.status());
         if (m === "POST" && path === "/api/setup/keys") {
           if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) throw new ApiError(415, "expected JSON");

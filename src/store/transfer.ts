@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { JSONL_FILES, timestampId } from "./sessionStore.ts";
 import { extractStoredEntry, readZipEntries, readZipEntry, writeZip, ZipError, type ZipInput } from "./zip.ts";
 import { wavHeader } from "../audio/wav.ts";
+import { childEnv } from "../keys.ts";
 
 // Recordings leave and arrive as one file: `<name>.conversation-recording`, a ZIP (see docs/recordings.md § Export and
 // import). A custom extension rather than .zip, so a browser never unzips it on download and a chat app sends it as a
@@ -23,12 +24,17 @@ export type AudioChoice = "compressed" | "original" | "none";
 /** AAC bitrate per stream: speech at 16 kHz stays clear, and an hour of show is about 30 MB. */
 export const AAC_BITRATE = 32_000;
 
-const run = promisify(execFile);
+const execFileP = promisify(execFile);
+const run = (bin: string, args: string[]) => execFileP(bin, args, { env: childEnv() });
 
 /** Everything a recording folder holds besides audio; chats only when asked for. */
 const DATA_FILES = ["session.json", "meta.json", "speakers.json", ...JSONL_FILES.map((f) => `${f}.jsonl`)];
 const STREAMS = ["host", "remote"] as const;
-const MAX_DATA_BYTES = 1 << 30; // 1 GB for any one data file
+// Imports come from other people, so every size in them is a claim to check. A two-hour show's data files weigh about
+// 3 MB in all; these limits leave ample room while stopping a small file from filling the disk.
+const MAX_DATA_BYTES = 256 * 1024 * 1024; // any one data file
+const MAX_DATA_TOTAL = 512 * 1024 * 1024; // all data files together
+const MAX_PAD_BYTES = 32_000; // silence added when decoded audio comes out short: 1 s at most
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024 * 1024 - 1;
 
 export interface Manifest {
@@ -160,7 +166,9 @@ async function canonicalWav(src: string, dest: string, samples: number | null) {
       p += 8 + n + (n & 1);
     }
     if (dataAt < 0) throw new TransferError(400, "no audio data after decoding");
-    const want = samples === null ? dataLen : samples * 2;
+    // the manifest's sample count trims or pads (decoding can be a few samples short), but never adds more than 1 s of
+    // silence: a crafted manifest could otherwise ask for gigabytes of it
+    const want = samples === null ? dataLen : Math.min(samples * 2, dataLen + MAX_PAD_BYTES);
     const out = await open(dest, "w");
     try {
       await out.write(wavHeader(want, 16_000));
@@ -225,9 +233,14 @@ export async function importRecording(
   // written to a hidden folder first, which the library ignores, then moved into place in one step
   const work = await mkdtemp(join(root, ".import-"));
   try {
+    let budget = MAX_DATA_TOTAL;
     for (const f of [...DATA_FILES, "chats.jsonl"]) {
       const e = byName.get(`data/${f}`);
-      if (e) await writeFile(join(work, f), await readZipEntry(file, e, MAX_DATA_BYTES));
+      if (!e) continue;
+      if (e.size > budget) throw new TransferError(400, "the recording's data is too large");
+      const data = await readZipEntry(file, e, Math.min(MAX_DATA_BYTES, budget));
+      budget -= data.length;
+      await writeFile(join(work, f), data);
     }
     // under a new id (a copy, or another recording's id taken), the recording names itself by it
     const recordedId = typeof session.id === "string" ? session.id : manifest.recording.id;
@@ -239,7 +252,8 @@ export async function importRecording(
     }
     for (const f of JSONL_FILES) if (!existsSync(join(work, `${f}.jsonl`))) await writeFile(join(work, `${f}.jsonl`), "");
     for (const s of STREAMS) {
-      const samples = manifest.audio?.streams?.find((x) => x.stream === s)?.samples ?? null;
+      const declared = manifest.audio?.streams?.find((x) => x.stream === s)?.samples;
+      const samples = Number.isSafeInteger(declared) && (declared as number) >= 0 ? (declared as number) : null;
       const wav = byName.get(`audio/${s}.wav`);
       const m4a = byName.get(`audio/${s}.m4a`);
       if (wav) {

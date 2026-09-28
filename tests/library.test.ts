@@ -136,3 +136,11 @@ describe("session library", () => {
     expect(replayed.map((e) => e.seq)).toEqual([...replayed.map((e) => e.seq)].sort((x, y) => x - y));
   });
 });
+
+test("a recording that cannot be read is skipped, and the rest are still listed", () => {
+  const root = mkdtempSync(join(tmpdir(), "lib-broken-"));
+  makeSession(root, "20260924-100000", { startedAt: "2026-09-24T10:00:00Z", lines: [["u_1", "Hello there."]] });
+  mkdirSync(join(root, "20260924-110000", "events.jsonl"), { recursive: true }); // a directory where a file should be
+  writeFileSync(join(root, "20260924-110000", "session.json"), JSON.stringify({ id: "20260924-110000", mode: "live", startedAt: "2026-09-24T11:00:00Z" }));
+  expect(new SessionLibrary(root).list().map((s) => s.id)).toEqual(["20260924-100000"]);
+});

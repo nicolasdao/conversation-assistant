@@ -181,7 +181,8 @@ export function finalizeVerdict(raw: RawVerdict, annotations: unknown): Verdict 
   const seen = new Set<string>();
   const sources: Citation[] = [];
   for (const s of [...raw.sources, ...citationsOf(annotations)]) {
-    if (!s.url || seen.has(s.url)) continue;
+    // a link from the model's output is shown on screen: web pages only (no javascript:, data:, or file: links)
+    if (!s.url || !/^https?:\/\//i.test(s.url) || seen.has(s.url)) continue;
     seen.add(s.url);
     sources.push({ url: s.url, title: cleanTitle(s.title, s.url) });
   }

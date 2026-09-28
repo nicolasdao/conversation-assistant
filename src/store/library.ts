@@ -165,7 +165,15 @@ export class SessionLibrary {
     const words = (opts.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
     const out: (SessionSummary & { matches?: SearchMatch[] })[] = [];
     for (const id of this.ids()) {
-      const { summary, utterances, recorded } = this.load(id);
+      let loaded: ReturnType<SessionLibrary["load"]>;
+      try {
+        loaded = this.load(id);
+      } catch (e) {
+        // one unreadable folder (damaged, or a crafted import) must not hide every other recording
+        console.error(`recording ${id} could not be read: ${e instanceof Error ? e.message : String(e)}`);
+        continue;
+      }
+      const { summary, utterances, recorded } = loaded;
       if (summary.tool && !opts.includeTools) continue;
       if (words.length === 0) {
         out.push(summary);

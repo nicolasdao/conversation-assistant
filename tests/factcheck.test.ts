@@ -230,6 +230,14 @@ describe("System 2: queue, research, grading", () => {
     expect(v.downgraded).toBe(false);
   });
 
+  test("sources are web pages only: javascript:, data: and file: links from the model are dropped", () => {
+    const v = finalizeVerdict({
+      ...VERDICT(),
+      sources: [{ url: "javascript:alert(1)", title: "x" }, { url: "file:///etc/passwd", title: "y" }, { url: "data:text/html,hi", title: "z" }, { url: "https://ok.example/a", title: "OK" }],
+    }, [{ type: "url_citation", url_citation: { url: "JavaScript:void(0)", title: "w" } }]);
+    expect(v.sources.map((s) => s.url)).toEqual(["https://ok.example/a"]);
+  });
+
   test("inline markdown citations are stripped from text and titles", () => {
     const v = finalizeVerdict({
       ...VERDICT(),

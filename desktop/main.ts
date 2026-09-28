@@ -14,9 +14,6 @@ const REPO = "https://github.com/nicolasdao/conversation-assistant";
 /** How long quitting waits for a session on air to end; its audio is complete within seconds (src/pipeline/session.ts). */
 const QUIT_WAIT_MS = 30_000;
 const UPDATE_EVERY_MS = 4 * 60 * 60 * 1000;
-// The page may load only from the app itself; styles stay inline-able because the page sets them from code.
-const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
-  + "media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 // A packaged app refuses Chromium's remote debugging: it would let any program on this Mac drive the window, and through
 // it the engine, with the app's Microphone and System Audio Recording grants. The fuses in electron-builder.yml close
@@ -67,7 +64,8 @@ function openOutside(url: string) {
 function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1024, minHeight: 640, title: "Conversation Assistant", backgroundColor: "#0a1628", show: false,
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false },
+    // no DevTools in the packaged app: pasted into its console, code could use the app's microphone grant
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false, devTools: !app.isPackaged },
   });
   win.once("ready-to-show", () => win?.show());
   // links to other sites (key setup steps, fact-check sources) open in the default browser, never in the app
@@ -101,6 +99,11 @@ function downloadPath(fileName: string): string {
   return p;
 }
 
+/** A license file: in the app's Resources/licenses when packaged, in the project folder in development. */
+function licensePath(packaged: string, project: string): string {
+  return app.isPackaged ? join(process.resourcesPath, "licenses", packaged) : join(app.getAppPath(), project);
+}
+
 function menu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { role: "appMenu" },
@@ -115,7 +118,16 @@ function menu() {
     { role: "editMenu" },
     { role: "viewMenu" },
     { role: "windowMenu" },
-    { role: "help", submenu: [{ label: "Conversation Assistant on GitHub", click: () => void shell.openExternal(REPO) }] },
+    {
+      role: "help",
+      submenu: [
+        { label: "Conversation Assistant on GitHub", click: () => void shell.openExternal(REPO) },
+        { type: "separator" },
+        { label: "License", click: () => void shell.openPath(licensePath("LICENSE.txt", "LICENSE")) },
+        { label: "Third-Party Notices", click: () => void shell.openPath(licensePath("THIRD_PARTY_NOTICES.txt", "THIRD_PARTY_NOTICES.md")) },
+        { label: "Chromium Licenses", click: () => void shell.openPath(licensePath("LICENSES.chromium.html", "node_modules/electron/dist/LICENSES.chromium.html")) },
+      ],
+    },
   ]));
 }
 
@@ -203,19 +215,27 @@ function updates() {
 
 // ---------- start ----------
 
+/** The only browser permission the page needs: the chat's Copy buttons. Capture goes through the helper, never the page. */
+const PAGE_PERMISSIONS = new Set(["clipboard-sanitized-write"]);
+
 app.whenReady().then(() => {
+  // Electron grants a page every permission it asks for unless told otherwise
+  session.defaultSession.setPermissionRequestHandler((_w, permission, done) => done(PAGE_PERMISSIONS.has(permission)));
+  session.defaultSession.setPermissionCheckHandler((_w, permission) => PAGE_PERMISSIONS.has(permission));
   protocol.handle("app", async (req) => {
     if (new URL(req.url).host !== "conversation-assistant") return new Response("not found", { status: 404 });
-    const res = await handle(req);
-    if (res.headers.get("content-type")?.startsWith("text/html")) res.headers.set("Content-Security-Policy", CSP);
-    return res;
+    return handle(req); // the page's Content-Security-Policy comes with it (PAGE_CSP in src/server/main.ts)
   });
   session.defaultSession.on("will-download", (_e, item) => {
     const target = downloadPath(item.getFilename());
     item.setSavePath(target);
     item.once("done", (_d, state) => { if (state === "completed") app.dock?.downloadFinished(target); });
   });
-  app.setAboutPanelOptions({ copyright: "© 2026 Cloudless Consulting Pty Ltd · BSD 3-Clause", website: REPO });
+  app.setAboutPanelOptions({
+    copyright: "© 2026 Cloudless Consulting Pty Ltd · BSD 3-Clause",
+    credits: "Includes third-party software under their own licenses: Help → Third-Party Notices.",
+    website: REPO,
+  });
   menu();
   createWindow();
   // in development, macOS asks on behalf of the terminal that started the app, which already has both permissions

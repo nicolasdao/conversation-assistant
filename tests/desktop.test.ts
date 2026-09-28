@@ -6,6 +6,7 @@ import { appPaths, setAppPaths, speakerModelPath, vadModelPath } from "../src/pa
 import { SessionLibrary } from "../src/store/library.ts";
 import { about, engineStale } from "../src/server/main.ts";
 import { SessionStore } from "../src/store/sessionStore.ts";
+import { childEnv } from "../src/keys.ts";
 
 // What the Mac app relies on in the engine (see docs/desktop.md). The app itself runs in Electron, which these
 // tests do not start.
@@ -59,4 +60,9 @@ test("a recording's audio is complete as soon as its input ends, before the rest
   expect(readFileSync(join(store.dir, "events.jsonl"), "utf8")).toContain("session.ended");
   store.close();
   expect(dataSize()).toBe(3200);
+});
+
+test("child processes (the capture helper, afconvert) get the environment without the API keys", () => {
+  const env = childEnv({ PATH: "/usr/bin", HOME: "/Users/x", OPENAI_API_KEY: "sk-proj-secret", OPENROUTER_API_KEY: "sk-or-secret" });
+  expect(env).toEqual({ PATH: "/usr/bin", HOME: "/Users/x" });
 });

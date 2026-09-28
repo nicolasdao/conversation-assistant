@@ -4,6 +4,7 @@ import type { AppConfig } from "../config.ts";
 import type { Budget } from "../budget.ts";
 import { backoffMs, classifyError, effectiveStatus, HttpError, parseRetryAfter } from "../jev/client.ts";
 import { CHAT_URL } from "../factcheck/s2.ts";
+import { processSecrets } from "../store/events.ts";
 
 export const MODELS_URL = "https://openrouter.ai/api/v1/models";
 export const GENERATION_URL = "https://openrouter.ai/api/v1/generation";
@@ -278,7 +279,7 @@ export class ChatService {
   }
 
   private append(s: ChatSource, row: Row) {
-    appendFileSync(this.path(s), JSON.stringify(row) + "\n");
+    appendFileSync(this.path(s), processSecrets()(JSON.stringify(row)) + "\n"); // like every session file: never a key
   }
 
   private rows(s: ChatSource) {

@@ -331,7 +331,7 @@ export function renderMenu(st: State) {
   replace($("#m-s1"), `${st.s1.active} · ${c.flags} flag${c.flags === 1 ? "" : "s"}`);
   replace($("#m-speakers"), `${voices} voice${voices === 1 ? "" : "s"}`);
   replace($("#m-labels"), st.labels.version || "–");
-  replace($("#m-stats"), st.stats ? `Rogan index ${Math.round((st.stats.roganIndex ?? 0) * 100)}%` : "Every minute");
+  replace($("#m-stats"), st.stats ? `Off-topic index ${Math.round((st.stats.roganIndex ?? 0) * 100)}%` : "Every minute");
   replace($("#m-log"), st.errors.length ? `${st.errors.length} error${st.errors.length === 1 ? "" : "s"}` : "No errors");
 }
 
@@ -620,7 +620,8 @@ function card(st: State, c: Claim): HTMLElement {
       v ? h("p", { class: "restated" }, v.restated_claim) : null,
       v?.correction ? h("p", { class: "correction" }, v.correction) : null,
       v?.sources.length ? h("div", { class: "sources" }, h("span", { class: "lbl" }, "Sources"),
-        v.sources.map((s) => h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title || s.url))) : null,
+        // web pages only: a recording's events are data from wherever it came from
+        v.sources.filter((s) => /^https?:\/\//i.test(s.url)).map((s) => h("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, s.title || s.url))) : null,
       v && !c.disputed ? h("div", { class: "fc-foot" }, h("button", {
         class: "linkbtn", onclick: async () => {
           const note = await ask("Host disputes this verdict", { message: "Why? (optional)", input: true, placeholder: "A note for System 2", ok: "Dispute" });
@@ -936,7 +937,7 @@ export function renderStats(st: State) {
       ? h("ul", {}, s[k].map((x: any) => h("li", {}, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); jumpToSegment(x.segmentId); } }, x.text || x.segmentId))))
       : h("p", { class: "note" }, "None yet"));
   replace($("#stats"),
-    h("div", { class: "big" }, h("span", { class: "n" }, `${Math.round((s.roganIndex ?? 0) * 100)}%`), h("span", { class: "k" }, "Rogan index: time spent on personal life and other topics")),
+    h("div", { class: "big" }, h("span", { class: "n" }, `${Math.round((s.roganIndex ?? 0) * 100)}%`), h("span", { class: "k" }, "Off-topic index: time spent on personal life and other topics")),
     h("table", { class: "data" },
       h("thead", {}, h("tr", {}, h("th", {}, "Speaker"), h("th", {}, "Talk"), h("th", {}, "Disagreements"), h("th", {}, "Hype"))),
       h("tbody", {}, (s.speakers ?? []).map((sp: any) => h("tr", {},
