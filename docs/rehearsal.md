@@ -36,6 +36,8 @@ Pick the microphone (default: built-in), press **Start live**, and check that bo
 
 ## Planted lines to say on air
 
+These are **test statements**, written so the fact-checker has something to catch: some are deliberately false, exaggerated, or unverified. They are not claims made by this project or its authors about any product or company.
+
 Say each one naturally, in its own sentence, and pause after it.
 
 1. "Honestly, Jev is four hundred and forty-five times cheaper than GPT." → flagged; the verdict should question a vendor figure.

@@ -1,4 +1,5 @@
 // Live checks of every external service (§4.11, about $0.30). npm run smoke [-- --checks 1,2,4] [--allow-over-dev-cap]
+// The claims it sends ("Jev is 445 times cheaper than GPT", …) are planted test statements from the fixture, not claims of this project.
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";

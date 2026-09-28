@@ -1,4 +1,6 @@
 // Builds fixtures/conversation/{host,remote}.wav (16 kHz mono PCM16) and script.json from macOS `say` voices (§4.3).
+// The conversation is fictional. Its factual-sounding lines are test statements, planted so the fact-checker has
+// something to catch: some are deliberately false, exaggerated, or unverified, and none is a claim of this project.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

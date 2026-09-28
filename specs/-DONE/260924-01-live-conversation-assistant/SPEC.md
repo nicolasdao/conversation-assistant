@@ -955,7 +955,7 @@ Checks 2, 3, 5, and 6 use the background settings (§2.5).
 #### §4.12 Stats and calibration
 
 **`src/pipeline/stats.ts`** emits `stats` every 60 s and at session end:
-- Rogan index: the share of labelled segment time whose subject is `personal_life` or `other_topics`.
+- Off-topic index (renamed from an earlier working name): the share of labelled segment time whose subject is `personal_life` or `other_topics`.
 - Talk time per speaker.
 - Disagreements per speaker: segments with a `disagreement` marker in which the speaker talked.
 - Duration-weighted mean `hype` per speaker.
@@ -1268,7 +1268,7 @@ npm run calibrate:boundary -- boundary.jsonl
 | Memory question | `known_<claimId>`: recognises a repeat of a claim already queued or checked. |
 | Attention question | `attention_<n>`: a noul question that System 2 adds to prioritise a kind of claim. |
 | Replay gate | Asking a candidate System 1 set again on logged states, and promoting it only if it fixes errors without losing good flags. |
-| Rogan index | The share of the show spent on `personal_life` and `other_topics`. |
+| Off-topic index | The share of the show spent on `personal_life` and `other_topics`. |
 | Speed `max` / `1` | Replay as fast as possible / at real-time pace. |
 
 ## §10 References

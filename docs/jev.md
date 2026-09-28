@@ -45,7 +45,7 @@ The response carries `answers` (one per question id), `id`, `model` (the resolve
 
 ### A real exchange from this project
 
-The repeated fixture line "Jev is 445 times cheaper than GPT." as the per-utterance request sent it (session `20260925-133413`, abridged to the fields shown):
+The repeated fixture line "Jev is 445 times cheaper than GPT." (a planted test statement for the fact-checker, not a claim of this project) as the per-utterance request sent it (session `20260925-133413`, abridged to the fields shown):
 
 ```json
 "state": {

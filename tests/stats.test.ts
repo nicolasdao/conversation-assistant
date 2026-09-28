@@ -39,7 +39,7 @@ describe("stats on a synthetic session", () => {
     factcheck: fc, cost, timeline: cfg.timeline,
   });
 
-  test("Rogan index is the personal_life + other_topics share of labelled time", () => {
+  test("the Off-topic index is the personal_life + other_topics share of labelled time", () => {
     expect(st.labelledMs).toBe(50_000);
     expect(st.roganIndex).toBeCloseTo(20_000 / 50_000);
   });

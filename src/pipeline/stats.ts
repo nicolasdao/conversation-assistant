@@ -7,6 +7,7 @@ import type { SegmentLabels } from "./timeline.ts";
 export interface SpeakerStat { speakerId: string; displayName: string; talkMs: number; disagreements: number; hype: number | null }
 
 export interface SessionStats {
+  /** The Off-topic index: the share of labelled time on personal_life and other_topics. Stored events keep this field name, so recordings made before the rename still show it. */
   roganIndex: number;
   labelledMs: number;
   speakers: SpeakerStat[];
@@ -27,7 +28,7 @@ export interface StatsInput {
   timeline: AppConfig["timeline"];
 }
 
-const ROGAN = new Set(["personal_life", "other_topics"]);
+const OFF_TOPIC = new Set(["personal_life", "other_topics"]);
 
 function segmentText(s: Segment): string {
   return s.utterances.filter((u) => !u.failed).map((u) => u.text).join(" ").trim();
@@ -36,7 +37,7 @@ function segmentText(s: Segment): string {
 /** End-of-show and periodic stats (§4.12). Everything is counted in code. */
 export function computeStats(input: StatsInput): SessionStats {
   let labelledMs = 0;
-  let roganMs = 0;
+  let offTopicMs = 0;
   const talk = new Map<string, number>();
   const disagreements = new Map<string, number>();
   const hypeSum = new Map<string, { w: number; sum: number }>();
@@ -59,7 +60,7 @@ export function computeStats(input: StatsInput): SessionStats {
     const subject = l.choices.subject?.choice;
     if (subject) {
       labelledMs += dur;
-      if (ROGAN.has(subject)) roganMs += dur;
+      if (OFF_TOPIC.has(subject)) offTopicMs += dur;
     }
     if (l.markers.includes("disagreement")) for (const id of perSpeaker.keys()) disagreements.set(id, (disagreements.get(id) ?? 0) + 1);
     const hype = l.scores.hype;
@@ -87,7 +88,7 @@ export function computeStats(input: StatsInput): SessionStats {
   }).sort((a, b) => b.talkMs - a.talkMs);
 
   return {
-    roganIndex: labelledMs > 0 ? roganMs / labelledMs : 0,
+    roganIndex: labelledMs > 0 ? offTopicMs / labelledMs : 0,
     labelledMs, speakers, predictions, recommendations, clips, factcheck: input.factcheck, cost: input.cost,
   };
 }
