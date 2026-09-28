@@ -406,6 +406,9 @@ main { position: relative; z-index: 1; }
 .fine { border-top: 1px solid var(--rule); background: var(--deck); }
 .fine-in { max-width: 1240px; margin: 0 auto; padding: 44px 48px 56px; }
 .fine-h { margin: 0 0 18px; display: flex; align-items: center; gap: 10px; font: 800 26px/1 var(--cond); text-transform: uppercase; letter-spacing: 0.04em; }
+.fine-rel { margin: -6px 0 20px; font: 600 14px/1.4 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); }
+.fine-rel b { color: var(--accent); font-weight: 800; }
+.fine-rel a { color: var(--ink-2); }
 .fine-links { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 28px; }
 .fine-links a { font: 700 14px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--ink-2); }
 .fine-links a:hover { color: var(--accent); }

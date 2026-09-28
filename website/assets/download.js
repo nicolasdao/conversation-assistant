@@ -2,7 +2,9 @@
 //
 // Markup:
 //   <a data-download href="https://github.com/nicolasdao/tattle/releases/latest">Download for Mac</a>
-//   <span data-version></span>  -> "v0.6.2"      <span data-size></span> -> "146 MB"
+//   <span data-version></span>  -> "v0.8.0"      <span data-size></span> -> "153 MB"
+//   <span data-released></span> -> "28 Sep 2026" <a data-notes>…</a> -> links to that release's notes
+//   [data-release] -> hidden until the release is known, then shown
 //   [data-when="mac"] / [data-when="other"]      -> shown only on a Mac / only elsewhere (theme.css)
 //   <button data-copy-link>Copy link</button>     -> copies the page's URL, says "Copied"
 //
@@ -32,6 +34,9 @@
     document.querySelectorAll("[data-download]").forEach((a) => { if (a.tagName === "A") a.href = release.url; });
     document.querySelectorAll("[data-version]").forEach((el) => { el.textContent = release.version; });
     document.querySelectorAll("[data-size]").forEach((el) => { el.textContent = release.size; });
+    document.querySelectorAll("[data-released]").forEach((el) => { el.textContent = release.released || ""; if (release.date) el.setAttribute("datetime", release.date); });
+    document.querySelectorAll("[data-notes]").forEach((a) => { if (release.notes) a.href = release.notes; });
+    document.querySelectorAll("[data-release]").forEach((el) => { el.hidden = false; });
   }
 
   function onReady() {
@@ -53,7 +58,7 @@
 
   async function load() {
     let release = null;
-    try { release = JSON.parse(sessionStorage.getItem("ca.release") || "null"); } catch { /* storage blocked */ }
+    try { release = JSON.parse(sessionStorage.getItem("ca.release.v2") || "null"); } catch { /* storage blocked */ }
     if (!release) {
       try {
         const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
@@ -61,8 +66,10 @@
         const data = await res.json();
         const dmg = (data.assets || []).find((a) => /-arm64\.dmg$/.test(a.name));
         if (!dmg) return;
-        release = { version: data.tag_name, url: dmg.browser_download_url, size: `${Math.round(dmg.size / 1e6)} MB` };
-        try { sessionStorage.setItem("ca.release", JSON.stringify(release)); } catch { /* storage blocked */ }
+        const date = (data.published_at || "").slice(0, 10);
+        const released = date ? new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "";
+        release = { version: data.tag_name, url: dmg.browser_download_url, size: `${Math.round(dmg.size / 1e6)} MB`, date, released, notes: data.html_url };
+        try { sessionStorage.setItem("ca.release.v2", JSON.stringify(release)); } catch { /* storage blocked */ }
       } catch { return; } // offline or rate-limited: the links keep pointing at the release page
     }
     CA.release = release;
