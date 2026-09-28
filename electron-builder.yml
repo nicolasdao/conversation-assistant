@@ -37,6 +37,17 @@ extraResources:
     filter: ["*.onnx"]
   - from: native/capture/.build/release/conversation-capture
     to: bin/conversation-capture
+  # the licenses: ours, every third-party component's (THIRD_PARTY_NOTICES.md, generated), and Electron's own
+  - from: LICENSE
+    to: licenses/LICENSE.txt
+  - from: THIRD_PARTY_NOTICES.md
+    to: licenses/THIRD_PARTY_NOTICES.txt
+  - from: licenses
+    to: licenses
+  - from: node_modules/electron/dist/LICENSE
+    to: licenses/LICENSE.electron.txt
+  - from: node_modules/electron/dist/LICENSES.chromium.html
+    to: licenses/LICENSES.chromium.html
 mac:
   target:
     - target: dmg

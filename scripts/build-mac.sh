@@ -14,6 +14,7 @@ cd "$(dirname "$0")/.."
 npm run build:capture
 npm run build:web
 npm run build:desktop
+node scripts/third-party-notices.mjs # the app ships the notices for exactly what is installed
 rm -rf out
 
 # the keychain profile, when nothing else is set and Apple accepts it (a quick, free check)
