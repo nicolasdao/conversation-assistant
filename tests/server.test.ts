@@ -203,7 +203,7 @@ describe("HTTP API", () => {
 
   test("the licenses: the app's own, then every third-party component with the full texts it names", async () => {
     const l = (await call("GET", "/api/licenses")).json;
-    expect(l.app).toMatchObject({ name: "Conversation Assistant", license: "BSD-3-Clause", text: expect.stringMatching(/Cloudless Consulting Pty Ltd/) });
+    expect(l.app).toMatchObject({ name: "Tattle", license: "BSD-3-Clause", text: expect.stringMatching(/Cloudless Consulting Pty Ltd/) });
     expect(l.groups.map((g: any) => g.title)).toEqual(["Components built into the app", "npm packages in the app"]);
     const all = l.groups.flatMap((g: any) => g.components);
     const find = (prefix: string) => all.find((c: any) => c.title.startsWith(prefix));

@@ -122,7 +122,7 @@ export interface NativeCapture {
   done: Promise<void>;
 }
 
-/** Spawns conversation-capture and exposes its two streams as AudioSources (§4.14b). */
+/** Spawns tattle-capture and exposes its two streams as AudioSources (§4.14b). */
 export function startNativeCapture(opts: NativeCaptureOptions = {}): Promise<NativeCapture> {
   const bin = opts.bin ?? appPaths().helper;
   const spawn = opts.spawn ?? ((b: string, a: string[]) => nodeSpawn(b, a, { stdio: ["pipe", "pipe", "pipe"], env: childEnv() }) as unknown as HelperProcess);
@@ -243,7 +243,7 @@ export function listDevices(bin = appPaths().helper): Promise<unknown[]> {
     p.stdout!.on("data", (c) => (out += c));
     p.on("error", reject);
     p.on("exit", (code) => {
-      if (code !== 0) return reject(new Error(`conversation-capture --list-devices exited with ${code}`));
+      if (code !== 0) return reject(new Error(`tattle-capture --list-devices exited with ${code}`));
       resolve(out.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)));
     });
   });

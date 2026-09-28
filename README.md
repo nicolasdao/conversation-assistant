@@ -1,8 +1,8 @@
-# Conversation Assistant
+# Tattle
 
 **An open-source Mac app** that transcribes live conversations (your microphone and the call your Mac plays), maps them on a timeline, and fact-checks claims as they're said.
 
-**[Download for Mac](https://github.com/nicolasdao/conversation-assistant/releases/latest)** · Apple Silicon, macOS 14.2 or later · signed and notarized by Apple · updates itself · free and open source ([BSD 3-Clause](LICENSE))
+**[Download for Mac](https://github.com/nicolasdao/tattle/releases/latest)** · Apple Silicon, macOS 14.2 or later · signed and notarized by Apple · updates itself · free and open source ([BSD 3-Clause](LICENSE))
 
 It was built for a podcast recorded over Riverside: the host's microphone plus the Mac's system audio, transcribed live, labelled on a timeline with Jev, and fact-checked with a System 1 / System 2 loop. It exists to demonstrate, live on air, that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 that improves it. Start with the [Mission](docs/mission.md), then [Architecture](docs/architecture.md), [Jev](docs/jev.md), and [System 1 and System 2](docs/system1-system2.md).
 
@@ -28,17 +28,19 @@ It was built for a podcast recorded over Riverside: the host's microphone plus t
 
 For anyone, no terminal needed. It needs a Mac with Apple Silicon and macOS 14.2 or later, and two API accounts with prepaid credit (OpenAI and OpenRouter; the app walks through both).
 
-1. Download `Conversation-Assistant-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/conversation-assistant/releases/latest).
-2. Open it and drag **Conversation Assistant** into Applications.
+1. Download `Tattle-<version>-arm64.dmg` from the project's [latest GitHub Release](https://github.com/nicolasdao/tattle/releases/latest).
+2. Open it and drag **Tattle** into Applications.
 3. Open it from Applications. macOS asks once whether to open an app downloaded from the internet.
 4. Paste the two API keys: the app explains how to get each one (create the account, add prepaid credit, create the key) and checks each key before saving it.
 5. Click Allow when macOS asks for **Microphone** and **System Audio Recording**. The app asks for both on its first launch, so they never interrupt a show.
 
-It updates itself from GitHub Releases, never during a show. Recordings are kept in `~/Library/Application Support/Conversation Assistant/sessions` (**File → Show Recordings in Finder**), next to the saved keys. See [The Mac app](docs/desktop.md).
+**Coming from Conversation Assistant?** It is the same app, renamed. Install Tattle and delete `Conversation Assistant.app`: your keys, recordings, and permissions carry over.
+
+It updates itself from GitHub Releases, never during a show. Recordings are kept in `~/Library/Application Support/Tattle/sessions` (**File → Show Recordings in Finder**), next to the saved keys. See [The Mac app](docs/desktop.md).
 
 ## Privacy: what leaves your Mac
 
-Conversation Assistant has no server of its own and collects nothing: no account, no analytics, no telemetry. What leaves your Mac, and where it goes:
+Tattle has no server of its own and collects nothing: no account, no analytics, no telemetry. What leaves your Mac, and where it goes:
 
 | What | Sent to | When |
 | --- | --- | --- |
@@ -47,11 +49,11 @@ Conversation Assistant has no server of its own and collects nothing: no account
 | Your chat questions with the transcript | OpenRouter, with your key, to the model you pick | When you ask |
 | A check for a new version | GitHub | At launch and every 4 hours, never during a show |
 
-OpenRouter calls ask providers not to keep or train on the data (`data_collection: "deny"`); what OpenAI and OpenRouter do with it is governed by your agreements with them. Recordings, transcripts, and keys stay on your Mac (`~/Library/Application Support/Conversation Assistant/`), and nothing reaches the project's authors. An exported recording goes wherever you send it.
+OpenRouter calls ask providers not to keep or train on the data (`data_collection: "deny"`); what OpenAI and OpenRouter do with it is governed by your agreements with them. Recordings, transcripts, and keys stay on your Mac (`~/Library/Application Support/Tattle/`), and nothing reaches the project's authors. An exported recording goes wherever you send it.
 
 ## Responsible use
 
-Conversation Assistant records and transcribes everyone on a call, including the people you are talking to. Many places require the consent of everyone recorded, and some require it to be explicit: tell the people on the call, and get their consent, before you record. You are responsible for how you use the app and its recordings. The fact-checker's verdicts are produced by AI models and can be wrong; treat them as leads to check, not as facts.
+Tattle records and transcribes everyone on a call, including the people you are talking to. Many places require the consent of everyone recorded, and some require it to be explicit: tell the people on the call, and get their consent, before you record. You are responsible for how you use the app and its recordings. The fact-checker's verdicts are produced by AI models and can be wrong; treat them as leads to check, not as facts.
 
 ## Develop
 
@@ -61,12 +63,12 @@ Requires Node 24, macOS on Apple Silicon, and the Xcode command-line tools (for 
 npm install
 npm run models                           # Silero VAD + WeSpeaker speaker-embedding models into models/
 npm run fixtures                         # a scripted ~78 s test conversation into fixtures/conversation/
-npm run build:capture                    # the conversation-capture Swift helper
+npm run build:capture                    # the tattle-capture Swift helper
 npm run serve                            # then open http://127.0.0.1:4317
 npm run app                              # or: the same, in the Mac app's window
 ```
 
-The first time, the page asks for two API keys, one from OpenAI and one from OpenRouter, and walks through getting each: create the account, add prepaid credit, create the key, paste it. Each key is checked before it is saved. Keys are saved in `~/Library/Application Support/Conversation Assistant/credentials.json`, readable only by your macOS user and outside the project folder, and shared with the Mac app; the cog menu's **API keys** (in the Mac app also **Conversation Assistant → Settings…**, ⌘,) replaces them later. Developers can set `OPENAI_API_KEY` and `OPENROUTER_API_KEY` in `.env` (see `.env.example`) instead, which wins over the saved file. See [Setup and API keys](docs/setup.md).
+The first time, the page asks for two API keys, one from OpenAI and one from OpenRouter, and walks through getting each: create the account, add prepaid credit, create the key, paste it. Each key is checked before it is saved. Keys are saved in `~/Library/Application Support/Tattle/credentials.json`, readable only by your macOS user and outside the project folder, and shared with the Mac app; the cog menu's **API keys** (in the Mac app also **Tattle → Settings…**, ⌘,) replaces them later. Developers can set `OPENAI_API_KEY` and `OPENROUTER_API_KEY` in `.env` (see `.env.example`) instead, which wins over the saved file. See [Setup and API keys](docs/setup.md).
 
 ## Scripts
 
@@ -80,7 +82,7 @@ The first time, the page asks for two API keys, one from OpenAI and one from Ope
 | `npm run serve [-- --replay <dir> --speed 1\|max]` | The web page and HTTP + SSE API on http://127.0.0.1:4317 |
 | `npm run app` | The Mac app from the project folder, in development (see [The Mac app](docs/desktop.md)) |
 | `npm run dist:mac` | Builds the Mac app into `out/`: the DMG, and the files updates download (signed with the Developer ID in the keychain, else ad hoc for this Mac only) |
-| `npm run build:capture` | Builds the `conversation-capture` Swift helper (microphone + system audio) |
+| `npm run build:capture` | Builds the `tattle-capture` Swift helper (microphone + system audio) |
 | `npm run capture:test` | Checks the helper and the macOS permissions on this Mac (interactive) |
 | `npm run build:web` | Compiles the web page (`npm run serve` and `npm run app` do it first) |
 | `npm run build:desktop` | Bundles the Mac app's main process and the engine into `dist/desktop/main.mjs` |
@@ -94,7 +96,7 @@ macOS asks once for **Microphone** and once for **System Audio Recording**. With
 
 ## Using it
 
-Open Conversation Assistant (or, developing, `npm run serve` and http://127.0.0.1:4317) and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The window shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, Insights (the show's stats, how the fact-checker did, and the error log), Speakers, and Labels. Every session is saved as a folder (both audio streams included: in the app's Application Support folder, or `sessions/` in development); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.conversation-recording` file (about 30 MB an hour, into Downloads) to send over WhatsApp or email, and **Import** (or dropping the file on the window) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a reload, or a bookmark in a browser, lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
+Open Tattle (or, developing, `npm run serve` and http://127.0.0.1:4317) and press **Start live** (earbuds in), which first asks for the microphone, how many people are on the call, and whether to turn off fact-checking and labels for that show. With both off it is a plain recording with a transcript, about $1.23 an hour, and Jev is never called. The window shows both stream meters, a transcript that streams as people speak, the timeline, fact-check cards, and the verdict tally; the header's **Chat** button (or ⌘K) opens a large chat window that answers questions about the transcript with any of 14 OpenRouter models (GPT-6 Luna by default), live on air or on a recording; the cog at the top right opens Recordings, Insights (the show's stats, how the fact-checker did, and the error log), Speakers, and Labels. Every session is saved as a folder (both audio streams included: in the app's Application Support folder, or `sessions/` in development); **Recordings** lists, names, searches, opens, and deletes them; **Export** saves the recording on screen as one `.tattle` file (about 30 MB an hour, into Downloads) to send over WhatsApp or email, and **Import** (or dropping the file on the window) adds one someone shared; and an opened recording can be played back from the timeline at up to 4×. Each recording has its own URL (`/recordings/<id>`, with `?t=` for the playback position), so a reload, or a bookmark in a browser, lands on the same view. Choose how many people are on the call next to the microphone; the Speakers window can suggest merges for duplicate speakers.
 
 Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final transcripts, $0.04 Jev, and up to $0.35 fact-checking. The per-session cap is `budget.sessionCapUsd` ($10) in `config/app.json`. Chat is extra, pay-as-you-ask (a question about a two-hour episode is about $0.004 on GPT-6 Luna, more on larger models), with its own cap of $2 per recording (`chat.capUsd`). OpenRouter calls send `provider: { data_collection: "deny" }`.
 
@@ -106,7 +108,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 - [The Mac app](docs/desktop.md) — The Mac app — Electron running the engine in-process with no server port, the window on the app:// scheme, the menu bar (Settings, Check for Updates, Licenses and Acknowledgements) and its bridge to the page, where the app keeps its files, macOS permissions, quitting and updating around a show, and how the app is built, signed, notarized, and published.
 - [Gotchas](docs/gotchas.md) — Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, Jev question wording, and test-fixture voices — each with its fix.
 - [Jev](docs/jev.md) — What Jev is, how its Decisions API works (question types, answers, confidence, limits, price), and every place this project asks it a question — per utterance, per segment, in the replay gate — with the client's retry and budget rules.
-- [Mission](docs/mission.md) — Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
+- [Mission](docs/mission.md) — Why Tattle exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 - [Recordings](docs/recordings.md) — Where every session is stored, what each file holds, and how the recordings library lists, names, searches, reopens, plays back, replays, exports, imports, and deletes past sessions.
 - [Rehearsal kit](docs/rehearsal.md) — The pre-show checklist, the planted lines to say on air, how to keep a fallback recording, and how to calibrate thresholds on an old episode.
 - [Setup and API keys](docs/setup.md) — The two API keys (OpenAI and OpenRouter) — the first-run setup screen that replaces the app until both are set, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.
@@ -131,7 +133,7 @@ Expect about $1.60 per hour of show: roughly $1.00 streaming text, $0.23 final t
 
 **Architecture.** The engine owns everything smart: capture, VAD, speakers, transcription, System 1 and System 2, storage, and the HTTP and SSE API. It is the Node server plus a native capture helper that the server starts as a child process. The front end is a thin client: it only reads `GET /api/state` and `GET /api/events` and posts commands. It could be replaced later, for example by a SwiftUI app, without touching the engine.
 
-**Capture: a native Swift helper, `conversation-capture`.**
+**Capture: a native Swift helper, `tattle-capture`.**
 - `host`: the MacBook's built-in microphone, chosen explicitly whatever the system default input is.
 - `remote`: a Core Audio tap (macOS 14.2+) of everything the Mac plays, on any output device (speakers, wired earbuds, AirPods), including a device switch mid-session. Since 27 September 2026 the tap lists the apps playing sound and follows them, instead of being one global tap: a global tap made other apps hang when they started a microphone (see [Gotchas](docs/gotchas.md#capture-macos)).
 - It works whether Riverside runs in Chrome or as the Mac app.
@@ -159,7 +161,7 @@ A good session starts with `/init-context <what you want to do>`: it loads the m
 | Area | Skills | What they do |
 | --- | --- | --- |
 | Project memory | `init-context`, `update-doc`, `init-doc`, `refactor-doc`, `init-mission`, `project-memory` | Load the right docs before work; keep them in step with the code after it (`update-doc` after every feature or fix); bootstrap or restructure them; maintain the mission |
-| Committing and releasing | `git-commit`, `release-conversation-assistant`, `create-release-skill` | Conventional commits of a session's work; cut a release (see [Releasing](#releasing)); generate a release skill for another project |
+| Committing and releasing | `git-commit`, `release-tattle`, `create-release-skill` | Conventional commits of a session's work; cut a release (see [Releasing](#releasing)); generate a release skill for another project |
 | Planning | `init-spec` | Write a `SPEC.md` for a feature, and archive it when done |
 | Session control | `open-items`, `session-status`, `go-with-recommendations` | What is still open and what waits on you; a done / left / waiting ledger; carry out the recommendations in dependency order |
 | Checking work | `scrutinize`, `second-opinion` | Review and fix the session's own changes with evidence; audit an analysis and fix plan before it is implemented |
@@ -177,9 +179,9 @@ A deployed version is final: GitHub keeps release tags and published releases fr
 **With Claude Code**, run:
 
 ```
-/release-conversation-assistant            # decides the bump from what changed
-/release-conversation-assistant minor      # or force patch, minor, or major
-/release-conversation-assistant unreleased # record work under [Unreleased] without releasing
+/release-tattle            # decides the bump from what changed
+/release-tattle minor      # or force patch, minor, or major
+/release-tattle unreleased # record work under [Unreleased] without releasing
 ```
 
 It does, in order (a summary of the skill's own steps):
@@ -188,7 +190,7 @@ It does, in order (a summary of the skill's own steps):
 2. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.
 3. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
 4. Shows you the version, the bump, and the entry, and waits for your go.
-5. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): conversation-assistant v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and tags it, **on this Mac only**.
+5. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): tattle v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and tags it, **on this Mac only**.
 6. Builds and verifies the app, still on this Mac: the locked dependencies (`npm ci`), their registry signatures, no high-severity advisory in what ships, the notices, the build, Apple's notarization, and Gatekeeper. If anything fails, it undoes the local tag and commit, so the same version can be released after the fix.
 7. Asks once before **deploying**: it pushes `master` and the tag, and publishes the GitHub Release with the DMG, the update files, an SBOM, the GPL sources, and SHA-256 checksums.
 8. Verifies production from the outside: the update feed names the new version, the published DMG is the one that was built, and a downloaded copy passes Gatekeeper.
@@ -196,7 +198,7 @@ It does, in order (a summary of the skill's own steps):
 **Without Claude Code**, the same steps are plain shell scripts, run from the project root:
 
 ```bash
-S=.claude/skills/release-conversation-assistant/scripts
+S=.claude/skills/release-tattle/scripts
 sh $S/preflight.sh release              # the working tree must be clean
 sh $S/checks.sh                         # typecheck, tests, web build, Mac app bundle, notices
 sh $S/credentials.sh                    # can this Mac deploy? (certificate, notary credentials, GitHub)
@@ -208,22 +210,22 @@ sh $S/deploy.sh x.y.z notes.md          # push, and publish the GitHub Release (
 sh $S/verify-release.sh x.y.z           # check production from the outside
 ```
 
-After a release, installed apps offer the new version within about 4 hours, or at their next launch, and **Conversation Assistant → Check for Updates…** finds it at once; **About Conversation Assistant** shows the version (in a browser, the settings menu does). In development, reload the page.
+After a release, installed apps offer the new version within about 4 hours, or at their next launch, and **Tattle → Check for Updates…** finds it at once; **About Tattle** shows the version (in a browser, the settings menu does). In development, reload the page.
 
 ## Security
 
-Report a vulnerability privately (the repository's Security tab, or email), never in a public issue: see [SECURITY.md](SECURITY.md), which also explains how to check that a download is genuine. The only official downloads are this repository's [Releases](https://github.com/nicolasdao/conversation-assistant/releases), signed by **Developer ID Application: Nicolas Dao (UX774V7BK2)** and notarized by Apple, with their SHA-256 checksums in the release notes.
+Report a vulnerability privately (the repository's Security tab, or email), never in a public issue: see [SECURITY.md](SECURITY.md), which also explains how to check that a download is genuine. The only official downloads are this repository's [Releases](https://github.com/nicolasdao/tattle/releases), signed by **Developer ID Application: Nicolas Dao (UX774V7BK2)** and notarized by Apple, with their SHA-256 checksums in the release notes.
 
 ## License
 
-BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it under **Help → Licenses and Acknowledgements** (in a browser, the **Licenses** link at the bottom of the settings menu, the cog), and names it in **About Conversation Assistant**.
+BSD 3-Clause, © 2026 Cloudless Consulting Pty Ltd (nic@cloudlesslabs.com). See [LICENSE](LICENSE); the app shows it under **Help → Licenses and Acknowledgements** (in a browser, the **Licenses** link at the bottom of the settings menu, the cog), and names it in **About Tattle**.
 
 **Third-party software.** The Mac app includes components under their own licenses, listed with their notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (in the app: **Help → Licenses and Acknowledgements**, with each component's full license text), with the full texts in [licenses/](licenses/). One of them is under the GPL-3.0: the prebuilt speech library from sherpa-onnx compiles in eSpeak NG (text-to-speech, which this app does not use); its source is linked there and attached to every release. The speaker-recognition model is the WeSpeaker ResNet34-LM, CC BY 4.0.
 
 **The Claude Code skills** in `.agents/skills/` (and `.claude/skills/`, which links to them) are by their authors named in each `skill.json`, under the license declared there; they help maintain the project and are not part of the app.
 
-**Trademarks.** Conversation Assistant is an independent project. It is not affiliated with, sponsored, or endorsed by Apple, OpenAI, OpenRouter, TypeSafe AI, Riverside, or Meta (WhatsApp). Their names, and names such as macOS, GPT-6 Luna, and Jev (TypeSafe AI's), are trademarks of their owners, used here only to say what the app works with.
+**Trademarks.** Tattle is an independent project. It is not affiliated with, sponsored, or endorsed by Apple, OpenAI, OpenRouter, TypeSafe AI, Riverside, or Meta (WhatsApp). Their names, and names such as macOS, GPT-6 Luna, and Jev (TypeSafe AI's), are trademarks of their owners, used here only to say what the app works with.
 
 ## Versioning
 
-The project's version lives in one place: `version` in the root `package.json`. The engine reads it from there (`GET /api/about`; in the Mac app, from the copy inside the app), and the Mac app shows it in **About Conversation Assistant** (a browser, at the bottom of the settings menu); nothing else in the repository holds a copy (the Mac app build derives its own from it: the copy inside the app, the app's `Info.plist`, and the file names in `out/`). It changes only through a release (see [Releasing](#releasing)).
+The project's version lives in one place: `version` in the root `package.json`. The engine reads it from there (`GET /api/about`; in the Mac app, from the copy inside the app), and the Mac app shows it in **About Tattle** (a browser, at the bottom of the settings menu); nothing else in the repository holds a copy (the Mac app build derives its own from it: the copy inside the app, the app's `Info.plist`, and the file names in `out/`). It changes only through a release (see [Releasing](#releasing)).

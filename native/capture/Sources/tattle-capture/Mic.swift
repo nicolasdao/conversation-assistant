@@ -12,7 +12,7 @@ final class Mic {
     private var stream: UInt8 = 0
     private var stopped = false
     private var restarts: [Date] = []
-    private let restartQueue = DispatchQueue(label: "conversation-capture.mic-restart")
+    private let restartQueue = DispatchQueue(label: "tattle-capture.mic-restart")
     /// When the last buffer arrived (mach time), or when the engine was last (re)started. Guarded by `lastLock`.
     private var lastBufferAt: UInt64 = 0
     private let lastLock = NSLock()

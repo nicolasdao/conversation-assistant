@@ -8,7 +8,7 @@ source:
 
 # Rehearsal kit
 
-Everything to check before going on air with Conversation Assistant, the lines to plant, and how to calibrate on an old episode.
+Everything to check before going on air with Tattle, the lines to plant, and how to calibrate on an old episode.
 
 ## The day before
 
@@ -30,7 +30,7 @@ Everything to check before going on air with Conversation Assistant, the lines t
 
 ## Starting the show
 
-Open **Conversation Assistant**. (In development: `npm run serve`, which builds the page and serves http://127.0.0.1:4317, or `npm run app`.) The Mac app never checks for or downloads an update while a session is on air.
+Open **Tattle**. (In development: `npm run serve`, which builds the page and serves http://127.0.0.1:4317, or `npm run app`.) The Mac app never checks for or downloads an update while a session is on air.
 
 Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream stays at or below −50 dBFS for more than 10 s, or no audio frame arrives for more than 3 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
 

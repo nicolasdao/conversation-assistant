@@ -14,7 +14,7 @@
       "description": null,
       "has_frontmatter": false,
       "headings": [
-        "Conversation Assistant",
+        "Tattle",
         "Table of Contents",
         "Install",
         "Privacy: what leaves your Mac",
@@ -30,7 +30,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 229,
+      "line_count": 231,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -177,13 +177,14 @@
         "macOS permissions",
         "A show in progress",
         "Updates",
+        "The name, and what kept the old one",
         "Building",
         "Signing and notarization",
         "Hardening",
         "Licenses",
         "Publishing"
       ],
-      "line_count": 223,
+      "line_count": 238,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -248,7 +249,7 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 83,
+      "line_count": 84,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
@@ -337,7 +338,7 @@
     },
     {
       "dangling": false,
-      "description": "Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.",
+      "description": "Why Tattle exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.",
       "has_frontmatter": true,
       "headings": [
         "Mission",

@@ -9,7 +9,7 @@ version="$1"
 if git ls-remote --exit-code --tags origin "v$version" >/dev/null 2>&1; then
   echo "v$version is already on origin: it is final, so fix forward with a new version"; exit 1
 fi
-[ "$(git log -1 --format=%s)" = "chore(release): conversation-assistant v$version" ] || { echo "HEAD is not the release commit of v$version"; exit 1; }
+[ "$(git log -1 --format=%s)" = "chore(release): tattle v$version" ] || { echo "HEAD is not the release commit of v$version"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "the working tree is not clean"; exit 1; }
 git tag -d "v$version" >/dev/null 2>&1 || true
 git reset -q --keep HEAD~1

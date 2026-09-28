@@ -19,7 +19,7 @@ Every session — live or replay — is kept as one folder of plain files. There
 
 ## Session folders
 
-`src/store/sessionStore.ts` creates `<YYYYMMDD-HHMMSS>/` in the recordings folder at session start. The recordings folder (`sessions` in `src/paths.ts`) is the project's `sessions/` for `npm run serve` and the CLI tools, and `~/Library/Application Support/Conversation Assistant/sessions` in the Mac app (see [The Mac app](desktop.md#where-the-app-keeps-its-files--srcpathsts)); `sessions/` below means that folder. The two are separate libraries: to see recordings made in development in the app, move their folders across, or export and import them. `npm run smoke` and `npm run preflight` write only their call logs, to `smoke-…` and `preflight-…` folders; those have no `session.json`, so the library never lists them. Every JSONL file is append-only and flushed on every write, so a crash loses at most the last line.
+`src/store/sessionStore.ts` creates `<YYYYMMDD-HHMMSS>/` in the recordings folder at session start. The recordings folder (`sessions` in `src/paths.ts`) is the project's `sessions/` for `npm run serve` and the CLI tools, and `~/Library/Application Support/Tattle/sessions` in the Mac app (see [The Mac app](desktop.md#where-the-app-keeps-its-files--srcpathsts)); `sessions/` below means that folder. The two are separate libraries: to see recordings made in development in the app, move their folders across, or export and import them. `npm run smoke` and `npm run preflight` write only their call logs, to `smoke-…` and `preflight-…` folders; those have no `session.json`, so the library never lists them. Every JSONL file is append-only and flushed on every write, so a crash loses at most the last line.
 
 | File | Holds |
 | --- | --- |
@@ -62,7 +62,7 @@ While a recording is open, `GET /api/state` returns an archived snapshot (`sessi
 
 ## Export and import
 
-A recording can be shared as **one file**, `<name>.conversation-recording` (files named `.podcast-recording`, exported before the app was renamed, still import), typically over WhatsApp or email, with someone who has Conversation Assistant too (`src/store/transfer.ts`, `src/store/zip.ts`).
+A recording can be shared as **one file**, `<name>.tattle` (files named `.conversation-recording` or `.podcast-recording`, exported under the app's earlier names, still import), typically over WhatsApp or email, with someone who has Tattle too (`src/store/transfer.ts`, `src/store/zip.ts`).
 
 **The format** is a ZIP with its own extension:
 - A ZIP is the standard way to bundle files, and Node's zlib is enough to write and read it (a minimal writer and reader, no dependency). The system's own `unzip` opens it too.
@@ -72,7 +72,7 @@ Inside:
 
 | Entry | Holds |
 | --- | --- |
-| `manifest.json` (first) | `format: "conversation-assistant-recording"` (`"podcast-assistant-recording"`, from before the app was renamed, still imports), `formatVersion` (1), `app` (name and version that **exported** it), `exportedAt`; `recording` (`id`, `name`, `startedAt`, `durationMs`, `mode`, `recordedWith`: the version that **recorded** it, from `session.json`, or null before 0.3.0); `audio` (`choice`, `format`, `bitrate`, and each stream's sample count); `chats`; `files` |
+| `manifest.json` (first) | `format: "tattle-recording"` (`"conversation-assistant-recording"` and `"podcast-assistant-recording"`, from the app's earlier names, still import), `formatVersion` (1), `app` (name and version that **exported** it), `exportedAt`; `recording` (`id`, `name`, `startedAt`, `durationMs`, `mode`, `recordedWith`: the version that **recorded** it, from `session.json`, or null before 0.3.0); `audio` (`choice`, `format`, `bitrate`, and each stream's sample count); `chats`; `files` |
 | `data/*` | The session's files, deflated: `session.json`, `meta.json`, `speakers.json`, every JSONL file; `chats.jsonl` only when chosen |
 | `audio/host.m4a`, `audio/remote.m4a` | Compressed audio (the default), stored |
 | `audio/host.wav`, `audio/remote.wav` | Or the original WAVs, stored |
@@ -90,7 +90,7 @@ Inside:
 
 **Export**, from the header (a recording on screen) or a row of the Recordings window:
 1. `POST /api/sessions/:id/export { audio: "compressed" | "original" | "none", chats }` writes the file to the system's temporary folder and returns `{ token, fileName, bytes }`. Errors show in the window.
-2. The page then downloads `GET /api/exports/:token` (`Content-Disposition: attachment`), usually to Downloads; the Mac app always saves it there, as `<name> (2).conversation-recording` and so on when the name is taken. The file is deleted once sent, or after 15 minutes.
+2. The page then downloads `GET /api/exports/:token` (`Content-Disposition: attachment`), usually to Downloads; the Mac app always saves it there, as `<name> (2).tattle` and so on when the name is taken. The file is deleted once sent, or after 15 minutes.
 3. A session still on air cannot be exported (409).
 
 **Import**, from the header (anything but a session on air), the Recordings window, or by dropping the file anywhere on the page:
@@ -126,7 +126,7 @@ A two-hour show imports in about 4 s.
 | POST | `/api/session/start` | `{ mode: "replay", sessionId, speed }` replays a recording; `name` names the new session |
 | GET | `/api/sessions/:id/export` | What an export would weigh: `{ fileName, recordedWith, app, bytes: { compressed, original, none }, chats, hasAudio }` |
 | POST | `/api/sessions/:id/export` | `{ audio, chats }` → `{ token, fileName, bytes }`; 409 for a session on air |
-| GET | `/api/exports/:token` | The `.conversation-recording` file, as a download |
+| GET | `/api/exports/:token` | The `.tattle` file, as a download |
 | POST | `/api/sessions/import` | The file's bytes (`X-File-Name` header) → `{ summary, already }`, plus `copyToken` when the library already had it |
 | POST | `/api/sessions/import/:copyToken` | `{ name }` → imports that kept upload again as a named copy → `{ summary, already: false }`; 404 once used or after 15 minutes |
 

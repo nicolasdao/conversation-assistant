@@ -56,7 +56,7 @@ Tier 1
 - [ ] `npm run typecheck && npm test` pass; new tests from §4 exist and pass.
 - [ ] Recording `20260925-202620` (in `sessions/`) opened in the dev app shows the same timeline lanes, colours, markers, filters, transcript tags, and Insights numbers as the screenshots taken before Tier 1 (§0 step 3), except: humour now has a filter chip; clip markers come from the converted legacy set.
 - [ ] `grep -rn "personal_life\|other_topics\|ai_models\|\"subject\"\|\"mode\"\|\"heat\"\|\"hype\"\|clip_worthy\|hot_take" src web/src --include=*.ts` finds these ids only in the legacy converter and its test data (§4.T1.3), never in rendering, stats, or pipeline code.
-- [ ] A replay of `fixtures/conversation` (Start live is not needed: `npm run replay -- --host fixtures/conversation/host.wav --remote fixtures/conversation/remote.wav --speed max`) writes `session.json` with `labelSet.format === "conversation-assistant-labels"` and a `stories` array. Ask the user before running it: it calls Jev and OpenAI (about $0.05).
+- [ ] A replay of `fixtures/conversation` (Start live is not needed: `npm run replay -- --host fixtures/conversation/host.wav --remote fixtures/conversation/remote.wav --speed max`) writes `session.json` with `labelSet.format === "tattle-labels"` and a `stories` array. Ask the user before running it: it calls Jev and OpenAI (about $0.05).
 - [ ] With the window narrowed to 1024 px, the marker chips under the transcript scroll sideways on one line and every dropdown stays visible.
 
 Tier 2
@@ -80,7 +80,7 @@ A new file per set, `format` and `version` first so files are self-describing:
 
 ```jsonc
 {
-  "format": "conversation-assistant-labels", "version": 1,
+  "format": "tattle-labels", "version": 1,
   "id": "ai-podcast",               // built-in: fixed; user sets: generated, [a-z0-9-]+
   "name": "AI podcast", "description": "…",
   "builtIn": true,                  // only the shipped set; stripped on import and clone

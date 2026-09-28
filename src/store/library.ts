@@ -34,7 +34,7 @@ export interface SessionSummary {
   hasAudio: boolean;
   /** The app version that made the recording (null before versions were recorded). */
   appVersion: string | null;
-  /** Set for a recording imported from a `.conversation-recording` file. */
+  /** Set for a recording imported from a `.tattle` file. */
   imported: { at: string; exportedWith: string | null; fileName: string | null } | null;
 }
 

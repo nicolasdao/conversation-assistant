@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- The app is now called **Tattle**: the app, its menus and dialogs, the DMG (`Tattle-<version>-arm64.dmg`), the permission prompts, and the GitHub repository (`nicolasdao/tattle`; the old address redirects)
+- Your keys, recordings, and saved preferences move to `~/Library/Application Support/Tattle/` the first time Tattle opens, and macOS keeps its Microphone and System Audio Recording permissions
+- Recordings export as `.tattle` files; `.conversation-recording` and `.podcast-recording` files still import
+- The capture helper is now `tattle-capture`
+
 ## [0.7.0] - 2026-09-28
 
 ### Added

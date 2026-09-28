@@ -14,7 +14,7 @@ source:
 
 # Architecture
 
-Conversation Assistant is an open-source Mac app: people download a signed, notarized build and it updates itself (see [The Mac app](desktop.md)); developers run the same engine and page from the project folder with `npm run serve` or `npm run app`. Either way, it has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+Tattle is an open-source Mac app: people download a signed, notarized build and it updates itself (see [The Mac app](desktop.md)); developers run the same engine and page from the project folder with `npm run serve` or `npm run app`. Either way, it has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
 
 The engine runs in one of two hosts, with the same start-up (`bootEngine()` in `src/server/main.ts`) and the same router: **`npm run serve`**, a server on http://127.0.0.1:4317 for development and the command-line tools, or **the Mac app**, where it runs inside Electron's main process and the app's window reaches the router in-process, with no port (see [The Mac app](desktop.md)). Where the engine finds its files — the page, config, models, recordings, the helper — comes from `src/paths.ts`: the project folder by default, the app bundle and Application Support in the Mac app.
 
@@ -23,7 +23,7 @@ flowchart TB
   subgraph Mac
     MIC[Built-in microphone] --> HELPER
     OUT[Everything the Mac plays<br/>Riverside call, any output device] --> HELPER
-    HELPER["conversation-capture (Swift)<br/>16 kHz PCM16 frames on stdout"]
+    HELPER["tattle-capture (Swift)<br/>16 kHz PCM16 frames on stdout"]
   end
   HELPER --> SRC[Audio sources: host, remote]
   FILES[WAV files] --> SRC
@@ -41,7 +41,7 @@ flowchart TB
 
 ## Capture — `native/capture/` and `src/audio/nativeSource.ts`
 
-`conversation-capture` is a Swift command-line helper (swift-tools 6.0, Swift 5 language mode) that uses Apple frameworks only:
+`tattle-capture` is a Swift command-line helper (swift-tools 6.0, Swift 5 language mode) that uses Apple frameworks only:
 
 - **`host`** — the MacBook's built-in microphone, chosen explicitly whatever the default input is, captured with `AVAudioEngine` (voice processing off, channel 0).
 - **`remote`** — a private Core Audio tap (macOS 14.2+) of everything the Mac plays, read through a private aggregate device whose main sub-device is the current default output. When the default output changes (AirPods connect), the aggregate is rebuilt.
@@ -53,7 +53,7 @@ flowchart TB
 - **Stdout** carries binary frames only: `PCAP`, a stream byte (0 host, 1 remote), 3 reserved bytes, `sessionMs` (float64 LE), a sample count (uint32 LE), and that many PCM16 LE samples at 16 kHz (1,600 per frame, about every 100 ms). **Stderr** carries JSON status lines (`started` with `epochMs`, `device_changed`, `warning`, `error`).
 - `--list-devices` prints input devices; `--probe <s>` prints peak and RMS levels (used by `capture:test` and `preflight`).
 
-The Info.plist is embedded in the binary (`-sectcreate __TEXT __info_plist`), without which macOS refuses the permissions. macOS attributes both permissions to the app that launched the helper — the terminal app for `npm run serve`, Conversation Assistant itself for the Mac app, which declares the same two usage descriptions in its own `Info.plist` (see [The Mac app](desktop.md#macos-permissions)); a denied permission delivers silence, not an error (see [Gotchas](gotchas.md)).
+The Info.plist is embedded in the binary (`-sectcreate __TEXT __info_plist`), without which macOS refuses the permissions. macOS attributes both permissions to the app that launched the helper — the terminal app for `npm run serve`, Tattle itself for the Mac app, which declares the same two usage descriptions in its own `Info.plist` (see [The Mac app](desktop.md#macos-permissions)); a denied permission delivers silence, not an error (see [Gotchas](gotchas.md)).
 
 The Node adapter spawns the helper, parses frames across partial reads, maps helper time onto the session clock (`started.epochMs − session start`), and re-chunks into 512-sample Float32 frames, filling gaps with silence. A malformed frame kills the helper; an unexpected exit is restarted up to 3 times per session, 1 s apart, with an `error` event each time, then the live sources end cleanly. Stopping closes stdin, then sends SIGTERM after 2 s and SIGKILL after 5 s.
 
@@ -110,7 +110,7 @@ The router (`createApiServer`) uses Node's `http` module and serves one session 
 | GET | `/api/licenses` | The Licenses and Acknowledgements window's content: the app's license, every component of `THIRD_PARTY_NOTICES.md` by group, and the full texts they name (`src/licenses.ts`; see [The Mac app](desktop.md#licenses-and-acknowledgements--weblicenseshtml-srclicensests)). Open before the keys are set |
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the engine started; the page then shows a banner asking for a restart. Never in the packaged Mac app, which has no sources |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
-| GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.conversation-recording` file (see [Recordings](recordings.md#export-and-import)) |
+| GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.tattle` file (see [Recordings](recordings.md#export-and-import)) |
 | GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
 
 **Every request must come from the page itself** (`fromThisPage`): the `Host` must be `127.0.0.1` or `localhost`, which defeats DNS rebinding, and any `Origin` must match it, so another website open in the browser can neither read anything nor act, not even with the "simple" cross-site requests that skip CORS (a text/plain POST that would start a recording). Anything else gets 403 (added 27 September 2026, after a review found only the setup routes guarded). The page itself is served with a Content-Security-Policy (`PAGE_CSP`): scripts, fonts, media, and connections from its own origin only, inline styles allowed because the page sets them from code.
@@ -216,7 +216,7 @@ One ledger per session, plus the development total read from the recordings fold
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 
-The API keys are not in `config/`: they come from the environment (`.env`, in development) or `~/Library/Application Support/Conversation Assistant/credentials.json` (see [Setup](setup.md)).
+The API keys are not in `config/`: they come from the environment (`.env`, in development) or `~/Library/Application Support/Tattle/credentials.json` (see [Setup](setup.md)).
 
 Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a `choice` without criteria or without a `none` / `other…` option, a `score` with fewer than 2 levels, non-snake_case ids, and a System 1 set whose `claim_type` does not have exactly its 7 keys.
 

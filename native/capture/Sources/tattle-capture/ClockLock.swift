@@ -94,7 +94,7 @@ final class ClockLock {
     static let toleranceSamples: Int64 = 20 * 16
     static let frameSamples = 1600
 
-    let queue = DispatchQueue(label: "conversation-capture.clocklock")
+    let queue = DispatchQueue(label: "tattle-capture.clocklock")
     let startHost: UInt64
     let epochMs: Double
     private let timebase: mach_timebase_info_data_t

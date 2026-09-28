@@ -1,3 +1,4 @@
+import { existsSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +17,7 @@ export interface AppPaths {
   models: string;
   /** One folder per recording (see docs/recordings.md). */
   sessions: string;
-  /** The conversation-capture helper. */
+  /** The tattle-capture helper. */
   helper: string;
   /** The third-party notices, THIRD_PARTY_NOTICES.md (in the Mac app, a .txt copy next to the full texts). */
   notices: string;
@@ -34,7 +35,7 @@ const DEFAULTS: AppPaths = {
   config: "config",
   models: "models",
   sessions: "sessions",
-  helper: "native/capture/.build/release/conversation-capture",
+  helper: "native/capture/.build/release/tattle-capture",
   notices: join(ROOT, "THIRD_PARTY_NOTICES.md"),
   licenses: join(ROOT, "licenses"),
   src: join(ROOT, "src"),
@@ -52,9 +53,29 @@ export function setAppPaths(p: Partial<AppPaths> = {}): AppPaths {
   return current;
 }
 
-/** ~/Library/Application Support/Conversation Assistant: the saved keys, and the Mac app's recordings. */
-export function appSupportDir(): string {
-  return join(homedir(), "Library", "Application Support", "Conversation Assistant");
+/** ~/Library/Application Support/Tattle: the saved keys, and the Mac app's recordings. */
+export function appSupportDir(base = join(homedir(), "Library", "Application Support")): string {
+  return join(base, "Tattle");
+}
+
+/** The folder's name before the app was renamed Tattle (28 September 2026). */
+const LEGACY_APP_SUPPORT = "Conversation Assistant";
+
+/**
+ * Moves the folder from before the rename into place, once, so the keys, the recordings, and the window's storage come
+ * along. Does nothing when the new folder exists already. Returns the folder it moved, or null.
+ */
+export function migrateAppSupportDir(base = join(homedir(), "Library", "Application Support")): string | null {
+  const from = join(base, LEGACY_APP_SUPPORT);
+  const to = appSupportDir(base);
+  if (existsSync(to) || !existsSync(from)) return null;
+  try {
+    renameSync(from, to);
+    return from;
+  } catch (err) {
+    console.warn(`Could not move ${from} to ${to}: ${(err as Error).message}`);
+    return null;
+  }
 }
 
 export const vadModelPath = () => join(current.models, "silero_vad.onnx");

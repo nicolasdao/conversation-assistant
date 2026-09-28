@@ -2,17 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- the id keeps the name from before the rename to Tattle: an id never changes -->
     <key>CFBundleIdentifier</key>
     <string>com.cloudlesslabs.conversation-capture</string>
     <key>CFBundleName</key>
-    <string>conversation-capture</string>
+    <string>tattle-capture</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
     <string>0.1.0</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Conversation Assistant transcribes the host's microphone during a recording.</string>
+    <string>Tattle transcribes the host's microphone during a recording.</string>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>Conversation Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.</string>
+    <string>Tattle transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.</string>
 </dict>
 </plist>

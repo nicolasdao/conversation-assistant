@@ -19,7 +19,7 @@ source:
 
 # The Mac app
 
-Conversation Assistant ships as a Mac app for people who never open a terminal: download the DMG, drag the app to Applications, open it. It is the same engine and the same web page as `npm run serve`, packaged with Electron (added 27 September 2026). Developers keep running `npm run serve` and the CLI tools as before.
+Tattle ships as a Mac app for people who never open a terminal: download the DMG, drag the app to Applications, open it. It is the same engine and the same web page as `npm run serve`, packaged with Electron (added 27 September 2026). Developers keep running `npm run serve` and the CLI tools as before.
 
 It is distributed by direct download, signed with a Developer ID and notarized by Apple, not through the Mac App Store: the App Store requires the App Sandbox, which the system-audio tap, the capture helper, and `afconvert` would all have to live within.
 
@@ -27,13 +27,13 @@ It is distributed by direct download, signed with a Developer ID and notarized b
 
 ```mermaid
 flowchart LR
-  subgraph App[Conversation Assistant.app]
+  subgraph App[Tattle.app]
     subgraph Main[Electron main process]
       ENGINE[Engine + router<br/>createApiServer, not listening]
       BRIDGE[inProcessHandler<br/>stream pair per request]
     end
     WIN[Window: the web page<br/>app://conversation-assistant/]
-    HELPER[conversation-capture<br/>child process]
+    HELPER[tattle-capture<br/>child process]
   end
   WIN -- fetch, EventSource, XHR, audio --> BRIDGE --> ENGINE
   HELPER -- PCM frames on stdout --> ENGINE
@@ -59,12 +59,12 @@ flowchart LR
 | --- | --- | --- |
 | `root` (`package.json`, `LICENSE`) | the project folder | inside `app.asar` (`app.getAppPath()`) |
 | `web`, `config`, `models` | `web/`, `config/`, `models/` | `Contents/Resources/…`, read-only |
-| `helper` | `native/capture/.build/release/conversation-capture` | `Contents/Resources/bin/conversation-capture` |
-| `sessions` | `sessions/` | `~/Library/Application Support/Conversation Assistant/sessions` |
+| `helper` | `native/capture/.build/release/tattle-capture` | `Contents/Resources/bin/tattle-capture` |
+| `sessions` | `sessions/` | `~/Library/Application Support/Tattle/sessions` |
 | `notices`, `licenses` (the Licenses window) | `THIRD_PARTY_NOTICES.md`, `licenses/` | `Contents/Resources/licenses/THIRD_PARTY_NOTICES.txt`, `Contents/Resources/licenses/` |
 | `src` (the restart banner's watch) | `src/` | none: `/api/engine` never reports stale |
 
-- `~/Library/Application Support/Conversation Assistant/` (`appSupportDir()`) also holds `credentials.json`, the keys saved from the setup page ([Setup](setup.md)), and `Window/`, the window's own storage (the preferences the page remembers). The app's working directory is set there too, so anything still relative lands there, never in `/`.
+- `~/Library/Application Support/Tattle/` (`appSupportDir()`) also holds `credentials.json`, the keys saved from the setup page ([Setup](setup.md)), and `Window/`, the window's own storage (the preferences the page remembers). The app's working directory is set there too, so anything still relative lands there, never in `/`.
 - The config is read-only in the app. Label edits never needed to write it: they are saved in each recording ([Recordings](recordings.md)).
 - **Recordings made with `npm run serve` stay in the project's `sessions/`.** To see them in the app, move the folders into the app's `sessions/` folder (**File → Show Recordings in Finder**), or export and import them.
 - The packaged app never enforces the $3 development cap ([Architecture](architecture.md#budgets--srcbudgetts)): it guards a developer's replays, and the app's users have the per-session cap.
@@ -75,7 +75,7 @@ flowchart LR
 - **One instance.** Opening the app again focuses the open window.
 - **Closing the window keeps the app running**, and any show on air with it, as Mac apps do. The Dock icon reopens it.
 - **Links to other sites** (the key setup steps, fact-check sources) open in the default browser (`setWindowOpenHandler`). Any other navigation away from `app://conversation-assistant/` is refused.
-- **Exports** are saved to Downloads, like a browser: `<name>.conversation-recording`, then `<name> (2).conversation-recording` if taken. The Dock's Downloads stack bounces when one finishes.
+- **Exports** are saved to Downloads, like a browser: `<name>.tattle`, then `<name> (2).tattle` if taken. The Dock's Downloads stack bounces when one finishes.
 - **Imports** (the Import button, or a file dropped on the window) work as in a browser. The upload is in-process and instant, and the scheme reports no upload progress, so the progress bar moves back and forth while the recording is unpacked (`web/src/transfer.ts`).
 - **No browser permissions** but the clipboard: Electron grants a page any permission it asks for unless told otherwise, so the window refuses them all except `clipboard-sanitized-write` (the chat's Copy buttons). Capture never goes through the page.
 - **No DevTools in the packaged app** (`webPreferences.devTools`): code pasted into its console would run with the app's microphone grant. `npm run app` keeps them.
@@ -87,10 +87,10 @@ Since 28 September 2026 the app menu is the app's own, as in a native Mac app, n
 
 | Menu | Items |
 | --- | --- |
-| Conversation Assistant | **About Conversation Assistant** (macOS's panel: the version, the copyright and license, and where the licenses are), **Check for Updates…** (below), **Settings…** (⌘,), then the standard Services, Hide, Hide Others, Show All, and Quit |
+| Tattle | **About Tattle** (macOS's panel: the version, the copyright and license, and where the licenses are), **Check for Updates…** (below), **Settings…** (⌘,), then the standard Services, Hide, Hide Others, Show All, and Quit |
 | File | **Show Recordings in Finder**, Close |
 | Edit, View, Window | The standard ones |
-| Help | **Conversation Assistant on GitHub**, **Licenses and Acknowledgements** (below) |
+| Help | **Tattle on GitHub**, **Licenses and Acknowledgements** (below) |
 
 **Settings…** opens the API keys window ([Setup](setup.md)), the page's `?panel=keys`. The app's own windows (Recordings, Insights, Speakers, Labels) stay in the page's settings cog, not in the menu bar: the menu bar holds what is about the app (its version, updates, the API keys, the licenses), and the cog what is about the show, one click away in the window shared on air. So in the Mac app the cog leaves out what the menu bar has: API keys, the footer's version and Licenses link, and the Replay-a-folder button (see [Architecture](architecture.md#web-front-end--web)). In a browser (`npm run serve`), which has no menu bar, the cog keeps them all.
 
@@ -114,9 +114,9 @@ In a browser `window.desktop` is undefined, and the page does without: the cog's
 
 ## macOS permissions
 
-macOS asks for **Microphone** and **System Audio Recording** the first time the capture helper starts, and gives both to the app: it attributes the helper's requests to the app that launched it (verified in macOS's permission log, `tccd`). System Settings → Privacy & Security lists **Conversation Assistant**, not Terminal.
+macOS asks for **Microphone** and **System Audio Recording** the first time the capture helper starts, and gives both to the app: it attributes the helper's requests to the app that launched it (verified in macOS's permission log, `tccd`). System Settings → Privacy & Security lists **Tattle**, not Terminal.
 
-- **First launch.** When the microphone permission is undetermined, the app shows a sheet, "Conversation Assistant needs two permissions", then starts the helper for a moment (`--probe 1`), so macOS asks both questions now rather than at the start of a show.
+- **First launch.** When the microphone permission is undetermined, the app shows a sheet, "Tattle needs two permissions", then starts the helper for a moment (`--probe 1`), so macOS asks both questions now rather than at the start of a show.
 - **A refused microphone.** At each launch, the app offers to open System Settings at Privacy & Security → Microphone. A refused System Audio Recording cannot be detected before a session: it records silence, which the page's stream meter shows in red ([Architecture](architecture.md#web-front-end--web)).
 - **Grants follow the signature.** macOS ties them to the app's code signature, so every version must be signed with the same Developer ID, or an update loses them. Ad-hoc test builds (below) are a different app to macOS.
 - **In development** (`npm run app`, or `npm run serve`), macOS still asks on behalf of the terminal that started it, so the first-launch sheet is skipped.
@@ -129,7 +129,7 @@ macOS asks for **Microphone** and **System Audio Recording** the first time the 
 
 ## Updates
 
-`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/conversation-assistant`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**, once per version.
+`electron-updater` checks the project's GitHub Releases (`publish` in `electron-builder.yml`: `nicolasdao/tattle`) at launch and every 4 hours, only in the packaged app and only while nothing is on air, so a download never competes with a live call. It downloads the new version's zip in the background (only the changed blocks, using the `.blockmap` files) and installs it when the app quits. When a download is ready and nothing is on air, a sheet offers **Restart Now** or **Later**, once per version.
 
 **Check for Updates…** (the app menu, since 28 September 2026) says what it finds, each time on a sheet:
 
@@ -149,7 +149,22 @@ Tested with `npm run app` on 28 September 2026: the menus, **Settings…** (also
 
 - It needs a signed app: macOS refuses to update an ad-hoc build.
 - It reads `latest-mac.yml` from the newest published (not draft, not pre-release) GitHub Release.
-- Installed copies look for updates in the repository they were built with, `nicolasdao/conversation-assistant`. On 28 September 2026 that repository was recreated with a rewritten history (private details removed from old commits; the first public one had been renamed and made private), under the same name, so copies installed before still find new releases. GitHub keeps the tag name of an immutable release reserved even across such a move, so the rewritten `v0.6.0` could not be pushed: 0.6.0 has a changelog entry and a local tag but no tag or release page on GitHub; 0.6.1 was tagged but never published (a release check caught an error); 0.6.2 is the first published release. If it moves again, change `publish` in `electron-builder.yml` and the `REPO` link in `desktop/main.ts`, and keep publishing to the old repository until installed copies have updated.
+- Installed copies look for updates in the repository they were built with. Since the rename to Tattle it is `nicolasdao/tattle`, which GitHub renamed from `nicolasdao/conversation-assistant`: GitHub redirects the old name to the new one, so copies built before still find new releases, as long as no repository is ever created under the old name again. Earlier, on 28 September 2026, that repository was recreated with a rewritten history (private details removed from old commits; the first public one had been renamed and made private), under the same name, so copies installed before still find new releases. GitHub keeps the tag name of an immutable release reserved even across such a move, so the rewritten `v0.6.0` could not be pushed: 0.6.0 has a changelog entry and a local tag but no tag or release page on GitHub; 0.6.1 was tagged but never published (a release check caught an error); 0.6.2 is the first published release. If it moves again, change `publish` in `electron-builder.yml` and the `REPO` link in `desktop/main.ts`, and keep publishing to the old repository until installed copies have updated.
+
+## The name, and what kept the old one
+
+The app was called Conversation Assistant before 0.8.0 (and Podcast Assistant before that), and is now **Tattle**. The names people see changed everywhere: the app and its menus, the DMG, the permission prompts, the capture helper (`tattle-capture`), exports (`.tattle`, while the older extensions still import, see [Recordings](recordings.md#export-and-import)), and the repository. Four identifiers kept the old name on purpose, because changing any of them breaks something for people who already have the app:
+
+| Kept | Where | Why it can never change |
+| --- | --- | --- |
+| The bundle id `com.cloudlesslabs.conversation-assistant` | `appId` in `electron-builder.yml` | macOS ties the Microphone and System Audio Recording grants to it, and an update installs only over an app with the same one: a new id is a different app to macOS |
+| The page's address `app://conversation-assistant` | `ORIGIN` in `desktop/main.ts` | The window's storage (the preferences the page remembers) is kept per address |
+| The notary keychain profile `conversation-assistant` | `scripts/build-mac.sh`, the release skill | Saving it again needs the App Store Connect key file (`.p8`), which Apple gives out only once |
+| The helper's bundle id `com.cloudlesslabs.conversation-capture` | `native/capture/Info.plist` | An id, never shown; nothing gains from changing it |
+
+**The data folder moves once.** At launch (the Mac app, and `npm run serve`), `migrateAppSupportDir()` in `src/paths.ts` renames `~/Library/Application Support/Conversation Assistant/` to `~/Library/Application Support/Tattle/` when only the old one exists, so the keys, the recordings, and the window's storage come along. It never touches a `Tattle` folder that exists already.
+
+**Installing over the old app.** An auto-update keeps the app's file where it was, so an updated copy can stay `Conversation Assistant.app` in Applications while it shows Tattle everywhere else. Installing the DMG gives `Tattle.app`; delete `Conversation Assistant.app` then, since two copies of one bundle id confuse macOS about which one to open and update.
 
 ## Building
 
@@ -159,12 +174,12 @@ Tested with `npm run app` on 28 September 2026: the menus, **Settings…** (also
 | `npm run build:desktop` | Bundles `desktop/main.ts` and the engine with esbuild into `dist/desktop/main.mjs` (ESM; `electron`, `electron-updater`, and `sherpa-onnx-node` stay external), and `desktop/preload.ts` into `dist/desktop/preload.cjs` |
 | `npm run dist:mac` | `scripts/build-mac.sh`: the models if missing, the capture helper, the page, the bundle, then electron-builder into `out/` |
 
-`npm run dist:mac` writes `out/Conversation-Assistant-<version>-arm64.dmg` (what people download), `out/Conversation-Assistant-<version>-arm64-mac.zip` (what updates download), their `.blockmap` files, `out/latest-mac.yml`, and the app itself in `out/mac-arm64/`. It takes about 3.5 minutes. Measured at 0.6.2: the app is about 345 MB (328 MiB), the DMG 146 MB; Electron's framework is most of it, then sherpa-onnx (33 MB) and the models (26 MB).
+`npm run dist:mac` writes `out/Tattle-<version>-arm64.dmg` (what people download), `out/Tattle-<version>-arm64-mac.zip` (what updates download), their `.blockmap` files, `out/latest-mac.yml`, and the app itself in `out/mac-arm64/`. It takes about 3.5 minutes. Measured at 0.6.2: the app is about 345 MB (328 MiB), the DMG 146 MB; Electron's framework is most of it, then sherpa-onnx (33 MB) and the models (26 MB).
 
 What `electron-builder.yml` puts in the app:
 - `app.asar`: the bundle, `package.json` (the version), and `LICENSE`, plus the production `node_modules` (`electron-updater`, `sherpa-onnx-node`).
 - `app.asar.unpacked`: sherpa-onnx's addon and dylibs, which cannot load from inside the archive.
-- `Contents/Resources/`: `web/` (`index.html`, `licenses.html`, the styles, the compiled scripts without source maps, the fonts), `config/`, `models/*.onnx`, `bin/conversation-capture`, and `licenses/`.
+- `Contents/Resources/`: `web/` (`index.html`, `licenses.html`, the styles, the compiled scripts without source maps, the fonts), `config/`, `models/*.onnx`, `bin/tattle-capture`, and `licenses/`.
 - `Info.plist`: the bundle id `com.cloudlesslabs.conversation-assistant`, macOS 14.2 or later (the Core Audio process tap), and the Microphone and System Audio usage descriptions macOS shows in its prompts.
 - English only (`electronLanguages`): the page is in English, and Electron's other languages cost 47 MB.
 - Apple Silicon (`arm64`) only, like the capture helper and sherpa-onnx's addon.

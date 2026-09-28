@@ -1,9 +1,9 @@
-// conversation-capture: captures the built-in microphone (host) and a global Core Audio tap of all system output (remote),
+// tattle-capture: captures the built-in microphone (host) and a global Core Audio tap of all system output (remote),
 // and writes framed 16 kHz PCM16 to stdout. Status goes to stderr as JSON lines.
 //
-//   conversation-capture --list-devices
-//   conversation-capture [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global]
-//   conversation-capture --probe <seconds>
+//   tattle-capture --list-devices
+//   tattle-capture [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global]
+//   tattle-capture --probe <seconds>
 import Darwin
 import Foundation
 
@@ -45,7 +45,7 @@ while let a = args.popFirst() {
         guard let v = args.popFirst().flatMap(Double.init), v > 0 else { fail("--probe needs a number of seconds", code: 64) }
         probeSeconds = v
     case "-h", "--help":
-        print("usage: conversation-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global] | --probe <seconds>")
+        print("usage: tattle-capture --list-devices | [--mic builtin|<uid>] [--no-mic] [--no-system] [--tap apps|global] | --probe <seconds>")
         exit(0)
     default: fail("unknown argument \(a)", code: 64)
     }

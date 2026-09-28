@@ -65,7 +65,7 @@ describe("export and import", () => {
     const est = exportEstimate(dir);
     expect(est.chats).toBe(1);
     expect(est.bytes.compressed).toBeLessThan(est.bytes.original);
-    const out = await exportRecording(dir, "20260925-120000", { audio: "compressed", chats: false, app: { name: "conversation-assistant", version: "0.3.0" } });
+    const out = await exportRecording(dir, "20260925-120000", { audio: "compressed", chats: false, app: { name: "tattle", version: "0.3.0" } });
     expect(out.fileName).toBe(`Episode 12 a b${EXTENSION}`);
     const names = (await readZipEntries(out.path)).map((e) => e.name);
     expect(names[0]).toBe("manifest.json");
@@ -74,7 +74,7 @@ describe("export and import", () => {
     expect(names.some((n) => n.endsWith(".wav"))).toBe(false);
 
     const dest = mkdtempSync(join(tmpdir(), "dest-"));
-    const { id, manifest } = await importRecording(out.path, dest, "Episode 12.conversation-recording");
+    const { id, manifest } = await importRecording(out.path, dest, "Episode 12.tattle");
     expect(id).toBe("20260925-120000");
     expect(manifest).toMatchObject({ app: { version: "0.3.0" }, recording: { recordedWith: "0.2.0", name: "Episode 12: a/b" }, audio: { format: "aac" } });
     for (const s of ["host", "remote"]) {
@@ -120,7 +120,7 @@ describe("export and import", () => {
     const dir = recording(root);
     const file = await exportRecording(dir, "20260925-120000", { audio: "none", chats: false, app: { name: "p", version: "0.3.0" } });
     const engine = new Engine({ sessionsDir: root });
-    const first: any = await engine.transfer.importFile(createReadStream(file.path), "x.conversation-recording");
+    const first: any = await engine.transfer.importFile(createReadStream(file.path), "x.tattle");
     expect(first).toMatchObject({ already: true, summary: { id: "20260925-120000" } });
     expect(first.copyToken).toMatch(/^[0-9a-f-]{36}$/);
     await expect(engine.transfer.importCopy(first.copyToken, "  ")).rejects.toThrow(/name is required/);
@@ -146,13 +146,13 @@ describe("export and import", () => {
     expect(events.filter((e) => e.type.startsWith("session.")).map((e) => (e.data as any).sessionId)).toEqual(["20260925-120000-2", "20260925-120000-2"]);
   });
 
-  test("imports a recording exported before the app was renamed", async () => {
+  test.each(["podcast-assistant-recording", "conversation-assistant-recording"])("imports a recording exported under an earlier name (%s)", async (format) => {
     const src = mkdtempSync(join(tmpdir(), "src-"));
-    const good = await exportRecording(recording(src), "20260925-120000", { audio: "none", chats: false, app: { name: "podcast-assistant", version: "0.3.0" } });
+    const good = await exportRecording(recording(src), "20260925-120000", { audio: "none", chats: false, app: { name: "conversation-assistant", version: "0.3.0" } });
     const old = join(mkdtempSync(join(tmpdir(), "old-")), "old.zip");
     await writeZip(old, await Promise.all((await readZipEntries(good.path)).map(async (e) => {
       const data = await readZipEntry(good.path, e, 1 << 20);
-      return { name: e.name, data: e.name === "manifest.json" ? Buffer.from(data.toString("utf8").replace("conversation-assistant-recording", "podcast-assistant-recording")) : data };
+      return { name: e.name, data: e.name === "manifest.json" ? Buffer.from(data.toString("utf8").replace("tattle-recording", format)) : data };
     })));
     const { id } = await importRecording(old, mkdtempSync(join(tmpdir(), "dest-")), null);
     expect(id).toBe("20260925-120000");
@@ -164,8 +164,8 @@ describe("export and import", () => {
     writeFileSync(join(d, "x.txt"), "hello");
     await expect(importRecording(join(d, "x.txt"), dest, null)).rejects.toThrow(/not a recording file/);
     const newer = join(d, "newer.zip");
-    await writeZip(newer, [{ name: "manifest.json", data: Buffer.from(JSON.stringify({ format: "conversation-assistant-recording", formatVersion: 2, app: { version: "9.0.0" } })) }]);
-    await expect(importRecording(newer, dest, null)).rejects.toThrow(/newer Conversation Assistant \(v9\.0\.0\)/);
+    await writeZip(newer, [{ name: "manifest.json", data: Buffer.from(JSON.stringify({ format: "tattle-recording", formatVersion: 2, app: { version: "9.0.0" } })) }]);
+    await expect(importRecording(newer, dest, null)).rejects.toThrow(/newer Tattle \(v9\.0\.0\)/);
 
     const src = mkdtempSync(join(tmpdir(), "src-"));
     const dir = recording(src);

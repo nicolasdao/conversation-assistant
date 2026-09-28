@@ -10,7 +10,7 @@ import { EventBus } from "../src/store/events.ts";
 
 const OPENAI = "sk-proj-abcdefghijklmnopqrstuvwxyz0123";
 const OPENROUTER = "sk-or-v1-abcdefghijklmnopqrstuvwxyz9876";
-const tmpFile = () => join(mkdtempSync(join(tmpdir(), "keys-")), "Conversation Assistant", "credentials.json");
+const tmpFile = () => join(mkdtempSync(join(tmpdir(), "keys-")), "Tattle", "credentials.json");
 
 /** A fake of both services: `status` per host, and OpenRouter's key info. */
 function fakeFetch(opts: { openai?: number; openrouter?: number; limit?: number | null; freeTier?: boolean; models?: string[]; offline?: boolean } = {}) {

@@ -25,7 +25,7 @@ This project calls Jev through OpenRouter's Decisions API (alpha), pinned to `ty
 POST https://openrouter.ai/api/alpha/decisions
 Authorization: Bearer $OPENROUTER_API_KEY
 Content-Type: application/json
-X-OpenRouter-Title: Conversation Assistant
+X-OpenRouter-Title: Tattle
 
 { "model": "typesafe/jev-1.13",
   "state": { ... },

@@ -1,6 +1,6 @@
 {
-  "name": "conversation-assistant",
-  "productName": "Conversation Assistant",
+  "name": "tattle",
+  "productName": "Tattle",
   "version": "0.7.0",
   "description": "Live conversation transcript, Jev timeline, and fact-checker, as a Mac app",
   "license": "BSD-3-Clause",

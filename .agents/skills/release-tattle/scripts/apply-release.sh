@@ -3,7 +3,7 @@
 #   apply-release.sh <version> [attribution line]
 # Sets package.json's version (npm keeps package-lock.json in step; skipped when unchanged, as on the
 # first release), stages ONLY package.json, package-lock.json and CHANGELOG.md, commits
-# "chore(release): conversation-assistant v<version>" and creates the annotated tag v<version>.
+# "chore(release): tattle v<version>" and creates the annotated tag v<version>.
 set -e
 version="$1"
 attribution="$2"
@@ -17,7 +17,7 @@ if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
 fi
 git add package.json CHANGELOG.md
 [ -f package-lock.json ] && git add package-lock.json
-msg="chore(release): conversation-assistant v$version"
+msg="chore(release): tattle v$version"
 if [ -n "$attribution" ]; then
   git commit -q -m "$msg" -m "$attribution"
 else

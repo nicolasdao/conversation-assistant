@@ -12,7 +12,7 @@ import Foundation
 /// (AudioDeviceStart waiting on coreaudiod), in 28 of 32 attempts; a tap that lists processes froze none in 12.
 @available(macOS 14.2, *)
 final class SystemTap {
-    private let queue = DispatchQueue(label: "conversation-capture.tap", qos: .userInteractive)
+    private let queue = DispatchQueue(label: "tattle-capture.tap", qos: .userInteractive)
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var tapUID = ""
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
@@ -54,7 +54,7 @@ final class SystemTap {
         let desc = global ? CATapDescription(monoGlobalTapButExcludeProcesses: []) : CATapDescription(monoMixdownOfProcesses: SystemTap.playingProcesses())
         desc.isPrivate = true
         desc.muteBehavior = .unmuted
-        desc.name = "conversation-capture"
+        desc.name = "tattle-capture"
         var id = AudioObjectID(kAudioObjectUnknown)
         let st = AudioHardwareCreateProcessTap(desc, &id)
         guard st == noErr, id != kAudioObjectUnknown else { throw CaptureError.message("AudioHardwareCreateProcessTap failed (OSStatus \(st))") }
@@ -158,7 +158,7 @@ final class SystemTap {
         outputName = Devices.name(out)
         outputKind = Devices.outputKind(out)
         let dict: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "conversation-capture tap",
+            kAudioAggregateDeviceNameKey: "tattle-capture tap",
             kAudioAggregateDeviceUIDKey: "com.cloudlesslabs.conversation-capture.\(UUID().uuidString)",
             kAudioAggregateDeviceMainSubDeviceKey: outUID,
             kAudioAggregateDeviceIsPrivateKey: true,

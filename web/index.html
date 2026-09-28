@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Conversation Assistant</title>
+  <title>Tattle</title>
   <link rel="preload" href="/fonts/BarlowCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/Barlow-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
@@ -37,7 +37,7 @@
   <header id="top" class="top no-onair">
     <div id="onair" class="onair" hidden><i></i><span id="onair-label">On air</span></div>
     <div class="strap">
-      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Conversation Assistant<span id="features-chip" class="features-chip" hidden></span></div>
+      <div class="eyebrow"><span id="conn" class="conn" title="Event stream connected"></span>Tattle<span id="features-chip" class="features-chip" hidden></span></div>
       <button id="session-name" class="name" title="Click to rename this session" disabled>No session</button>
     </div>
     <div class="clock"><span class="k">Elapsed</span><span id="clock" class="t">00:00</span></div>
@@ -234,7 +234,7 @@
     </div>
   </dialog>
 
-  <!-- Export and import: one .conversation-recording file -->
+  <!-- Export and import: one .tattle file -->
   <dialog id="dlg-export" class="start-dlg" aria-labelledby="h-export">
     <div class="dlg-head"><h2 id="h-export">Export</h2><span id="export-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="export-body" class="dlg-body"></div>
@@ -243,7 +243,7 @@
     <div class="dlg-head"><h2 id="h-import">Import</h2><span class="sub">A recording someone shared with you</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="import-body" class="dlg-body"></div>
   </dialog>
-  <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .conversation-recording file</span></div></div>
+  <div id="drop" class="drop-overlay" hidden><div><b>Drop to import</b><span>A .tattle file</span></div></div>
 
   <!-- A speaker, from a click on their name in the transcript: rename or merge -->
   <dialog id="dlg-speaker" class="speaker-dlg" aria-labelledby="h-speaker">

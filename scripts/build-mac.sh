@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the Mac app into out/: Conversation-Assistant-<version>-arm64.dmg, the zip auto-update downloads, and
+# Builds the Mac app into out/: Tattle-<version>-arm64.dmg, the zip auto-update downloads, and
 # latest-mac.yml (see docs/desktop.md). npm run dist:mac
 #
 # With a "Developer ID Application" certificate in the keychain, the app is signed with it, and notarized when notary

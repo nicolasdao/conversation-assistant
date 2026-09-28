@@ -26,7 +26,7 @@ const GUIDES: Record<KeyName, Guide> = {
     steps: [
       ["Sign in, or create an account, at ", link("https://platform.openai.com/signup", "platform.openai.com"), ". This is OpenAI's developer site, separate from a ChatGPT subscription."],
       ["Add credit: ", link("https://platform.openai.com/settings/organization/billing/overview", "Settings → Billing"), " → Add to credit balance. $10 is plenty to start. Leave automatic recharge off, so you are never charged more than you added."],
-      ["Create a key: ", link("https://platform.openai.com/api-keys", "API keys"), " → Create new secret key. Name it Conversation Assistant and keep the default project and All permissions. Copy it: OpenAI shows it only once."],
+      ["Create a key: ", link("https://platform.openai.com/api-keys", "API keys"), " → Create new secret key. Name it Tattle and keep the default project and All permissions. Copy it: OpenAI shows it only once."],
       ["Paste it below. OpenAI keys start with sk-."],
     ],
     placeholder: "sk-…",
@@ -39,7 +39,7 @@ const GUIDES: Record<KeyName, Guide> = {
     steps: [
       ["Sign in, or create an account, at ", link("https://openrouter.ai", "openrouter.ai"), "."],
       ["Add credit: ", link("https://openrouter.ai/settings/credits", "Settings → Credits"), " → Add credits. $10 is plenty to start. Leave auto top-up off."],
-      ["Create a key: ", link("https://openrouter.ai/settings/keys", "Settings → API keys"), " → Create API key. Name it Conversation Assistant and give it a credit limit, for example $10: the key stops at that amount, whatever happens."],
+      ["Create a key: ", link("https://openrouter.ai/settings/keys", "Settings → API keys"), " → Create API key. Name it Tattle and give it a credit limit, for example $10: the key stops at that amount, whatever happens."],
       ["Paste it below. OpenRouter keys start with sk-or-."],
     ],
     placeholder: "sk-or-v1-…",
@@ -111,7 +111,7 @@ const padlock = () => s("svg", { class: "setup-lock", viewBox: "0 0 24 24", "ari
 const trust = () => h("div", { class: "setup-trust" }, padlock(),
   h("div", {},
     h("b", {}, "Your keys stay on this Mac"),
-    h("span", {}, "Conversation Assistant has no server of its own. Your keys are saved on this computer and sent only to OpenAI and OpenRouter, to use your account with them. Never to us, never anywhere else.")));
+    h("span", {}, "Tattle has no server of its own. Your keys are saved on this computer and sent only to OpenAI and OpenRouter, to use your account with them. Never to us, never anywhere else.")));
 
 /**
  * The first-run screen, instead of the app: nothing else loads until both keys are saved. What stands out is the two
@@ -195,9 +195,9 @@ export function showSetup(status: SetupStatus) {
   const actions = h("div", { class: "setup-actions" }, save, progress, general);
   const done = (r: SaveKeysResult) => {
     const warned = Object.values(r.checks).some((c) => c?.warning);
-    const go = h("button", { class: "btn primary setup-go armed", type: "button", onclick: () => location.reload() }, "Open Conversation Assistant");
+    const go = h("button", { class: "btn primary setup-go armed", type: "button", onclick: () => location.reload() }, "Open Tattle");
     // a warning is worth reading before moving on; otherwise the app opens by itself
-    replace(actions, go, h("p", { class: "setup-progress done" }, warned ? "Saved. Read the note above, then open the app." : "All set. Opening Conversation Assistant…"));
+    replace(actions, go, h("p", { class: "setup-progress done" }, warned ? "Saved. Read the note above, then open the app." : "All set. Opening Tattle…"));
     if (!warned) setTimeout(() => location.reload(), 1200);
     go.focus();
   };
@@ -206,13 +206,13 @@ export function showSetup(status: SetupStatus) {
   refresh();
 
   replace(root, h("div", { class: "setup-inner" },
-    h("div", { class: "setup-brand" }, h("i"), "Conversation Assistant"),
+    h("div", { class: "setup-brand" }, h("i"), "Tattle"),
     h("h1", {}, names.length > 1 ? "Add your two API keys to start" : `Add your ${GUIDES[names[0]].title} API key to start`),
     h("p", { class: "setup-lede" }, "The app uses OpenAI and OpenRouter, which you pay directly, only for what you use. Paste a key from each below. No keys yet? Open the guide under each field."),
     h("section", { class: "setup-panel" }, cards, actions, trust()),
     h("p", { class: "note setup-privacy" },
       "A show costs about $1.60 an hour ($1.23 for a transcript only), from prepaid credit; each session stops itself at $10. ",
-      `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: ${desktop ? "Conversation Assistant → Settings… (⌘,)" : "cog menu → API keys"}.`)));
+      `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: ${desktop ? "Tattle → Settings… (⌘,)" : "cog menu → API keys"}.`)));
   document.body.append(root);
   fields[0]?.input.focus();
 }

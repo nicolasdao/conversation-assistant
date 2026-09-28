@@ -5,12 +5,13 @@ import electronUpdater, { type UpdateInfo } from "electron-updater";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { extname, join } from "node:path";
-import { appPaths, appSupportDir, setAppPaths } from "../src/paths.ts";
+import { appPaths, appSupportDir, migrateAppSupportDir, setAppPaths } from "../src/paths.ts";
 import { bootEngine } from "../src/server/main.ts";
 import { inProcessHandler } from "../src/server/inProcess.ts";
 
+// The page's address keeps the app's old name: its saved preferences are stored under it, so it must never change.
 const ORIGIN = "app://conversation-assistant";
-const REPO = "https://github.com/nicolasdao/conversation-assistant";
+const REPO = "https://github.com/nicolasdao/tattle";
 /** How long quitting waits for a session on air to end; its audio is complete within seconds (src/pipeline/session.ts). */
 const QUIT_WAIT_MS = 30_000;
 const UPDATE_EVERY_MS = 4 * 60 * 60 * 1000;
@@ -25,11 +26,13 @@ if (app.isPackaged && ["remote-debugging-port", "remote-debugging-pipe"].some((s
 
 // ---------- where things are: the bundle's Resources, and Application Support ----------
 
+// first, the folder from before the rename to Tattle moves into place, with the keys, the recordings, and the window's storage
+migrateAppSupportDir();
 if (app.isPackaged) {
   const res = process.resourcesPath;
   setAppPaths({
     root: app.getAppPath(), web: join(res, "web"), config: join(res, "config"), models: join(res, "models"),
-    helper: join(res, "bin", "conversation-capture"), sessions: join(appSupportDir(), "sessions"), src: null,
+    helper: join(res, "bin", "tattle-capture"), sessions: join(appSupportDir(), "sessions"), src: null,
     notices: join(res, "licenses", "THIRD_PARTY_NOTICES.txt"), licenses: join(res, "licenses"),
   });
   mkdirSync(appPaths().sessions, { recursive: true });
@@ -87,7 +90,7 @@ function appWindow(opts: Electron.BrowserWindowConstructorOptions, path: string)
 }
 
 function createWindow() {
-  win = appWindow({ width: 1440, height: 900, minWidth: 1024, minHeight: 640, title: "Conversation Assistant" }, "/");
+  win = appWindow({ width: 1440, height: 900, minWidth: 1024, minHeight: 640, title: "Tattle" }, "/");
   win.on("closed", () => { win = null; });
 }
 
@@ -117,7 +120,7 @@ function ask(opts: Electron.MessageBoxOptions) {
   return dialog.showMessageBox(win!, opts);
 }
 
-/** Exports go to Downloads, like a browser: "name.conversation-recording", then "name (2)…" if taken. */
+/** Exports go to Downloads, like a browser: "name.tattle", then "name (2)…" if taken. */
 function downloadPath(fileName: string): string {
   const dir = app.getPath("downloads");
   const ext = extname(fileName);
@@ -181,7 +184,7 @@ function menu() {
     {
       role: "help",
       submenu: [
-        { label: "Conversation Assistant on GitHub", click: () => void shell.openExternal(REPO) },
+        { label: "Tattle on GitHub", click: () => void shell.openExternal(REPO) },
         { type: "separator" },
         { label: "Licenses and Acknowledgements", click: () => openLicenses() },
       ],
@@ -201,7 +204,7 @@ async function askPermissions() {
   if (mic === "not-determined") {
     await ask({
       type: "info", buttons: ["Continue"],
-      message: "Conversation Assistant needs two permissions",
+      message: "Tattle needs two permissions",
       detail: "It listens to your microphone and to the call your Mac plays, then transcribes both. macOS will now ask for "
         + "Microphone and for System Audio Recording: click Allow on both.",
     });
@@ -209,9 +212,9 @@ async function askPermissions() {
   } else if (mic === "denied" || mic === "restricted") {
     const { response } = await ask({
       type: "warning", buttons: ["Open System Settings", "Not now"], defaultId: 0, cancelId: 1,
-      message: "The microphone is turned off for Conversation Assistant",
+      message: "The microphone is turned off for Tattle",
       detail: "Live shows record silence without it. In System Settings → Privacy & Security → Microphone, turn on "
-        + "Conversation Assistant, then quit and reopen it.",
+        + "Tattle, then quit and reopen it.",
     });
     if (response === 0) void shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone");
   }
@@ -297,7 +300,7 @@ async function offerRestart(version: string) {
   while (onAir()) await sleep(30_000);
   const { response } = await ask({
     type: "info", buttons: ["Restart Now", "Later"], defaultId: 0, cancelId: 1,
-    message: `Conversation Assistant ${version} is ready`,
+    message: `Tattle ${version} is ready`,
     detail: "Restart to use it now, or it installs the next time you quit.",
   });
   if (response === 0) autoUpdater.quitAndInstall();
@@ -323,12 +326,12 @@ async function checkForUpdatesNow() {
   } catch (e) {
     return void info("Can't check for updates right now", `${reason(e)}\n\nCheck the internet connection and try again. You have ${current}.`, "warning");
   }
-  if (!found) return void info("You're up to date", `Conversation Assistant ${current} is the newest version.`);
+  if (!found) return void info("You're up to date", `Tattle ${current} is the newest version.`);
   for (;;) {
     const { response } = await ask({
       type: "info", buttons: ["Download and Install", "Later", "Release Notes"], defaultId: 0, cancelId: 1,
       message: "A new version is available",
-      detail: `Conversation Assistant ${found.version} is out. You have ${current}.`,
+      detail: `Tattle ${found.version} is out. You have ${current}.`,
     });
     if (response === 2) { void shell.openExternal(`${REPO}/releases/tag/v${found.version}`); continue; }
     if (response !== 0) return;

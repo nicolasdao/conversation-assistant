@@ -1,12 +1,12 @@
 ---
-name: release-conversation-assistant
-description: Release — cut a conversation-assistant version and deploy it to production (the signed Mac app on GitHub Releases, which installed copies update to), after bumping package.json, updating CHANGELOG.md, and tagging. Use when asked to release, ship, deploy, bump the version, or record unreleased changes. Not for running the app.
+name: release-tattle
+description: Release — cut a Tattle version and deploy it to production (the signed Mac app on GitHub Releases, which installed copies update to), after bumping package.json, updating CHANGELOG.md, and tagging. Use when asked to release, ship, deploy, bump the version, or record unreleased changes. Not for running the app.
 argument-hint: "[patch|minor|major|unreleased|auto] [description]"
 arguments: [action, note]
 allowed-tools: Bash, Read, Edit, Write, Grep, AskUserQuestion, Skill
 ---
 
-# Release conversation-assistant
+# Release Tattle
 
 Cuts a release of this project and deploys it: bring the docs up to date and commit everything, analyse what changed, write the changelog, bump the version, commit and tag **locally**, build and verify the Mac app **locally**, then deploy to production (push, and publish the GitHub Release), and verify production from the outside. Or, with `unreleased`, record work into the changelog's `[Unreleased]` ledger without releasing.
 
@@ -96,7 +96,7 @@ AskUserQuestion, presenting: current → new version, the bump and why, the full
 AskUserQuestion, stating plainly: deploying pushes `master` and the tag `v<version>` to `origin` and publishes the GitHub Release, which new users download and **every installed copy will install**; it cannot be undone or replaced (a problem found later means a new version). Options: **Deploy**, **Not now**.
 
 - **Deploy:** write the version's changelog entry (its bullets, without the `## [x.y.z]` heading; include earlier versions' entries that were tagged but never deployed) plus an **Install** paragraph to a temporary notes file, then `sh "${CLAUDE_SKILL_DIR}/scripts/deploy.sh" <version> <notes-file>`. It refuses unless `build-app.sh` verified a build of exactly this commit and the built files are unchanged; then it pushes, and creates the release with the DMG, the zip, their blockmaps, `latest-mac.yml`, the SBOM, the GPL sources, and the checksums in the notes. If the push succeeded but publishing failed, rerun `deploy.sh`: it skips what is done.
-- **Not now:** everything stays on this Mac. Remind: deploy later with `sh .claude/skills/release-conversation-assistant/scripts/deploy.sh <version> <notes-file>` (from the same commit, with `out/` intact), or drop the release with `undo-local-release.sh <version>`.
+- **Not now:** everything stays on this Mac. Remind: deploy later with `sh .claude/skills/release-tattle/scripts/deploy.sh <version> <notes-file>` (from the same commit, with `out/` intact), or drop the release with `undo-local-release.sh <version>`.
 
 ## Step 10 — Verify production
 

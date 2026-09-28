@@ -372,7 +372,7 @@ export class S2Client {
       res = await this.deps.fetch(CHAT_URL, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Conversation Assistant",
+          Authorization: `Bearer ${this.deps.apiKey}`, "Content-Type": "application/json", "X-OpenRouter-Title": "Tattle",
         },
         body,
         signal: AbortSignal.timeout(this.cfg.timeoutMs),

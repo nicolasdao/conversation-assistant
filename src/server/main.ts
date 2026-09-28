@@ -20,10 +20,10 @@ import {
 } from "../store/transfer.ts";
 import { appInfo } from "../version.ts";
 import { KeyError, KeySetup, KeyStore } from "../keys.ts";
-import { appPaths } from "../paths.ts";
+import { appPaths, migrateAppSupportDir } from "../paths.ts";
 import { licenses } from "../licenses.ts";
 
-/** Export and import of recordings as one `.conversation-recording` file (see docs/recordings.md § Export and import). */
+/** Export and import of recordings as one `.tattle` file (see docs/recordings.md § Export and import). */
 export interface TransferApi {
   /** What an export would contain and weigh. */
   info(id: string): unknown;
@@ -804,6 +804,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
  * Mac app serves it in-process (src/server/inProcess.ts).
  */
 export function bootEngine(opts: { allowOverDevCap?: boolean } = {}) {
+  migrateAppSupportDir(); // before the keys are read: the folder from before the rename to Tattle
   const keys = new KeyStore().load();
   const config = loadConfig();
   const setup = new KeySetup(keys, {
@@ -830,7 +831,7 @@ async function main() {
   const { keys, config, engine, server } = bootEngine({ allowOverDevCap: values["allow-over-dev-cap"] });
   const port = Number(values.port ?? config.app.server.port);
   server.listen(port, "127.0.0.1", () => {
-    console.log(`Conversation Assistant on http://127.0.0.1:${port}`);
+    console.log(`Tattle on http://127.0.0.1:${port}`);
     const missing = keys.missing();
     if (missing.length) console.log(`API keys missing (${missing.join(", ")}): open the page above to add them`);
   });

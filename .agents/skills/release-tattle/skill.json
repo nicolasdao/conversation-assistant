@@ -1,12 +1,12 @@
 {
-	"name": "release-conversation-assistant",
-	"version": "0.3.0",
-	"description": "Release workflow for conversation-assistant: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits and tags locally, builds and verifies the signed Mac app, deploys it to production (push and GitHub Release, which installed copies update to), and verifies production, plus an [Unreleased] ledger mode.",
+	"name": "release-tattle",
+	"version": "0.4.0",
+	"description": "Release workflow for Tattle: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits and tags locally, builds and verifies the signed Mac app, deploys it to production (push and GitHub Release, which installed copies update to), and verifies production, plus an [Unreleased] ledger mode.",
 	"type": "skill",
-	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "conversation-assistant"],
+	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "tattle"],
 	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],
 	"license": "BSD-3-Clause",
-	"repository": "https://github.com/nicolasdao/conversation-assistant",
+	"repository": "https://github.com/nicolasdao/tattle",
 	"dependencies": {
 		"nicolasdao/update-doc": "^1.9.0",
 		"nicolasdao/git-commit": "^1.1.0"

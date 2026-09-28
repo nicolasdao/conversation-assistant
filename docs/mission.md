@@ -1,5 +1,5 @@
 ---
-description: Why Conversation Assistant exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
+description: Why Tattle exists — a live, on-air demonstration that software should call a decision model like Jev for bounded judgments, with a slower LLM as System 2 — and the principles and non-goals that follow from it.
 tags: [mission, purpose, principles, non-goals]
 ---
 
@@ -7,7 +7,7 @@ tags: [mission, purpose, principles, non-goals]
 
 ## Why this exists
 
-The host co-presents an AI podcast with two friends, who join remotely through Riverside. Conversation Assistant listens to a live recording — the host's microphone and the Mac's system audio, which carries the call — and, while the show is on air:
+The host co-presents an AI podcast with two friends, who join remotely through Riverside. Tattle listens to a live recording — the host's microphone and the Mac's system audio, which carries the call — and, while the show is on air:
 
 - transcribes it, with every voice identified as a speaker the host can name;
 - lays the conversation out on a timeline of topics, modes, heat, hype, disagreements, hot takes, predictions, recommendations, and clip-worthy moments;

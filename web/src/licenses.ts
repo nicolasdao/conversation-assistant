@@ -26,7 +26,7 @@ function fullText(name: string, text: string): HTMLElement {
 
 function items(l: Licenses): Item[] {
   const own: Item = {
-    group: "Conversation Assistant", title: "This app", license: l.app.license ?? "", text: l.app.text,
+    group: "Tattle", title: "This app", license: l.app.license ?? "", text: l.app.text,
     render: () => [
       h("p", { class: "lic-meta" }, `${l.app.name} ${l.app.version}${l.app.holder ? ` · ${l.app.holder.replace(/\s*<[^>]*>/, "")}` : ""}`),
       h("pre", { class: "license-text" }, l.app.text || "No LICENSE file."),

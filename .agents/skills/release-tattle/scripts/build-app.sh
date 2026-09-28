@@ -12,7 +12,7 @@ git rev-parse -q --verify "refs/tags/v$version" >/dev/null || { echo "no local t
 [ "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "v$version")" ] || { echo "HEAD is not v$version"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "the working tree is not clean"; exit 1; }
 sh "$(dirname "$0")/credentials.sh" || exit 1
-[ -n "${APPLE_API_KEY:-}${APPLE_ID:-}${APPLE_KEYCHAIN_PROFILE:-}" ] || export APPLE_KEYCHAIN_PROFILE=conversation-assistant
+[ -n "${APPLE_API_KEY:-}${APPLE_ID:-}${APPLE_KEYCHAIN_PROFILE:-}" ] || export APPLE_KEYCHAIN_PROFILE=conversation-assistant # the profile keeps its name from before the rename to Tattle
 
 npm ci
 npm audit signatures
@@ -20,9 +20,9 @@ npm audit --omit=dev --audit-level=high
 node scripts/third-party-notices.mjs --check
 
 npm run dist:mac
-app="out/mac-arm64/Conversation Assistant.app"
-dmg="out/Conversation-Assistant-$version-arm64.dmg"
-zip="out/Conversation-Assistant-$version-arm64-mac.zip"
+app="out/mac-arm64/Tattle.app"
+dmg="out/Tattle-$version-arm64.dmg"
+zip="out/Tattle-$version-arm64-mac.zip"
 [ -f "$dmg" ] && [ -f "$zip" ] || { echo "the build did not produce $dmg and $zip"; exit 1; }
 grep -q "^version: $version$" out/latest-mac.yml || { echo "out/latest-mac.yml is not for $version"; exit 1; }
 codesign --verify --deep --strict "$app"
@@ -37,7 +37,7 @@ curl -fsSL -o "out/source-espeak-ng-ed530aa113046142eb5115cf2fc9157854d0ffe1.zip
 echo "e4e262cbe34f7fe21f91f1ba3397f2728e1f30eafbae7853f2b753a9ed13f0dd  out/source-espeak-ng-ed530aa113046142eb5115cf2fc9157854d0ffe1.zip" | shasum -a 256 -c -
 
 # what ships inside the app (CycloneDX), and the checksums the release notes will carry
-npm sbom --omit=dev --sbom-format=cyclonedx > "out/Conversation-Assistant-$version-sbom.cdx.json"
+npm sbom --omit=dev --sbom-format=cyclonedx > "out/Tattle-$version-sbom.cdx.json"
 (cd out && shasum -a 256 "$(basename "$dmg")" "$(basename "$zip")") > out/SHA256SUMS
 git rev-parse HEAD > "out/.built-v$version" # deploy.sh publishes only a build of exactly this commit
 echo "ok: built and verified v$version ($(git rev-parse --short HEAD)); nothing has been pushed or published"

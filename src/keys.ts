@@ -17,9 +17,9 @@ export function childEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEn
   return out;
 }
 
-/** Where the page saves the keys: ~/Library/Application Support/Conversation Assistant/credentials.json (tests override it). */
+/** Where the page saves the keys: ~/Library/Application Support/Tattle/credentials.json (tests override it). */
 export function credentialsPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.CONVERSATION_ASSISTANT_CREDENTIALS || join(appSupportDir(), "credentials.json");
+  return env.TATTLE_CREDENTIALS || join(appSupportDir(), "credentials.json");
 }
 
 export interface KeyStatus {

@@ -4,7 +4,7 @@ Created 28 September 2026. Status: not started.
 
 ## §0 How to use this spec (read first)
 
-**What this spec is.** The complete plan for adding a second transcription engine to Conversation Assistant — Apple's on-device `SpeechAnalyzer` / `SpeechTranscriber` (macOS 26+) — making it the default where the Mac supports it, and removing the first-run API-key screen for those Macs.
+**What this spec is.** The complete plan for adding a second transcription engine to Tattle — Apple's on-device `SpeechAnalyzer` / `SpeechTranscriber` (macOS 26+) — making it the default where the Mac supports it, and removing the first-run API-key screen for those Macs.
 
 **Who you are.** A fresh session with no memory of the conversation that produced this spec. Everything that conversation established is here. Trust it; do not redo it.
 
@@ -18,7 +18,7 @@ Created 28 September 2026. Status: not started.
 
 **DO NOT**
 - Re-research Apple's APIs or re-explore the codebase: §2, §6, and §10 carry what was found, with sources.
-- Commit, push, open a PR, or release (`/release-conversation-assistant`) without the user's explicit go.
+- Commit, push, open a PR, or release (`/release-tattle`) without the user's explicit go.
 - Commit the working tree's pre-existing uncommitted changes (licenses work: `desktop/preload.ts`, `src/licenses.ts`, `web/licenses.html`, … as of 28 Sep 2026). Run `git status` first; if unrelated changes are present, **stop and ask** how the user wants them handled.
 - Edit `docs/mission.md` without the user approving the exact wording (see §4.10).
 - Edit this spec. If it is wrong or incomplete, stop and tell the user.
@@ -52,15 +52,15 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 
 - [ ] Phase 0 report delivered to the user and a go received (§4.0).
 - [ ] `npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop` pass. Tests stay offline and do not need macOS 26 (the helper is faked).
-- [ ] `npm run build:transcribe` builds `native/transcribe/.build/release/conversation-transcribe`; `otool -l` on it shows `minos 26.0`.
+- [ ] `npm run build:transcribe` builds `native/transcribe/.build/release/tattle-transcribe`; `otool -l` on it shows `minos 26.0`.
 - [ ] Fresh state on this Mac (no `credentials.json`, no `settings.json`, no `.env` keys): `npm run app` opens the app, not the setup screen; `GET /api/transcription` reports `engine: "apple"`; a live show with fact-check and labels off produces a transcript with live text; `transcriptions.jsonl` rows have `engine: "apple"` and `usd: 0`; no request goes to `api.openai.com` or `openrouter.ai` (check with `nettop -m route` or Little Snitch, or by running with Wi-Fi off after the model is installed).
 - [ ] Same fresh state, Start live: the switches start **off**; switching one on shows the OpenRouter key prompt inside the Start dialog; "Not now" turns it back off; a valid key keeps it on and the show runs with fact-checking.
 - [ ] `POST /api/session/start` with `features.factcheck: true` and no OpenRouter key → 400 with `needsKey: "openrouter"`. Chat routes with no key → 400 with `needsKey: "openrouter"`, and opening Chat shows the prompt.
-- [ ] Simulated old macOS (`CONVERSATION_ASSISTANT_FORCE_NO_APPLE_SPEECH=1`, §4.3): fresh state shows the setup screen with **only** the OpenAI field; after saving it the app opens with `engine: "openai"`.
+- [ ] Simulated old macOS (`TATTLE_FORCE_NO_APPLE_SPEECH=1`, §4.3): fresh state shows the setup screen with **only** the OpenAI field; after saving it the app opens with `engine: "openai"`.
 - [ ] Upgrade path: with an OpenAI key saved and no `settings.json`, first boot resolves and saves `engine: "openai"`.
 - [ ] Settings → Transcription switches engines (refused with 409 while a session is on air); choosing OpenAI with no key shows the OpenAI key card first.
 - [ ] `session.json` and `session.started` carry `transcription: { engine, … }`.
-- [ ] The packaged app (`npm run dist:mac`) contains `Contents/Resources/bin/conversation-transcribe`, signed by the same team (`codesign -dv`), its `Info.plist` has `NSSpeechRecognitionUsageDescription`, `minimumSystemVersion` is still 14.2, and a Gatekeeper check passes (`spctl -a -vv`).
+- [ ] The packaged app (`npm run dist:mac`) contains `Contents/Resources/bin/tattle-transcribe`, signed by the same team (`codesign -dv`), its `Info.plist` has `NSSpeechRecognitionUsageDescription`, `minimumSystemVersion` is still 14.2, and a Gatekeeper check passes (`spctl -a -vv`).
 - [ ] Docs updated through `update-doc` (§4.10).
 
 ## §4 The work
@@ -71,7 +71,7 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 
 **Where.** A throwaway Swift package **outside the repository** (your session scratchpad). Nothing from Phase 0 is committed. It may later be copied into `native/transcribe/` (§4.1).
 
-**Input.** A real recorded episode: `sessions/20260925-202620/` (≈1 h 57 min; `host.wav` and `remote.wav` are 16 kHz mono PCM16 with a 44-byte header; `events.jsonl` has 1,656 `utterance` events with OpenAI's `text`, `stream`, `startMs`, `endMs` — the reference). The same recording is in `~/Library/Application Support/Conversation Assistant/sessions/`.
+**Input.** A real recorded episode: `sessions/20260925-202620/` (≈1 h 57 min; `host.wav` and `remote.wav` are 16 kHz mono PCM16 with a 44-byte header; `events.jsonl` has 1,656 `utterance` events with OpenAI's `text`, `stream`, `startMs`, `endMs` — the reference). The same recording is in `~/Library/Application Support/Tattle/sessions/`.
 
 **Build a CLI that:**
 1. Installs the `en-US` model if needed (`AssetInventory.assetInstallationRequest(supporting:)` → `downloadAndInstall()`), printing progress, time, and whether macOS showed any prompt.
@@ -100,9 +100,9 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 
 ---
 
-### §4.1 The `conversation-transcribe` Swift helper
+### §4.1 The `tattle-transcribe` Swift helper
 
-**Where it lives (new).** `native/transcribe/Package.swift`, `native/transcribe/Info.plist`, `native/transcribe/Sources/conversation-transcribe/*.swift`. Mirror `native/capture/` exactly: swift-tools 6.0, Swift 5 language mode, `-sectcreate __TEXT __info_plist` linker flags (`native/capture/Package.swift:5-17`), frameworks `Speech`, `AVFoundation`, `CoreMedia`. Platform: `.macOS("26.0")`. `Info.plist`: bundle id `com.cloudlesslabs.conversation-transcribe`, plus `NSSpeechRecognitionUsageDescription` ("Conversation Assistant transcribes your conversations on this Mac. Audio never leaves it.").
+**Where it lives (new).** `native/transcribe/Package.swift`, `native/transcribe/Info.plist`, `native/transcribe/Sources/tattle-transcribe/*.swift`. Mirror `native/capture/` exactly: swift-tools 6.0, Swift 5 language mode, `-sectcreate __TEXT __info_plist` linker flags (`native/capture/Package.swift:5-17`), frameworks `Speech`, `AVFoundation`, `CoreMedia`. Platform: `.macOS("26.0")`. `Info.plist`: bundle id `com.cloudlesslabs.tattle-transcribe`, plus `NSSpeechRecognitionUsageDescription` ("Tattle transcribes your conversations on this Mac. Audio never leaves it.").
 
 **Commands.**
 - `--status` → one JSON line: `{"available":bool,"reason":string|null,"locale":"en_US"|null,"installed":bool}`. `available` is `SpeechTranscriber.isAvailable` and a supported locale equivalent to `--locale` (default `en-US`).
@@ -159,7 +159,7 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 **New file `src/settings.ts`.** A `SettingsStore` for `appSupportDir()/settings.json` (`src/paths.ts`), written atomically like `KeyStore` in `src/keys.ts:42` (read that and copy its write pattern). Shape: `{ "transcriptionEngine": "apple" | "openai" }`. Shared by the Mac app and `npm run serve`, like `credentials.json`.
 
 **Apple availability** (`src/transcribe/apple.ts`, exported `appleSpeechStatus()`):
-- If `os.release()` major is below 25 (macOS < 26), or env `CONVERSATION_ASSISTANT_FORCE_NO_APPLE_SPEECH=1` → `{ available:false, reason:"Needs macOS 26 or later" }`, without spawning anything (the binary cannot load there).
+- If `os.release()` major is below 25 (macOS < 26), or env `TATTLE_FORCE_NO_APPLE_SPEECH=1` → `{ available:false, reason:"Needs macOS 26 or later" }`, without spawning anything (the binary cannot load there).
 - Otherwise run `--status` (5 s timeout) and cache the answer for the engine's lifetime.
 - The model state is `missing | installing (fraction) | installed | error`.
 
@@ -194,7 +194,7 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 
 **How.**
 - `status()` gains `required: KeyName[]`: `["openai"]` when the effective engine is `openai`, `[]` otherwise. `configured` = every required key is set. OpenRouter is never required.
-- `showSetup` renders **only the required missing keys**, so the first-run screen is OpenAI-only. It gets a line explaining why: "On-device transcription needs macOS 26 or later. On this Mac, Conversation Assistant transcribes with OpenAI." Remove the OpenRouter guide from the first-run path, but keep `GUIDES.openrouter` for the prompts in §4.5–§4.7. Update the header comments that say "two keys" (`web/src/main.ts:1`, `src/keys.ts:1`, `web/src/keys.ts:117`, `:210`).
+- `showSetup` renders **only the required missing keys**, so the first-run screen is OpenAI-only. It gets a line explaining why: "On-device transcription needs macOS 26 or later. On this Mac, Tattle transcribes with OpenAI." Remove the OpenRouter guide from the first-run path, but keep `GUIDES.openrouter` for the prompts in §4.5–§4.7. Update the header comments that say "two keys" (`web/src/main.ts:1`, `src/keys.ts:1`, `web/src/keys.ts:117`, `:210`).
 - `bootEngine`'s logs and the `--replay` check require only what the engine and the requested features need.
 - `KeySetup.save` and `POST /api/setup/keys` are unchanged: they already take either key alone.
 
@@ -258,9 +258,9 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 ### §4.8 The Mac app: ship the helper, prepare at first launch
 
 **Where.**
-- `AppPaths` and its defaults — `src/paths.ts:20-37`: add `transcriber`, default `native/transcribe/.build/release/conversation-transcribe`.
-- `setAppPaths` in `desktop/main.ts:30-32`: add `resources/bin/conversation-transcribe`.
-- `electron-builder.yml`: `extraResources` at :38-39 (add the second binary → `bin/conversation-transcribe`); `extendInfo` at :65-67 (add `NSSpeechRecognitionUsageDescription`, same text as §4.1). **Leave `minimumSystemVersion: "14.2"` (:60) alone.**
+- `AppPaths` and its defaults — `src/paths.ts:20-37`: add `transcriber`, default `native/transcribe/.build/release/tattle-transcribe`.
+- `setAppPaths` in `desktop/main.ts:30-32`: add `resources/bin/tattle-transcribe`.
+- `electron-builder.yml`: `extraResources` at :38-39 (add the second binary → `bin/tattle-transcribe`); `extendInfo` at :65-67 (add `NSSpeechRecognitionUsageDescription`, same text as §4.1). **Leave `minimumSystemVersion: "14.2"` (:60) alone.**
 - `package.json`: add `build:transcribe` = `swift build -c release --package-path native/transcribe`, next to `build:capture` (:25).
 - `scripts/build-mac.sh:14`: build it after `build:capture`. There is no copy or sign step to add: electron-builder copies and signs extraResources (`build-mac.sh:26-36`). Verify with `codesign -dv`.
 - `askPermissions` — `desktop/main.ts:199-218`, the first-launch permissions sheet.
@@ -268,11 +268,11 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 **How.**
 - **If Phase 0 showed a Speech Recognition prompt:** the sheet also requests it up front when the engine is Apple, so it never interrupts a show. Add a `--request-permission` command to the helper (`SFSpeechRecognizer.requestAuthorization`, prints the status). Permissions are attributed to the app that launched the helper (gotchas § Capture), so the app's `Info.plist` must carry the usage string. **If no prompt appeared, add nothing here.**
 - The model download needs no question: the engine starts it at boot (§4.3). The first launch must work while the download runs: everything but Start works, and Start shows progress (§4.5).
-- Development: `README.md` § Develop gains `npm run build:transcribe`. `npm run app` and `serve` without the built helper → Apple is unavailable with reason "conversation-transcribe is not built (npm run build:transcribe)", not a crash.
+- Development: `README.md` § Develop gains `npm run build:transcribe`. `npm run app` and `serve` without the built helper → Apple is unavailable with reason "tattle-transcribe is not built (npm run build:transcribe)", not a crash.
 
 **Done when:** the packaged-app criteria in §3 pass. A clean first launch of the packaged app on this Mac (no `settings.json`, no credentials) opens straight into the app and asks only for the macOS permissions.
 
-**Stop and ask if:** notarization rejects the new binary, or the packaged helper fails to start (check its `codesign` entitlements against `conversation-capture`'s first).
+**Stop and ask if:** notarization rejects the new binary, or the packaged helper fails to start (check its `codesign` entitlements against `tattle-capture`'s first).
 
 ### §4.9 Command-line tools
 
@@ -351,16 +351,16 @@ Findings from the research, quoted where they were hedged:
 # gates
 npm run typecheck && npm test && npm run build:web && npm run build:desktop
 # helper
-npm run build:transcribe && native/transcribe/.build/release/conversation-transcribe --status
-otool -l native/transcribe/.build/release/conversation-transcribe | grep -A3 LC_BUILD_VERSION   # minos 26.0
+npm run build:transcribe && native/transcribe/.build/release/tattle-transcribe --status
+otool -l native/transcribe/.build/release/tattle-transcribe | grep -A3 LC_BUILD_VERSION   # minos 26.0
 npm run transcribe:test
 # fresh first run (back up first, restore after)
-D="$HOME/Library/Application Support/Conversation Assistant"
+D="$HOME/Library/Application Support/Tattle"
 mv "$D/credentials.json" /tmp/ca-credentials.json.bak; mv "$D/settings.json" /tmp/ca-settings.json.bak 2>/dev/null
 grep -n "OPENAI_API_KEY\|OPENROUTER_API_KEY" .env   # comment these out for the test, restore after
 npm run app          # expect: straight into the app, no key screen
 # simulated old macOS
-CONVERSATION_ASSISTANT_FORCE_NO_APPLE_SPEECH=1 npm run serve   # http://127.0.0.1:4317 → OpenAI-only setup screen
+TATTLE_FORCE_NO_APPLE_SPEECH=1 npm run serve   # http://127.0.0.1:4317 → OpenAI-only setup screen
 # API checks (npm run serve)
 curl -s http://127.0.0.1:4317/api/transcription | jq
 curl -s -X POST http://127.0.0.1:4317/api/session/start -H 'content-type: application/json' \
@@ -369,13 +369,13 @@ curl -s -X POST http://127.0.0.1:4317/api/session/start -H 'content-type: applic
 npm run replay -- --host sessions/20260925-202620/host.wav --remote sessions/20260925-202620/remote.wav --speed max --engine apple
 # packaged app
 npm run dist:mac
-codesign -dv "out/mac-arm64/Conversation Assistant.app/Contents/Resources/bin/conversation-transcribe"
-spctl -a -vv "out/mac-arm64/Conversation Assistant.app"
+codesign -dv "out/mac-arm64/Tattle.app/Contents/Resources/bin/tattle-transcribe"
+spctl -a -vv "out/mac-arm64/Tattle.app"
 # restore
 mv /tmp/ca-credentials.json.bak "$D/credentials.json"; mv /tmp/ca-settings.json.bak "$D/settings.json" 2>/dev/null
 ```
 
-The user's real keys live in `~/Library/Application Support/Conversation Assistant/credentials.json` and possibly `.env`. **Back them up before any fresh-state test, and restore them.** Never print them. The `out/` path is an assumption: check `electron-builder.yml`'s `directories.output`. A live show needs a real microphone and a call playing; for a hands-free check, use a speed-1 replay from the page.
+The user's real keys live in `~/Library/Application Support/Tattle/credentials.json` and possibly `.env`. **Back them up before any fresh-state test, and restore them.** Never print them. The `out/` path is an assumption: check `electron-builder.yml`'s `directories.output`. A live show needs a real microphone and a call playing; for a hands-free check, use a speed-1 replay from the page.
 
 ## §9 Glossary
 
@@ -387,7 +387,7 @@ The user's real keys live in `~/Library/Application Support/Conversation Assista
 | Stream | `host` (the Mac's microphone) or `remote` (the tap of everything the Mac plays, i.e. the call). |
 | Volatile / final result | Apple's provisional text, which may still change, and its settled text. |
 | Features | Fact-checking and labels, chosen per show in the Start live window, fixed for the session. |
-| Helper | A native Swift command-line binary spawned by the engine: `conversation-capture` (exists), `conversation-transcribe` (new). |
+| Helper | A native Swift command-line binary spawned by the engine: `tattle-capture` (exists), `tattle-transcribe` (new). |
 
 ## §10 References
 

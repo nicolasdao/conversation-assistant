@@ -11,7 +11,7 @@ source:
 
 # Setup and API keys
 
-Conversation Assistant needs two keys, and nothing works without them:
+Tattle needs two keys, and nothing works without them:
 
 | Key | Service | Used for | About |
 | --- | --- | --- | --- |
@@ -26,21 +26,21 @@ The screen is built around one call to action: fill two fields, press one button
 
 - a title ("Add your two API keys to start") and one line on why;
 - one panel with a large field per missing key, labelled "OpenAI API key" / "OpenRouter API key", each with a **Required** badge. As a key is typed, `formatProblem` checks it in the page: the field turns green with "✓ Looks right", or red with "Check this key" and the reason (an OpenRouter key in the OpenAI field, spaces, too short). The field hides the key (Show reveals it), and Enter saves;
-- under each field, one line on what it does, and **How do I get an … key?**, folded: what the service does and costs, then the steps with direct links (create an account, **add prepaid credit** — $10 is plenty, automatic recharge off — create a key named Conversation Assistant, on OpenRouter with a credit limit such as $10, and paste it);
+- under each field, one line on what it does, and **How do I get an … key?**, folded: what the service does and costs, then the steps with direct links (create an account, **add prepaid credit** — $10 is plenty, automatic recharge off — create a key named Tattle, on OpenRouter with a credit limit such as $10, and paste it);
 - one full-width **Save keys and start** button, dimmed until both fields look right, with a counter ("1 of 2 keys added");
 - inside the panel, under the button, a padlock and **Your keys stay on this Mac**: the app has no server of its own; keys are saved on this computer and sent only to OpenAI and OpenRouter, to use the account with them — never to the project's authors or anywhere else. It sits where the eye lands before pressing Save, because that is when people worry about handing over a key;
 - one small footer line: what a show costs, and the file the keys are saved in.
 
-The button checks each key with its service and saves them only if none is refused; each result shows under its field. If a check leaves a warning, the screen shows an **Open Conversation Assistant** button; otherwise the app opens by itself after about a second.
+The button checks each key with its service and saves them only if none is refused; each result shows under its field. If a check leaves a warning, the screen shows an **Open Tattle** button; otherwise the app opens by itself after about a second.
 
-Keys can be replaced later from **Conversation Assistant → Settings…** (⌘,) in the Mac app, or the cog menu → **API keys** in a browser; both open the same window (`?panel=keys`). There, the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
+Keys can be replaced later from **Tattle → Settings…** (⌘,) in the Mac app, or the cog menu → **API keys** in a browser; both open the same window (`?panel=keys`). There, the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
 
 ## Where keys are stored
 
 In order, first match wins:
 
 1. **The environment**: a shell variable, or `.env` in the project folder (the npm scripts load it with `--env-file-if-exists`, so it is optional). A key set here cannot be changed from the page. This is for development: the Mac app, opened from Finder, has no project folder and no shell environment, so it uses the file below.
-2. **`~/Library/Application Support/Conversation Assistant/credentials.json`**, written by the page. This is the macOS location for per-user app data. It sits outside the project folder, so a key can never be committed, and it survives a re-clone or an upgrade. `npm run serve` and the Mac app share it (`appSupportDir()` in `src/paths.ts`), and the Mac app keeps its recordings next to it (see [The Mac app](desktop.md)).
+2. **`~/Library/Application Support/Tattle/credentials.json`**, written by the page. This is the macOS location for per-user app data. It sits outside the project folder, so a key can never be committed, and it survives a re-clone or an upgrade. `npm run serve` and the Mac app share it (`appSupportDir()` in `src/paths.ts`), and the Mac app keeps its recordings next to it (see [The Mac app](desktop.md)). Both move the folder from before the rename, `~/Library/Application Support/Conversation Assistant/`, into place at launch (see [The Mac app](desktop.md#the-name-and-what-kept-the-old-one)).
 
 `src/keys.ts` (`KeyStore`) writes the file:
 
@@ -55,7 +55,7 @@ At startup, `load()` copies the file's keys into `process.env` wherever the envi
 - the chat's key is a getter;
 - `processSecrets()` redacts the keys current at each write.
 
-Sessions pick keys up when they start. `CONVERSATION_ASSISTANT_CREDENTIALS` overrides the file's path (tests use it).
+Sessions pick keys up when they start. `TATTLE_CREDENTIALS` overrides the file's path (tests use it).
 
 Keys never appear in logs, session files (the chat log included), events, or exports. The API returns only a key's last 4 characters (`hint`). Child processes, the capture helper and `afconvert`, get the environment without them (`childEnv` in `src/keys.ts`): none needs a key.
 

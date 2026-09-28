@@ -1,4 +1,4 @@
-// Export and import of recordings: one `.conversation-recording` file to send over WhatsApp or email, and back.
+// Export and import of recordings: one `.tattle` file to send over WhatsApp or email, and back.
 // The engine builds and reads the file (see docs/recordings.md § Export and import); this module is the two windows,
 // the header buttons, and dropping a file on the page.
 import { api, type ExportInfo, type ImportResult } from "./api.js";
@@ -6,9 +6,9 @@ import { $, clock, h, replace } from "./dom.js";
 import { toast } from "./panels.js";
 import type { State } from "./state.js";
 
-const EXTENSION = ".conversation-recording";
-/** Exports made before the app was renamed from Podcast Assistant (27 September 2026) still import. */
-const IMPORTABLE = [EXTENSION, ".podcast-recording"];
+const EXTENSION = ".tattle";
+/** Exports made under the app's earlier names, Podcast Assistant and Conversation Assistant, still import. */
+const IMPORTABLE = [EXTENSION, ".conversation-recording", ".podcast-recording"];
 type Audio = "compressed" | "original" | "none";
 
 let getState: () => State = () => { throw new Error("bindTransfer first"); };
@@ -96,7 +96,7 @@ export async function openExport(id: string) {
   drawChoices();
   drawFoot();
   replace(body, opts, chatSwitch, foot,
-    h("p", { class: "note" }, `Whoever you send it to imports it with Conversation Assistant: Import in the header, or drop the file on the page.`),
+    h("p", { class: "note" }, `Whoever you send it to imports it with Tattle: Import in the header, or drop the file on the page.`),
     status,
     h("div", { class: "row end" }, h("button", { class: "btn", onclick: () => d.close() }, "Cancel"), go));
   go.focus();

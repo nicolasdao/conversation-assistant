@@ -1,6 +1,7 @@
 # The Mac app's package (see docs/desktop.md). Build it with `npm run dist:mac`, which prepares everything below first.
+# the bundle id keeps the name from before the rename to Tattle: macOS ties the permissions and updates to it
 appId: com.cloudlesslabs.conversation-assistant
-productName: Conversation Assistant
+productName: Tattle
 copyright: © 2026 Cloudless Consulting Pty Ltd
 directories:
   output: out
@@ -35,8 +36,8 @@ extraResources:
   - from: models
     to: models
     filter: ["*.onnx"]
-  - from: native/capture/.build/release/conversation-capture
-    to: bin/conversation-capture
+  - from: native/capture/.build/release/tattle-capture
+    to: bin/tattle-capture
   # the licenses: ours, every third-party component's (THIRD_PARTY_NOTICES.md, generated), and Electron's own
   - from: LICENSE
     to: licenses/LICENSE.txt
@@ -54,7 +55,7 @@ mac:
       arch: arm64
     - target: zip # what auto-update downloads
       arch: arm64
-  artifactName: Conversation-Assistant-${version}-arm64-mac.${ext} # the zip; the DMG is named below
+  artifactName: Tattle-${version}-arm64-mac.${ext} # the zip; the DMG is named below
   category: public.app-category.productivity
   icon: desktop/icon.icns
   minimumSystemVersion: "14.2" # the Core Audio process tap
@@ -63,13 +64,13 @@ mac:
   entitlementsInherit: desktop/entitlements.mac.plist
   notarize: true # with APPLE_KEYCHAIN_PROFILE, which scripts/build-mac.sh sets (or APPLE_API_KEY…, or APPLE_ID…)
   extendInfo:
-    NSMicrophoneUsageDescription: Conversation Assistant transcribes the host's microphone during a recording.
-    NSAudioCaptureUsageDescription: Conversation Assistant transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.
+    NSMicrophoneUsageDescription: Tattle transcribes the host's microphone during a recording.
+    NSAudioCaptureUsageDescription: Tattle transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.
 dmg:
-  title: Conversation Assistant
-  artifactName: Conversation-Assistant-${version}-arm64.${ext}
+  title: Tattle
+  artifactName: Tattle-${version}-arm64.${ext}
 publish:
   provider: github
   owner: nicolasdao
-  repo: conversation-assistant
+  repo: tattle
   releaseType: release

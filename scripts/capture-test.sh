@@ -1,6 +1,6 @@
 #!/bin/sh
-# Checks the conversation-capture helper on this Mac (§4.14a). Steps 3 and 4 need you: speak, then stay silent with earbuds in.
-BIN=native/capture/.build/release/conversation-capture
+# Checks the tattle-capture helper on this Mac (§4.14a). Steps 3 and 4 need you: speak, then stay silent with earbuds in.
+BIN=native/capture/.build/release/tattle-capture
 FAILS=0
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1"; FAILS=$((FAILS + 1)); }

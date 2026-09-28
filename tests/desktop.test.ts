@@ -1,8 +1,8 @@
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
-import { appPaths, setAppPaths, speakerModelPath, vadModelPath } from "../src/paths.ts";
+import { appPaths, appSupportDir, migrateAppSupportDir, setAppPaths, speakerModelPath, vadModelPath } from "../src/paths.ts";
 import { SessionLibrary } from "../src/store/library.ts";
 import { about, engineStale } from "../src/server/main.ts";
 import { SessionStore } from "../src/store/sessionStore.ts";
@@ -14,6 +14,23 @@ import { childEnv } from "../src/keys.ts";
 afterEach(() => setAppPaths());
 
 describe("paths", () => {
+  test("the folder from before the rename to Tattle moves into place once, with everything in it", () => {
+    const base = mkdtempSync(join(tmpdir(), "support-"));
+    const old = join(base, "Conversation Assistant");
+    mkdirSync(join(old, "sessions", "20260925-120000"), { recursive: true });
+    writeFileSync(join(old, "credentials.json"), "{}");
+    expect(migrateAppSupportDir(base)).toBe(old);
+    expect(appSupportDir(base)).toBe(join(base, "Tattle"));
+    expect(existsSync(old)).toBe(false);
+    expect(readdirSync(join(base, "Tattle")).sort()).toEqual(["credentials.json", "sessions"]);
+    expect(existsSync(join(base, "Tattle", "sessions", "20260925-120000"))).toBe(true);
+    // a folder under the old name, made later, never replaces the new one
+    mkdirSync(old);
+    expect(migrateAppSupportDir(base)).toBeNull();
+    expect(existsSync(join(base, "Tattle", "credentials.json"))).toBe(true);
+    expect(migrateAppSupportDir(mkdtempSync(join(tmpdir(), "empty-")))).toBeNull();
+  });
+
   test("default to the project folder, as npm run serve and the CLI tools expect", () => {
     expect(appPaths()).toMatchObject({ web: "web", config: "config", models: "models", sessions: "sessions" });
     expect(vadModelPath()).toBe(join("models", "silero_vad.onnx"));
