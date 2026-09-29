@@ -27,7 +27,7 @@ The project is open source under the BSD 3-Clause license (Cloudless Consulting 
 
 - **Software calls the model for bounded judgments; the model does not behave like a program.** Every Jev question is one narrow, typed judgment. Code turns the answers into segments, flags, markers, and sections.
 - **Code does what code does exactly.** Timestamps, counting, arithmetic, company mentions, and speaker identity are computed, never asked of a model. Jev's state holds display names, text, and tags only.
-- **Improve with an outcome signal, or leave it to the host.** Fact-check verdicts grade System 1's flags, so System 2 may rewrite System 1 — only through a fixed set of operations, and only after a replay gate shows the rewrite fixes errors while keeping at least 90% of the good flags. The timeline has no such signal, so its labels are a host-editable config that no LLM writes or changes.
+- **Improve with an outcome signal, or leave it to the host.** Fact-check verdicts grade System 1's flags, so System 2 may rewrite System 1 — only through a fixed set of operations, and only after a replay gate shows the rewrite fixes errors while keeping at least 90% of the good flags. The timeline has no such signal, so the host owns its labels: an LLM may draft a label set that the host reviews, edits, and saves, but no LLM changes a label set or the labels on its own, and none runs on the timeline live.
 - **The engine owns capture and intelligence; the front end is only an interface.** Capture must not depend on a browser tab.
 - **Reliability matters as much as features on air.** Short timeouts with fallbacks on every live call, spend caps, every session recorded so it can be reopened exactly as it was (or its audio replayed), and a rehearsal kit with a recorded fallback (see [Rehearsal kit](rehearsal.md)).
 - **Plain files, no database.** One folder per session, append-only and readable (see [Recordings](recordings.md)).
@@ -37,7 +37,7 @@ The project is open source under the BSD 3-Clause license (Cloudless Consulting 
 ## Non-goals
 
 - Transcript Q&A as part of the demonstration: an LLM already does that well, so it proves nothing about Jev. The [Chat](chat.md) tab exists as a tool for the host (added 26 September 2026), kept apart from System 1 and System 2 and never used for a judgment Jev makes. "When did we talk about X?" stays a filter over existing labels.
-- An LLM writing or changing timeline labels, or a live System 2 on the timeline.
+- An LLM changing a label set or the timeline's labels on its own, or a live System 2 on the timeline. Drafting a set for the host to review and save is allowed (since 29 September 2026, see [Jev](jev.md#the-timeline-questions-per-segment-label-sets)).
 - Fixed-interval chunking of audio.
 - Using Jev for anything code does exactly.
 - OpenAI diarization: its speaker labels are scoped to one request.
