@@ -32,7 +32,8 @@ if (app.isPackaged) {
   const res = process.resourcesPath;
   setAppPaths({
     root: app.getAppPath(), web: join(res, "web"), config: join(res, "config"), models: join(res, "models"),
-    helper: join(res, "bin", "tattle-capture"), sessions: join(appSupportDir(), "sessions"), src: null,
+    helper: join(res, "bin", "tattle-capture"), transcriber: join(res, "bin", "tattle-transcribe"),
+    sessions: join(appSupportDir(), "sessions"), src: null,
     notices: join(res, "licenses", "THIRD_PARTY_NOTICES.txt"), licenses: join(res, "licenses"),
   });
   mkdirSync(appPaths().sessions, { recursive: true });

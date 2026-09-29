@@ -12,6 +12,7 @@ cd "$(dirname "$0")/.."
 
 [ -f models/silero_vad.onnx ] && [ -f models/wespeaker_en_voxceleb_resnet34_LM.onnx ] || npm run models
 npm run build:capture
+npm run build:transcribe
 npm run build:web
 npm run build:desktop
 node scripts/third-party-notices.mjs # the app ships the notices for exactly what is installed

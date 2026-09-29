@@ -38,6 +38,9 @@ extraResources:
     filter: ["*.onnx"]
   - from: native/capture/.build/release/tattle-capture
     to: bin/tattle-capture
+  # on-device transcription with Apple Speech (macOS 26+); never started on older macOS, where it cannot load
+  - from: native/transcribe/.build/release/tattle-transcribe
+    to: bin/tattle-transcribe
   # the licenses: ours, every third-party component's (THIRD_PARTY_NOTICES.md, generated), and Electron's own
   - from: LICENSE
     to: licenses/LICENSE.txt
@@ -66,6 +69,8 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: Tattle transcribes the host's microphone during a recording.
     NSAudioCaptureUsageDescription: Tattle transcribes the call audio (co-hosts and guests) that the Mac plays during a recording.
+    # Apple Speech asked for no permission in testing (docs/transcription.md); declared in case a macOS version does
+    NSSpeechRecognitionUsageDescription: Tattle transcribes your conversations on this Mac. Audio never leaves it.
 dmg:
   title: Tattle
   artifactName: Tattle-${version}-arm64.${ext}
