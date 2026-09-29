@@ -1,5 +1,7 @@
 # SPEC — Custom timeline label sets
 
+> **Revised 29 September 2026**, after the rename to Tattle (0.8.0) and on-device transcription with optional API keys (0.9.0). What changed: sets live in `Application Support/Tattle/labels`; exports are `.tattle-labels`; the OpenRouter key is optional, so a session's labels are on only with a set picked **and** the key, the library and editor need no key, and Try on a recording and Create with AI ask for the key in place (§4.K); most new recordings are transcript-only, and Try works on them (§4.T3.1); the command-line tools that read the old label set are listed (§4.T1.1); the Tier 1 replay check transcribes with Apple Speech. Anchors were refreshed.
+
 ## §0 How to use this spec (read first)
 
 **What this is:** the plan to replace the app's single hard-coded set of timeline labels with **label sets** the user can create, clone, edit, share, preview, and draft with AI, and pick at Start live.
@@ -56,21 +58,26 @@ Tier 1
 - [ ] `npm run typecheck && npm test` pass; new tests from §4 exist and pass.
 - [ ] Recording `20260925-202620` (in `sessions/`) opened in the dev app shows the same timeline lanes, colours, markers, filters, transcript tags, and Insights numbers as the screenshots taken before Tier 1 (§0 step 3), except: humour now has a filter chip; clip markers come from the converted legacy set.
 - [ ] `grep -rn "personal_life\|other_topics\|ai_models\|\"subject\"\|\"mode\"\|\"heat\"\|\"hype\"\|clip_worthy\|hot_take" src web/src --include=*.ts` finds these ids only in the legacy converter and its test data (§4.T1.3), never in rendering, stats, or pipeline code.
-- [ ] A replay of `fixtures/conversation` (Start live is not needed: `npm run replay -- --host fixtures/conversation/host.wav --remote fixtures/conversation/remote.wav --speed max`) writes `session.json` with `labelSet.format === "tattle-labels"` and a `stories` array. Ask the user before running it: it calls Jev and OpenAI (about $0.05).
+- [ ] A replay of `fixtures/conversation` (Start live is not needed: `npm run replay -- --host fixtures/conversation/host.wav --remote fixtures/conversation/remote.wav --speed max --engine apple --no-factcheck`) writes `session.json` with `labelSet.format === "tattle-labels"` and a `stories` array. Ask the user before running it: it calls Jev (labels and the boundary question, well under $0.01); Apple Speech transcribes for free.
+- [ ] A session started with labels off (`labelSet: null`) and fact-checking off needs no OpenRouter key, and writes `labelSet: null`; a transcript-only recording made before this work still opens and shows "Labels off for this session".
 - [ ] With the window narrowed to 1024 px, the marker chips under the transcript scroll sideways on one line and every dropdown stays visible.
 
 Tier 2
 - [ ] Cog → **Labels** opens the library at any time (no session needed) and lists the built-in set.
 - [ ] Clone, edit, save, rename, delete, export, import all work; the built-in set cannot be edited or deleted (the API answers 409).
 - [ ] `curl`-style tests in `tests/server.test.ts` cover every `/api/label-sets` route, including a rejected invalid set (400 with the reason).
-- [ ] Start live shows a **Labels** picker (every set, plus **Off**) and a **Tonight's stories** box; the session uses the picked set.
-- [ ] Exported file `<name>.conversation-labels` re-imports as an identical set (new id, same content).
+- [ ] Start live shows a **Labels** picker (every set, plus **Off**) and a **Tonight's stories** box; the session uses the picked set. Without the OpenRouter key the picker opens on **Off**, and picking a set asks for the key inside the window (§4.K).
+- [ ] With no OpenRouter key set, the whole library works: new, clone, edit, save, export, import, and the estimate.
+- [ ] Exported file `<name>.tattle-labels` re-imports as an identical set (new id, same content).
 
 Tier 3
 - [ ] **Try on a recording** shows the draft's timeline for the first 10 minutes of a chosen recording next to that recording's own, and the cost; nothing is written into the recording's folder (`git status sessions/` unchanged, and file mtimes unchanged).
+- [ ] On a transcript-only recording it shows the draft's timeline alone, with a note that the recording ran with labels off.
+- [ ] Without the OpenRouter key it asks for the key inside the editor and calls nothing.
 
 Tier 4
 - [ ] **Create with AI** produces a set that passes the same validation as a hand-made one; `openai/gpt-6-luna` is the only model used (fixed in config, no picker); `docs/mission.md` carries the reworded non-goal.
+- [ ] Without the OpenRouter key, Create with AI asks for it in place, as Chat does, and the route answers 400 `needsKey: "openrouter"`.
 
 ## §4 The work
 
@@ -115,6 +122,20 @@ Jev questions built from a set (replaces `timelineQuestions`, `src/pipeline/time
 
 Derived labels (replaces `deriveLabels`, `src/pipeline/timeline.ts:66`): a marker is on when its noul answer ≥ its own `threshold`; choices below `fadedBelowConfidence` are faded; mentions from the set's `companies`; `lane` becomes the option's `group` or its id. The labels rows written to `labels.jsonl` keep their current shape (keyed by question id).
 
+### §4.K Keys: what needs the OpenRouter key (all tiers)
+
+Since 0.9.0 both API keys are optional (`docs/setup.md`). On macOS 26 the app transcribes with Apple Speech and asks for no key; the OpenRouter key is asked for only when a feature that calls Jev or GPT-6 Luna is turned on, inside the window that needs it (`keyPrompt` in `web/src/keys.ts`), and the server refuses the same cases with 400 `{ error, needsKey: "openrouter" }` (`ApiError.extra`, `src/server/main.ts`).
+
+| Needs the OpenRouter key | Needs no key (nothing leaves the Mac) |
+| --- | --- |
+| A session with a label set picked (labels on) | The library: list, new, clone, edit, save, rename, delete, export, import |
+| Try on a recording (Jev) | The estimate (`POST /api/label-sets/estimate`, computed locally) |
+| Create with AI (GPT-6 Luna) | Opening any recording, including its converted set |
+
+- A session's labels are on when `labelSet` is not `null` and `features.labels` is not `false`. `Engine.start`'s OpenRouter check (`src/server/main.ts`, "what this session needs before anything starts") uses that rule, so labels Off with fact-checking off starts without the key.
+- The `/api/label-sets` routes sit behind the setup gate like every engine route; the gate only requires the transcription engine's key (none with Apple Speech). They are not added to `OPEN_ROUTES`.
+- Try and assist check `engine.openrouterKeySet()` before calling anything, as the chat routes do.
+
 ---
 
 ### Tier 1 — Label sets as data, screens driven by the set (app looks the same)
@@ -129,6 +150,7 @@ Derived labels (replaces `deriveLabels`, `src/pipeline/timeline.ts:66`): a marke
 3. **`clip_worthy` becomes a yes/no marker** (user decision): instructions "The segment contains a moment worth clipping for social media: a strong quote, a funny exchange, a surprising claim, or a memorable story.", criteria true/false written in the same concrete style as the other markers, `list: true`. This is the only intended change in labelling behaviour.
 4. Delete `config/labels.default.json` after the converter (§4.T1.3) embeds what legacy recordings need. Remove `noulMarkerThreshold`, `clipWorthyMin`, `fadedBelowConfidence`, `companies`, `stories` from `timeline` in `AppConfigSchema` and `config/app.json`; if the `timeline` block ends up empty, remove it.
 5. `electron-builder.yml` already ships `config/` whole: check that `config/labels/` and `config/timeline.json` land in `Contents/Resources/config` (no change expected).
+6. The command-line tools read the old set too: `src/cli/preflight.ts` (the boundary question, ~:125) and `src/cli/smoke.ts` (the boundary question ~:41, `timelineQuestions` ~:91) move to `config/timeline.json` and the built-in set; `src/cli/replay.ts` (~:57) logs a segment's labels by the set's categories and markers, not by `subject`/`mode`.
 
 **Done when:** `tests/config.test.ts` loads both files; a test asserts the Jev question set built from `ai-podcast.json` (without `clip_worthy`) equals the one built from the old file for the other ten questions (keep the old file's JSON inline in the test as fixture data).
 
@@ -138,19 +160,19 @@ Derived labels (replaces `deriveLabels`, `src/pipeline/timeline.ts:66`): a marke
 
 **Where:** `appSupportDir` `src/paths.ts:55-58`; add `labelSets` to `AppPaths` (pattern: `notices`/`licenses` added in `src/paths.ts`).
 
-**How:** new `src/labels/store.ts` (`LabelSetStore`): built-in sets from `config/labels/*.json` (read-only), user sets from `join(appSupportDir(), "labels")` (created on first write; one `<id>.json` each, written atomically: temp file then rename). Same folder in development and in the Mac app (user decision). Methods: `list()`, `get(id)`, `create(set)`, `update(id, set)`, `remove(id)`, `clone(id)`. Built-in ids are never written or deleted (throw a typed error the router maps to 409). Validation on every read and write; an invalid user file is listed as broken (name + error), never crashes the app.
+**How:** new `src/labels/store.ts` (`LabelSetStore`): built-in sets from `config/labels/*.json` (read-only), user sets from `join(appSupportDir(), "labels")`, that is `~/Library/Application Support/Tattle/labels` (created on first write; `migrateAppSupportDir` moves the whole folder, so nothing else is needed for the rename; one `<id>.json` each, written atomically: temp file then rename). Same folder in development and in the Mac app (user decision). Methods: `list()`, `get(id)`, `create(set)`, `update(id, set)`, `remove(id)`, `clone(id)`. Built-in ids are never written or deleted (throw a typed error the router maps to 409). Validation on every read and write; an invalid user file is listed as broken (name + error), never crashes the app.
 
 **Done when:** `tests/labels.test.ts` covers list/get/create/update/remove/clone, the built-in being read-only, and a corrupt file in a temp folder (use `setAppPaths`, as `tests/desktop.test.ts` does).
 
 #### §4.T1.3 Sessions use a set; recordings keep a frozen copy; legacy recordings still open
 
-**Where:** `Session` constructor `src/pipeline/session.ts:174-197` (`new Timeline(cfg.app, cfg.labels, …)`); `session.json` write `session.ts:270-275`; state `session.ts:593`; `Timeline` class `src/pipeline/timeline.ts:123-175` (`replaceLabels`, `setStories`, `relabel`); `SessionLibrary.snapshot` `src/store/library.ts:317-330`; `StartRequest` and `parseFeatures` `src/server/main.ts:57-70`, start at `main.ts:396-427`.
+**Where:** `Session` constructor `src/pipeline/session.ts:~191-240` (`new Timeline(cfg.app, cfg.labels, …)` ~:204, the segmenter's `boundary` ~:225); `session.json` write `session.ts:~310`; state `session.ts:~637`; `Timeline` class `src/pipeline/timeline.ts:123-235` (`replaceLabels`, `setStories`, `relabel`); `SessionLibrary.snapshot` `src/store/library.ts:~317-331`; `StartRequest` and `parseFeatures` `src/server/main.ts:~69-82`, `Engine.start` at `main.ts:~446`.
 
 **How:**
-1. `StartRequest` gains `labelSet?: string | null` (id; `null` = labels off) and `stories?: string[]`. `features.labels: false` keeps meaning off (older pages). Default when absent: `ai-podcast`.
-2. The engine resolves the id through `LabelSetStore` and passes the **full set** to the session. `session.json` stores `labelSet` (the full set, new format) and `stories`. The session never re-reads the store: editing a set later changes nothing in a running or past session.
+1. `StartRequest` gains `labelSet?: string | null` (id; `null` = labels off) and `stories?: string[]`. `features.labels: false` keeps meaning off (older pages). Default when absent: `ai-podcast`. An unknown id answers 400. Labels are on only when both allow it, and the OpenRouter check follows (§4.K).
+2. The engine resolves the id through `LabelSetStore` and passes the **full set** to the session. `session.json` stores `labelSet` (the full set, new format; `null` when labels are off) and `stories`. The session never re-reads the store: editing a set later changes nothing in a running or past session. The segmenter's boundary question comes from `config/timeline.json`, whatever the set (it is asked with fact-checking on even when labels are off).
 3. Remove live editing: delete `Timeline.replaceLabels`, `PUT /api/labels`, and the Labels editor (`renderLabels`, `questionRow`, `readEditor` in `web/src/panels.ts:870-930` and `#dlg-labels` in `web/index.html:180`). **Keep** `PUT /api/stories` and `POST /api/labels/relabel` in the engine (see §6 #3).
-4. **Legacy converter** `src/labels/legacy.ts`: `fromLegacy(labelSet, appTimeline)` turns an old `session.json` (old-format `labelSet` + `config.timeline`) into a new-format set: `subject`/`mode` → categories with today's colours and the AI group, `heat`/`hype` → scores, nouls → markers with today's icons and thresholds, `clip_worthy` → marker (legacy label rows already list `clip_worthy` in `markers`, so display needs only its definition). `SessionLibrary.snapshot` returns a new-format set for every recording.
+4. **Legacy converter** `src/labels/legacy.ts`: `fromLegacy(labelSet, appTimeline)` turns an old `session.json` (old-format `labelSet` + `config.timeline`) into a new-format set: `subject`/`mode` → categories with today's colours and the AI group, `heat`/`hype` → scores, nouls → markers with today's icons and thresholds, `clip_worthy` → marker (legacy label rows already list `clip_worthy` in `markers`, so display needs only its definition). `SessionLibrary.snapshot` returns a new-format set for every recording, or `null` for a new recording made with labels off. A transcript-only recording made before this work (old `labelSet`, `features.labels: false`) is converted like any other; the page keeps showing "Labels off for this session" from `features`.
 5. Stats: see §4.T1.4; legacy stored stats events are converted the same way.
 
 **Done when:** opening `sessions/20260925-202620` gives a new-format set in `GET /api/state` → `labels.set`; a test converts a legacy `session.json` fixture and snapshots the result.
@@ -192,7 +214,7 @@ Keep writing `roganIndex` (= `index.share`, or 0) so the event schema and older 
 1. The page reads the set from `st.labels.set` (new format) everywhere. Delete `SUBJECT_COLORS`, `MODE_COLORS`, `MARKERS`, `AI_SUBJECTS`.
 2. Timeline: one lane per category (named by the category; hidden when the set has none); section brackets from the first category, merged by option; one chart line per score (slot colours), chart hidden with no scores; marker pins with each marker's icon; lane labels from the set's names; the tooltip names each category's option, the story, and mentions.
 3. Transcript dividers: a tag per category (first coloured, second grey, as today), then marker icons.
-4. Filters: `Filters.subject: string` becomes `categories: Record<categoryId, string>` (option id or `group:<name>`). Under the transcript: marker chips for **every** marker (humour included) in a row that scrolls sideways on one line; pinned on the right, always visible: **All speakers**, then one dropdown per category ("All subjects", "All modes", named by the category). The timeline's legend row scrolls sideways the same way.
+4. Filters: `Filters.subject: string` becomes `categories: Record<categoryId, string>` (option id or `group:<name>`). Keep the speaker filter's current behaviour in `segmentMatches` exactly: its known bug (B2 in `specs/260929-01-test-driven-development/SPEC.md`) belongs to that spec. Under the transcript: marker chips for **every** marker (humour included) in a row that scrolls sideways on one line; pinned on the right, always visible: **All speakers**, then one dropdown per category ("All subjects", "All modes", named by the category). The timeline's legend row scrolls sideways the same way.
 5. Insights → Overview (`renderStats`): the index as the big number when the set has one; per category a split bar (option colours, share %); a per-speaker table with talk time, each `perSpeaker` marker's count, each score's average; one list per `list: true` marker (clicking jumps, as today). Cog summary: `<index name> <share>%` when there is an index.
 6. Jev log (`web/src/calls.ts`): summarise a segment call by the set's categories and scores, not hard-coded ids; the "Topic labels" description names no specific label.
 
@@ -220,11 +242,11 @@ Update `docs/jev.md` (§ The timeline questions: the set model, where sets live,
 | PUT | `/api/label-sets/:id` | Replace a user set; 409 for built-in |
 | DELETE | `/api/label-sets/:id` | Delete a user set; 409 for built-in |
 | POST | `/api/label-sets/:id/clone` | Copy named "<name> copy" → 201 + set |
-| GET | `/api/label-sets/:id/export` | Download `<name>.conversation-labels` (JSON, `application/octet-stream`, `Content-Disposition: attachment`) |
+| GET | `/api/label-sets/:id/export` | Download `<name>.tattle-labels` (JSON, `application/octet-stream`, `Content-Disposition: attachment`; the Mac app saves it to Downloads like a `.tattle` export) |
 | POST | `/api/label-sets/import` | Body: the file's JSON. Validated; new id; name clash → "<name> (2)" → 201 + set |
 | POST | `/api/label-sets/estimate` | Body: a draft set → `{ ok, errors, tokens, perHourUsd, overLimit }` (validation plus the §4.T2.3 estimate) |
 
-Invalid sets → 400 with the zod message. These routes are not in `OPEN_ROUTES` (keys required, like the rest).
+Invalid sets → 400 with the zod message. None of these routes needs the OpenRouter key (§4.K); they sit behind the setup gate like the rest, not in `OPEN_ROUTES`.
 
 **Done when:** `tests/server.test.ts` covers each route (FakeEngine or a real `LabelSetStore` on a temp folder).
 
@@ -252,13 +274,15 @@ Invalid sets → 400 with the zod message. These routes are not in `OPEN_ROUTES`
 
 #### §4.T2.4 Start live
 
-**Where:** `#dlg-start` `web/index.html:208-235` (the `#feat-labels` switch at 227); `openStartLive` / `bindStartLive` `web/src/panels.ts:187-212`; `api.startLive` in `web/src/api.ts`; `PER_HOUR` / `renderStartSummary` in `panels.ts`.
+**Where:** `#dlg-start` `web/index.html:~215-245` (the `#feat-labels` switch ~:235, `#start-key` below it); `openStartLive` / `bindStartLive` / `askOpenRouter` / `withoutKeyOff` `web/src/panels.ts:~173-290`; `api.startLive` in `web/src/api.ts`; `PER_HOUR` / `renderStartSummary` in `panels.ts`.
 
-**How:** replace the labels switch with a **Labels** select (every set by name, then **Off**), remembered in `localStorage` like the microphone (`MIC_KEY`), falling back to the built-in set when the remembered one is gone. Below it, **Tonight's stories (optional)**, a textarea, one headline per line (hidden when Labels is Off). Send `labelSet` and `stories`. The summary's cost line uses the chosen set's estimate. Replay (Recordings → Replay) uses the remembered set.
+**How:** replace the labels switch with a **Labels** select (every set by name, then **Off**), remembered in `localStorage` like the microphone (`MIC_KEY`), falling back to the built-in set when the remembered one is gone. Below it, **Tonight's stories (optional)**, a textarea, one headline per line (hidden when Labels is Off). Send `labelSet` and `stories`. The summary's cost line uses the chosen set's estimate for labels; with Apple Speech, labels Off and fact-checking off it still reads "Free: nothing leaves this Mac."
+
+Keys (§4.K), following the fact-check switch's current behaviour: the picker opens on the remembered set only when the OpenRouter key is set, and on **Off** when it is not. Picking a set without the key shows `askOpenRouter` inside `#dlg-start`; **Not now** puts the picker back on Off (and turns fact-checking off, as today); a saved key keeps the set. A 400 `needsKey: "openrouter"` from start does the same. Replays (the replay popover, Recordings → Replay) use the remembered set when the key is set and Off when it is not (extend `withoutKeyOff`).
 
 #### §4.T2.5 Docs for Tier 2
 
-`docs/architecture.md` (API table, Labels window, Start live), `docs/rehearsal.md` (stories are typed in Start live; remove "cog → Labels → Save stories"), `README.md` § Using it, `docs/desktop.md` if downloads/imports differ in the app. Rebuild the manifest.
+`docs/architecture.md` (API table, Labels window, Start live, the features table), `docs/setup.md` (§ Asking for a key where it is needed: the Labels picker), `docs/rehearsal.md` (stories are typed in Start live; remove "cog → Labels → Save stories"), `README.md` § Using it, `docs/desktop.md` if downloads/imports differ in the app. Rebuild the manifest.
 
 ---
 
@@ -268,11 +292,13 @@ Invalid sets → 400 with the zod message. These routes are not in `OPEN_ROUTES`
 
 **Where:** `SessionLibrary.snapshot` / `dirOf` `src/store/library.ts`; the Jev client `src/jev/client.ts` (purpose names, retry rules: `docs/jev.md` § The client); `renderTimeline` `web/src/timeline.ts:207` (render into any container).
 
-**How:** `POST /api/label-sets/try` `{ set, sessionId, minutes: 10 }`: validates the set; loads the recording's segments and their utterance text read-only; asks Jev the draft's questions for the segments starting within the first `minutes` (at most 40 segments), 4 in parallel (`jev.segmentConcurrency`), purpose `"try"` with the background retry rules; returns `{ labels: SegmentLabels[], costUsd, segments }`. Nothing is written into the recording's folder. Refuse while a session is on air (409), like other background Jev work. In the editor, **Try on a recording**: pick a recording (from `/api/sessions`), confirm the estimated cost ("about $0.00x"), then show two timelines stacked for that stretch: the recording's own labels and the draft's.
+**How:** `POST /api/label-sets/try` `{ set, sessionId, minutes: 10 }`: validates the set; loads the recording's segments and their utterance text read-only; asks Jev the draft's questions for the segments starting within the first `minutes` (at most 40 segments), 4 in parallel (`jev.segmentConcurrency`), purpose `"try"` with the background retry rules; returns `{ labels: SegmentLabels[], costUsd, segments }`. Nothing is written into the recording's folder. Refuse while a session is on air (409), like other background Jev work. Without the OpenRouter key answer 400 `needsKey: "openrouter"` before anything else; the editor shows `keyPrompt("openrouter", …)` inside its dialog and retries after a save (§4.K). In the editor, **Try on a recording**: pick a recording (from `/api/sessions`), confirm the estimated cost ("about $0.00x"), then show two timelines stacked for that stretch: the recording's own labels and the draft's.
 
-**Done when:** a server test with a fake Jev client covers the route and checks the recording folder is untouched; one live check on a real recording, after asking the user.
+**Transcript-only recordings** (fact-checking and labels off) are now the common case: every recording made without the OpenRouter key is one. They still have segments, closed at 2 s pauses rather than by the boundary question (`docs/architecture.md` § Features), so Try works on them unchanged. They have no labels of their own: show the draft's timeline alone, with "This recording ran with labels off: its segments were cut at pauses, so a live show's segments will differ." A recording with labels off but fact-checking on has boundary-question segments and no labels: the same, without the pause note.
 
-**Stop and ask if:** the recording has no segments (a transcript-only session): show "This recording has no segments to label" and do not call Jev.
+**Done when:** a server test with a fake Jev client covers the route (a labelled recording, a transcript-only one, no key) and checks the recording folder is untouched; one live check on a real recording, after asking the user.
+
+**Edge:** a recording with no segments at all (under 12 s of speech): show "This recording has no segments to label" and do not call Jev.
 
 ---
 
@@ -293,9 +319,10 @@ Invalid sets → 400 with the zod message. These routes are not in `OPEN_ROUTES`
 2. `POST /api/label-sets/assist` `{ messages: [{role, content}], draft: set | null }` → `{ reply: string, set: set | null, costUsd }`. System prompt: what a label set is, the three types and limits (2/2/8, 5 levels, ≤255 options), the `ICONS` list, the wording guide from §4.T2.3, and the built-in set as an example. Response format: strict JSON schema `{ reply, set }`. Validate `set` with the zod schema; on failure retry once with the error appended; then return the reply with `set: null` and the error.
 3. Per-conversation spend capped at `capUsd`; the running cost shows in the dialog.
 4. UI: Labels library → **Create with AI** opens a dialog: chat on the left (styled like the Chat window), the draft in the editor on the right, updated when a reply carries a set. The user can edit the draft directly; the next message sends the edited draft. **Try on a recording** and **Save** as in the editor.
-5. Requires the OpenRouter key, which the app always has after setup; on a 401/402 show the OpenRouter error, as Chat does.
+5. Requires the OpenRouter key, which is optional since 0.9.0 (§4.K): without it the route answers 400 `needsKey: "openrouter"` before calling anything, and the dialog shows `keyPrompt("openrouter", "Please provide your OpenRouter API key to create labels with AI.")` in place of the chat, as Chat does (`web/src/chat.ts`); saving opens the chat. On a 401/402 show the OpenRouter error, as Chat does.
+6. Privacy: the README's "what leaves your Mac" table gains a row for Create with AI (your messages and the draft, to GPT-6 Luna through OpenRouter) and one for Try on a recording (the first minutes of that recording's transcript, to Jev); `docs/setup.md` § Asking for a key lists both; the OpenRouter key card (`web/src/keys.ts`) says it is needed for "fact-checking, labels, and Chat" still (drafting sets is part of labels).
 
-**Done when:** tests with a fake OpenRouter response cover a valid set, an invalid set (retry, then error), and the cap; one live check after asking the user; `docs/jev.md` and `docs/architecture.md` describe it.
+**Done when:** tests with a fake OpenRouter response cover a valid set, an invalid set (retry, then error), the cap, and a missing key; one live check after asking the user; `docs/jev.md` and `docs/architecture.md` describe it.
 
 ## §5 Non-goals
 
@@ -323,7 +350,7 @@ Invalid sets → 400 with the zod message. These routes are not in `OPEN_ROUTES`
 
 ## §7 Anti-hallucination guardrails
 
-1. New files allowed: `config/timeline.json`, `config/labels/ai-podcast.json`, `src/labels/store.ts`, `src/labels/legacy.ts`, `web/src/icons.ts`, `tests/labels.test.ts`, test fixtures under `tests/fixtures/` if needed. Anything else: ask.
+1. New files allowed: `config/timeline.json`, `config/labels/ai-podcast.json`, `src/labels/store.ts`, `src/labels/legacy.ts`, `src/labels/model.ts` (the set model shared by the engine: questions, derived labels, estimate), `src/labels/try.ts` (Tier 3), `src/labels/assist.ts` (Tier 4), `web/src/icons.ts`, `web/src/labels.ts` (the library, editor, and Create with AI dialog), `tests/labels.test.ts`, test fixtures under `tests/fixtures/` if needed. Anything else: ask.
 2. `config/labels.default.json` is deleted only after its content is embedded in the converter and the equality test (§4.T1.1) passes.
 3. Keep Jev's wording of the ten existing questions byte-identical in the built-in set.
 4. Every dialog in the Mac app's main process goes through `ask()` in `desktop/main.ts` (`docs/gotchas.md` § Mac app); the page's own dialogs use the in-page `ask()` in `web/src/panels.ts`, never `confirm()` or `prompt()`.
@@ -353,7 +380,9 @@ Use a small Node script over the DevTools protocol (`Runtime.evaluate`, `Page.ca
 
 **Recordings for checks:** `sessions/20260925-202620` (2 h, labels, 46 flags, 4 errors), `sessions/20260925-180856`. Opening one is read-only; close the view afterwards with `POST /api/sessions/close`.
 
-**Where sets land:** `ls ~/Library/Application\ Support/Conversation\ Assistant/labels/`. Before testing, note what is there; remove only the sets your tests created.
+**Where sets land:** `ls ~/Library/Application\ Support/Tattle/labels/`. Before testing, note what is there; remove only the sets your tests created. Never touch `~/Library/Application Support/Tattle/sessions/`: those are the user's real shows.
+
+**No-key checks:** the dev app reads keys from `.env` and `Application Support/Tattle/credentials.json`. To check the no-key paths, use the automated tests (a fake engine with `openrouterKeySet: () => false`) rather than moving the user's keys.
 
 ## §9 Domain glossary
 
@@ -364,15 +393,17 @@ Use a small Node script over the DevTools protocol (`Runtime.evaluate`, `Page.ca
 | Label | One question asked about each segment: a **category** (choice), a **score** (0–4), or a **marker** (yes/no, shown as an icon when ≥ its threshold) |
 | Label set | A named collection of up to 2 categories, 2 scores, 8 markers, plus prefix, faded confidence, companies, optional index |
 | Boundary question | The yes/no question asked per sentence that decides where segments end; calibrated; locked |
-| Stories | Tonight's headlines; add the `story` question and a "Topics tonight" hint to transcription |
+| Stories | Tonight's headlines; add the `story` question, and a "Topics tonight" hint to transcription with the OpenAI engine (Apple Speech ignores it) |
+| Transcript-only | A session with fact-checking and labels off: Jev is never called, segments close at pauses; free with Apple Speech. The usual recording without an OpenRouter key |
+| OpenRouter key | Optional since 0.9.0; needed for anything that calls Jev or GPT-6 Luna (§4.K) |
 | Index | A category's options whose share of time is shown as one big percentage (today: Off-topic) |
 | System 1 / System 2 | The fact-checker's Jev questions / the LLM that researches and rewrites them. Not part of this work |
 | Recording, session | A session is what runs (live or replay); a recording is a finished one, reopened read-only |
 
 ## §10 References
 
-- `docs/mission.md` (principles, non-goals), `docs/jev.md` (timeline questions, limits, client), `docs/architecture.md` (web front end, API, Insights), `docs/recordings.md` (session folder), `docs/gotchas.md` (§ Jev questions, § Web page, § Mac app), `docs/desktop.md` (downloads, dialogs).
-- Other specs: `specs/260928-01-apple-speech-transcription/` (unrelated).
+- `docs/mission.md` (principles, non-goals), `docs/jev.md` (timeline questions, limits, client), `docs/architecture.md` (web front end, API, Insights, § Features: transcript-only sessions), `docs/setup.md` (§ Asking for a key where it is needed), `docs/recordings.md` (session folder), `docs/gotchas.md` (§ Jev questions, § Web page, § Mac app), `docs/desktop.md` (downloads, dialogs).
+- Other specs: `specs/-DONE/260928-01-apple-speech-transcription/` (done: optional keys, transcript-only sessions); `specs/260929-01-test-driven-development/` (owns the speaker-filter bug B2 in `segmentMatches`); `specs/260929-01-right-column-tabs/` (unrelated).
 
 **Code anchors**
 ```
@@ -382,16 +413,19 @@ NoulQuestion, ChoiceQuestion, ScoreQuestion, QuestionId   src/jev/types.ts:4-35
 timelineQuestions, deriveLabels      src/pipeline/timeline.ts:23, :66
 AI_SUBJECTS, sectionsOf, Timeline    src/pipeline/timeline.ts:41, :93, :123
 computeStats, OFF_TOPIC              src/pipeline/stats.ts:38, :31
-new Timeline / session.json write    src/pipeline/session.ts:174, :270
-StartRequest, parseFeatures          src/server/main.ts:57-70
-putLabels, relabel, putStories       src/server/main.ts:510-527, routes :730-732
+new Timeline / session.json write    src/pipeline/session.ts:~204, ~:310
+StartRequest, parseFeatures          src/server/main.ts:~69-82
+Engine.start (key checks)            src/server/main.ts:~446-460
+putLabels, relabel, putStories       src/server/main.ts (grep putLabels; routes near "/api/labels")
+preflight / smoke / replay CLI       src/cli/preflight.ts:~125, src/cli/smoke.ts:~41, ~91, src/cli/replay.ts:~57
+keyPrompt, askOpenRouter, withoutKeyOff   web/src/keys.ts, web/src/panels.ts:~187-235
 SessionLibrary.snapshot              src/store/library.ts:317-330
 stats event schema                   src/store/events.ts:38
 S2Client.rewrite, CHAT_URL           src/factcheck/s2.ts:294, :6
 appSupportDir, AppPaths              src/paths.ts
 SUBJECT_COLORS, MODE_COLORS, MARKERS, renderLegend, renderTimeline   web/src/timeline.ts:9-30, :207
 segmentMatches, renderFilters, segdiv, renderStats, renderMenu       web/src/panels.ts:432, :443, ~558, :972, ~340
-openStartLive, bindStartLive         web/src/panels.ts:187, :199
+openStartLive, bindStartLive         web/src/panels.ts:~240, ~:260
 renderLabels, questionRow, readEditor (to remove)                    web/src/panels.ts:870-930
 SESSION_WINDOWS                      web/src/panels.ts (above renderMenu)
 Jev log segment summary              web/src/calls.ts:42, :54, :129
