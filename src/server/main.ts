@@ -11,7 +11,7 @@ import { checkDraft, checkLabelSet, LABEL_FORMAT, type LabelSet } from "../label
 import { recordedSegments, tryLabelSet } from "../labels/try.ts";
 import { AssistError, assistSystemPrompt, LabelsAssistant, type AssistMessage } from "../labels/assist.ts";
 import { JevClient } from "../jev/client.ts";
-import { Budget, BudgetExhaustedError, sumDevSpend } from "../budget.ts";
+import { Budget, BudgetExhaustedError } from "../budget.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
 import { resolveRecorded, SessionLibrary } from "../store/library.ts";
 import { Embedder } from "../speakers/registry.ts";
@@ -601,7 +601,8 @@ export class Engine implements EngineApi {
     const draft = b.draft && typeof b.draft === "object" ? (() => { const { builtIn: _b, ...d } = asDraft(b.draft); return d; })() : null;
     const log = join(this.library.root, "label-assist.jsonl");
     const budget = new Budget({
-      sessionCapUsd: cap - spent, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: !this.opts.allowOverDevCap, devSpentUsd: sumDevSpend(this.library.root),
+      // like Chat: the host asks for each turn, and the conversation has its own cap; the development cap guards replays
+      sessionCapUsd: cap - spent, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0,
     });
     const assistant = new LabelsAssistant(cfg.labelsAssist, {
       fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
@@ -648,8 +649,8 @@ export class Engine implements EngineApi {
     const cfg = this.config.app;
     const log = join(this.library.root, "label-tries.jsonl");
     const budget = new Budget({
-      sessionCapUsd: cfg.budget.sessionCapUsd, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: !this.opts.allowOverDevCap,
-      devSpentUsd: sumDevSpend(this.library.root),
+      // like Chat: the host asks for it, and a try is at most 40 calls; the development cap guards replays
+      sessionCapUsd: cfg.budget.sessionCapUsd, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0,
     });
     const jev = new JevClient(cfg.jev, {
       fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
