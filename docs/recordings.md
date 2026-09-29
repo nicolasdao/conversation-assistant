@@ -35,7 +35,7 @@ Every session — live or replay — is kept as one folder of plain files. There
 | `imported.json` | Only for an imported recording: when, from which file, and the file's manifest (see [Export and import](#export-and-import)) |
 | `chats.jsonl` | The chat window's chats, messages, and calls with cost — written live and after the recording ended, since a recording can be chatted about (see [Chat](chat.md)) |
 
-The development budget (`src/budget.ts` `sumDevSpend`) sums `cost_usd` over the call rows in all of these folders, plus `sessions/deleted-spend.jsonl`: deleting a recording first appends its total there (`kind: "deleted_session"`), so deleting cannot lower the development total. Keys are redacted from every file and event.
+Keys are redacted from every file and event.
 
 ## The library — `src/store/library.ts`
 
@@ -108,7 +108,7 @@ A two-hour show imports in about 4 s.
 **Imported recordings:**
 - They open, play back, chat, replay (with audio), export, and delete like any other.
 - The Recordings window marks them **Imported** (with the exporting version) and **No audio** when there is none, and shows the version that recorded each recording.
-- Their spend was someone else's, so it never counts toward the [development total](architecture.md#budgets--srcbudgetts): `sumDevSpend` skips folders with `imported.json`, and deleting one adds nothing to `deleted-spend.jsonl`. Their own Cost still shows what they cost when they ran.
+- Their own Cost still shows what they cost when they ran, on the machine that recorded them.
 
 **Delete** removes a recording's folder for good, after an in-page confirmation (`DELETE /api/sessions/:id`). The running session cannot be deleted (409). Deleting the recording on screen opens the one listed below it (or above, if it was the last), or clears the view if none is left.
 

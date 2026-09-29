@@ -55,8 +55,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: false } },
 ]);
 
-// The dev spend cap guards the developer's own replays; the app's users have only the per-session cap.
-const { engine, server } = bootEngine({ allowOverDevCap: app.isPackaged });
+const { engine, server } = bootEngine();
 const handle = inProcessHandler(server);
 const onAir = () => engine.current?.status === "running";
 let win: BrowserWindow | null = null;

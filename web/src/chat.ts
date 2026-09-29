@@ -68,7 +68,6 @@ const facts = (m: ChatModel | undefined) =>
   m ? `${m.contextLength ? `${tokens(m.contextLength)} context` : "context ?"} · ${price(m.inputUsdPerM)} in / ${price(m.outputUsdPerM)} out per M tokens` : "";
 
 const activeModel = () => current?.model ?? draftModel ?? defaultModel;
-const capReached = () => !!list && list.spentUsd >= list.capUsd;
 
 // ---------- boot ----------
 
@@ -243,7 +242,6 @@ async function submit(text = el.input().value, mode: "send" | "edit" | "regenera
   const content = text.trim();
   if (streaming || (mode !== "regenerate" && !content)) return;
   if (!hasSession) return toast("Start a session or open a recording to chat about it.");
-  if (capReached()) return toast(`This recording's chat spend reached its cap of ${usd(list!.capUsd)}.`);
   try {
     if (!current) {
       current = await api.createChat(activeModel());
@@ -328,8 +326,7 @@ function drawSide() {
           h("button", { class: "btn icon sm", title: "Rename", "aria-label": `Rename ${c.title}`, onclick: () => void rename(c.id, c.title) }, "✎"),
           h("button", { class: "btn icon sm", title: "Delete", "aria-label": `Delete ${c.title}`, onclick: () => void remove(c.id, c.title) }, glyph("trash"))))));
   replace($("#chat-spend"), list
-    ? [h("span", { class: "k" }, "Chat spend"), h("span", { class: capReached() ? "error-text" : "" }, `${usd(list.spentUsd)} of ${usd(list.capUsd)}`),
-      h("span", { class: "bar" }, h("b", { class: list.spentUsd / list.capUsd > 0.8 ? "warn" : "", style: `width:${Math.min(100, (list.spentUsd / list.capUsd) * 100)}%` }))]
+    ? [h("span", { class: "k" }, "Chat spend"), h("span", {}, usd(list.spentUsd))]
     : null);
 }
 
@@ -462,10 +459,9 @@ function draw() {
   replace(send, streaming ? "Stop" : "Send");
   send.className = `btn sm ${streaming ? "stop" : "primary"}`;
   send.title = streaming ? "Stop the reply (Esc)" : "Send (Enter; Shift+Enter for a new line)";
-  send.disabled = !hasSession || (!streaming && capReached());
-  el.input().disabled = !hasSession || capReached();
-  el.input().placeholder = !hasSession ? "Start a session or open a recording to chat about it"
-    : capReached() ? `Chat spend reached its ${usd(list!.capUsd)} cap for this recording` : "Ask about the transcript…";
+  send.disabled = !hasSession;
+  el.input().disabled = !hasSession;
+  el.input().placeholder = !hasSession ? "Start a session or open a recording to chat about it" : "Ask about the transcript…";
 }
 
 function drawModelButton() {
@@ -483,7 +479,7 @@ function drawLog() {
     return replace(log, h("div", { class: "chat-empty" },
       h("h3", {}, "Ask about the transcript"),
       h("p", {}, "The transcript is attached. On air, each question also brings every line said since your last one, so answers cover the show up to the moment you ask."),
-      h("div", { class: "starters" }, STARTERS.map((q) => h("button", { class: "starter", disabled: capReached(), onclick: () => void submit(q) }, q)))));
+      h("div", { class: "starters" }, STARTERS.map((q) => h("button", { class: "starter", onclick: () => void submit(q) }, q)))));
   }
   const lastU = msgs.map((m) => m.role).lastIndexOf("user");
   const lastA = msgs.map((m) => m.role).lastIndexOf("assistant");
@@ -579,7 +575,7 @@ function drawMeter() {
         h("span", {}, `Out ${tokens(mt.outputTokens)}${mt.reasoningTokens ? ` (${tokens(mt.reasoningTokens)} thinking)` : ""}`),
         h("span", { title: mt.estimated ? "Includes an estimate for a stopped reply" : "" }, `This chat ${usd(mt.costUsd)}${mt.estimated ? "*" : ""}`),
       ] : h("span", {}, "Nothing sent yet: a new chat costs nothing until you ask."),
-      list ? h("span", { class: capReached() ? "error-text" : "" }, `Recording ${usd(list.spentUsd)} of ${usd(list.capUsd)}`) : null),
+      list ? h("span", {}, `Recording ${usd(list.spentUsd)}`) : null),
     pending ? h("div", { class: "meter-row small pending" },
       `Your next question brings ${pending} new line${pending === 1 ? "" : "s"} (about ${tokens(mt!.pendingTokens)} tokens).`) : null,
     window && used / window > 0.8 ? h("div", { class: "meter-row small error-text" }, "This chat is close to the model's limit: start a new chat, or pick a model with a larger context.") : null);

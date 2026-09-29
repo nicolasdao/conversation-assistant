@@ -606,7 +606,7 @@ const STATUS_MARK = { done: "✓", todo: "•", recommended: "○", skipped: "�
  * Create with AI, as an interview: the assistant (GPT-6 Luna, fixed in config) asks one question at a time until the
  * set is fully configured, proposing what the host leaves out and explaining anything asked; the app computes what is
  * still missing and shows it as progress. The draft fills in on the right and can be edited by hand at any time; the
- * next answer sends it as edited. Nothing is saved until the host presses Save. Each conversation has a $1 cap.
+ * next answer sends it as edited. Nothing is saved until the host presses Save.
  */
 export function openCreateWithAi() {
   const dlg = $<HTMLDialogElement>("#dlg-labels-ai");
@@ -673,7 +673,7 @@ export function openCreateWithAi() {
       aiBubble(r, r.set ? "Draft updated on the right" : undefined);
       if (r.error) aiBubble({ reply: r.error, question: "", choices: [] }, undefined, true);
       showProgress(r.checklist);
-      replace(spend, `Spent ${money(r.spentUsd)} of ${money(r.capUsd)}`);
+      replace(spend, `Spent ${money(r.spentUsd)}`);
     } catch (e) {
       typing.remove();
       messages.pop();

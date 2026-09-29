@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 252,
+      "line_count": 250,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -123,7 +123,7 @@
     },
     {
       "dangling": false,
-      "description": "The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.",
+      "description": "The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost, the API, and the page.",
       "has_frontmatter": true,
       "headings": [
         "Chat",
@@ -134,7 +134,7 @@
         "API",
         "The page — `web/src/chat.ts`, `web/src/markdown.ts`"
       ],
-      "line_count": 155,
+      "line_count": 152,
       "links_to": [
         "docs/architecture.md",
         "docs/mission.md",
@@ -188,7 +188,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 249,
+      "line_count": 248,
       "links_to": [
         "README.md",
         "docs/architecture.md",

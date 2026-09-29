@@ -233,7 +233,7 @@ export class ChatService {
   // ---------- models ----------
 
   /** The configured models with their context window and prices, from OpenRouter's catalogue (kept for an hour). */
-  async models(): Promise<{ default: string; capUsd: number; models: ModelInfo[] }> {
+  async models(): Promise<{ default: string; models: ModelInfo[] }> {
     const fresh = this.catalogue && Date.now() - this.catalogue.at < (this.catalogue.ok ? 3_600_000 : 60_000);
     if (!fresh) {
       try {
@@ -259,7 +259,7 @@ export class ChatService {
         available: m ? true : cat.byId.size ? false : null,
       };
     });
-    return { default: this.cfg.defaultModel, capUsd: this.cfg.capUsd, models };
+    return { default: this.cfg.defaultModel, models };
   }
 
   private async model(id: string): Promise<ModelInfo | undefined> {
@@ -325,7 +325,7 @@ export class ChatService {
   /** The chats of the session on screen, newest first, and its chat spend against the cap. */
   list() {
     const s = this.deps.source();
-    if (!s) return { sessionId: null, chats: [], spentUsd: 0, capUsd: this.cfg.capUsd };
+    if (!s) return { sessionId: null, chats: [], spentUsd: 0 };
     const rows = this.rows(s);
     const chats = [...foldChats(rows).values()].filter((c) => !c.deleted)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -333,7 +333,7 @@ export class ChatService {
         id: c.id, title: c.title, model: c.model, createdAt: c.createdAt, updatedAt: c.updatedAt, busy: this.busy(s, c.id),
         messages: c.messages.length, costUsd: c.calls.reduce((t, k) => t + k.cost_usd, 0),
       }));
-    return { sessionId: s.sessionId, chats, spentUsd: chatSpend(rows), capUsd: this.cfg.capUsd };
+    return { sessionId: s.sessionId, chats, spentUsd: chatSpend(rows) };
   }
 
   async chat(id: string) {
@@ -399,10 +399,6 @@ export class ChatService {
     const c = this.get(s, id);
     const mode = body.mode === "edit" || body.mode === "regenerate" ? body.mode : "send";
     if (this.busy(s, c.id)) throw new ChatError(409, "this chat is already writing a reply");
-    const spent = chatSpend(this.rows(s));
-    if (spent >= this.cfg.capUsd) {
-      throw new ChatError(409, `chat spend on this recording ($${spent.toFixed(4)}) reached its cap of $${this.cfg.capUsd} (chat.capUsd in config/app.json)`);
-    }
     const content = typeof body.content === "string" ? body.content.trim() : "";
     const lastUser = c.messages.map((m) => m.role).lastIndexOf("user");
     let keep = c.messages.length;

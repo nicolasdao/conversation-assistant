@@ -6,7 +6,6 @@ import { describe, expect, test } from "vitest";
 import { readZipEntries, readZipEntry, writeZip } from "../src/store/zip.ts";
 import { EXTENSION, exportEstimate, exportFileName, exportRecording, importRecording, TransferError } from "../src/store/transfer.ts";
 import { SessionLibrary } from "../src/store/library.ts";
-import { sumDevSpend } from "../src/budget.ts";
 import { wavHeader } from "../src/audio/wav.ts";
 import { createReadStream } from "node:fs";
 import { Engine } from "../src/server/main.ts";
@@ -86,8 +85,6 @@ describe("export and import", () => {
     const summary = lib.get(id);
     expect(summary).toMatchObject({ name: "Episode 12: a/b", hasAudio: true, appVersion: "0.2.0", imported: { exportedWith: "0.3.0" } });
     expect(summary.durationMs).toBe(3000);
-    // someone else's spend never counts toward this machine's development total
-    expect(sumDevSpend(dest)).toBe(0);
     expect(summary.costUsd).toBeCloseTo(0.25);
 
     // the same recording again is not added twice

@@ -250,7 +250,7 @@ export function showSetup(status: SetupStatus, t: TranscriptionStatus | null = n
         : "You chose OpenAI for transcription. OpenAI is paid directly, only for what you use. No key yet? Open the guide under the field."),
     h("section", { class: "setup-panel" }, cards, actions, trust()),
     h("p", { class: "note setup-privacy" },
-      "A transcript costs about $1.23 an hour, from prepaid credit; each session stops itself at $10. Fact-checking and labels add up to $0.40 an hour and need an OpenRouter key, which the app asks for when you turn them on. ",
+      "A transcript costs about $1.23 an hour, from prepaid credit. Fact-checking and labels add up to $0.40 an hour and need an OpenRouter key, which the app asks for when you turn them on. ",
       `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: ${desktop ? "Tattle → Settings… (⌘,)" : "cog menu → API keys"}.`)));
   document.body.append(root);
   fields[0]?.input.focus();

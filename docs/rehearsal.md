@@ -21,7 +21,7 @@ Everything to check before going on air with Tattle, the lines to plant, and how
 - [ ] Everyone wears headphones, and the host wears **earbuds**. On the Mac's speakers the app switches to speaker mode (a **Speakers** chip next to the meters): the microphone is muted while the call plays, so anything the host says over a guest is lost.
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
-- [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10; in the Mac app the config is built in, so changing it means building the app again), and a credit limit on the OpenRouter key.
+- [ ] The OpenRouter key has a **credit limit** (openrouter.ai → Settings → API keys): the app sets no spending limit of its own.
 - [ ] The **label set** is picked and **tonight's stories** are ready to type in Start live (one headline per line). A new set was tried on a recording first (cog → Labels).
 - [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
@@ -62,4 +62,4 @@ Later in the show, repeat line 1 word for word. It should produce an instant **r
    `npm run calibrate:boundary -- boundary.jsonl`.
 4. Write the chosen values to `config/app.json` (`speakers.threshold`, `segmentation.boundaryThreshold`) and restart `npm run serve`; for the Mac app, build it again (`npm run dist:mac`), since its config is built in.
 
-Calibration runs from the terminal, in development. Replays of old episodes count toward the $3 development cap; add `--allow-over-dev-cap` only when you mean to. (Replays started in the Mac app never count toward it.)
+Calibration runs from the terminal, in development. A replay of an old episode costs about what the episode cost the first time.

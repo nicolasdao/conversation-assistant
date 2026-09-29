@@ -9,7 +9,6 @@ import { Session } from "../src/pipeline/session.ts";
 import { EventBus, redactor } from "../src/store/events.ts";
 import { JSONL_FILES } from "../src/store/sessionStore.ts";
 import { Engine } from "../src/server/main.ts";
-import { sumDevSpend } from "../src/budget.ts";
 import { FIXTURE_DIR, loadScript, requireAssets } from "./helpers.ts";
 
 const OPENROUTER = "sk-or-v1-test-openrouter-key-0123456789";
@@ -267,7 +266,7 @@ describe("session (offline, fake services)", () => {
     expect((engine.state() as any).session.features).toEqual({ factcheck: false, labels: false });
   });
 
-  test("an ended session becomes a recording, which can be deleted without lowering the development spend", async () => {
+  test("an ended session becomes a recording, which can be deleted", async () => {
     requireAssets();
     const root = mkdtempSync(join(tmpdir(), "sessions-"));
     const { f } = fakeFetch(loadScript());
@@ -280,11 +279,9 @@ describe("session (offline, fake services)", () => {
     expect((engine.state() as any).session).toMatchObject({ id: sessionId, status: "archived" });
     expect(() => engine.pause()).toThrow(/recorded session/);
 
-    const spent = sumDevSpend(root);
-    expect(spent).toBeGreaterThan(0);
     expect(engine.deleteSession(sessionId)).toEqual({ deleted: sessionId });
     expect(existsSync(join(root, sessionId))).toBe(false);
-    expect(sumDevSpend(root)).toBeCloseTo(spent, 6);
+    expect(existsSync(join(root, "deleted-spend.jsonl"))).toBe(false);
     expect(engine.state()).toEqual({ session: null });
     expect(engine.bus.history()).toEqual([]);
     expect(() => engine.deleteSession(sessionId)).toThrow(/unknown session/);

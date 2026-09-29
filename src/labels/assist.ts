@@ -127,7 +127,7 @@ export interface AssistDeps {
   fetch: typeof fetch;
   apiKey: string;
   budget: Budget;
-  /** One row per call, as System 2's (kind s2_call, purpose labels_assist), so the development total counts it. */
+  /** One row per call, as System 2's (kind s2_call, purpose labels_assist). */
   log: (row: Record<string, unknown>) => void;
   sleep?: (ms: number) => Promise<void>;
 }

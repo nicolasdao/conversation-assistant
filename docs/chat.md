@@ -1,5 +1,5 @@
 ---
-description: The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost and its cap, the API, and the page.
+description: The chat window — questions about the transcript of the session on screen, live or recorded, to any curated OpenRouter model — how a live chat keeps up with the transcript, storage, cost, the API, and the page.
 tags: [chat, openrouter, llm, transcript, cost, api, web]
 source:
   - src/chat/**
@@ -48,7 +48,6 @@ Nothing is created, sent, or spent until the first question of a new chat. Openi
 | `models` | 14 ids | The curated list the picker shows: GPT-6 Luna, Sol, Astra; Claude Sonnet 5, Opus 5.5, Fable 5.1; Gemini 3.8 Flash; Grok 4.7; DeepSeek V4.1 Flash; Kimi K3; Qwen3.8 Max Prime; GLM 5.3; Muse Spark 1.3; Mistral Large 2512 |
 | `provider` | `{ data_collection: "deny" }` | Sent on every chat call, like Jev and System 2 |
 | `effort` | `low` | `reasoning.effort`, so replies start quickly; models without reasoning ignore it |
-| `capUsd` | `2` | The chat spend cap per recording (below) |
 | `timeoutMs`, `maxAttempts` | `120000`, `2` | A failure before the first word is retried once; a reply already streaming is never retried |
 
 Each model's facts come from OpenRouter's catalogue (`GET https://openrouter.ai/api/v1/models`), read by the engine and kept for an hour (a failed read is retried after a minute):
@@ -84,10 +83,8 @@ Chats can be made on a recording opened from the library. This is the second exc
 - **Every reply's cost** comes from the stream's final `usage` (`usage: { include: true }`).
 - **A stopped reply** has no final usage, so the engine asks OpenRouter's generation record (`GET /api/v1/generation?id=`, up to 3 tries 1–3 s apart). Only if that fails is the cost estimated from the price list (about 4 characters per token), marked `estimated` and shown with a `*`.
 - **The session's ledger:** during a session, chat spend goes into the budget's fourth bucket, `chat` (`src/budget.ts`). The header's spend and its hover breakdown include it (Transcription, Jev, System 2, Chat).
-- **The session cap ignores chat.** It counts only transcription, Jev, and System 2, so a long chat on air can never stop fact-checking.
-- **Chat's own cap:** `chat.capUsd` ($2) per recording, summed over its `chat_call` rows, deleted chats included. When it is reached, questions are refused (409) and the composer says so.
+- **No spending cap** (removed on 29 September 2026): the recording's chat spend is shown, summed over its `chat_call` rows, deleted chats included, and the OpenRouter key's own credit limit is the only one.
 - **A recording's cost** includes its chats (`SessionSummary.cost.chat`), so the header shows "what it cost when it ran, plus any chats about it". A chat on an opened recording emits a transient `cost` event with the recording's new totals.
-- **The development total:** `chat_call` counts toward it (`sumDevSpend`), but the development cap is not enforced on chat.
 - **A 402 from OpenRouter** marks a running session's budget exhausted, as for any other call.
 
 ## API
@@ -96,8 +93,8 @@ All of these act on the session on screen; with none, they answer 409 (the list 
 
 | Method | Route | Does |
 | --- | --- | --- |
-| GET | `/api/chat/models` | `{ default, capUsd, models: [{ id, name, contextLength, maxOutput, inputUsdPerM, outputUsdPerM, cacheReadUsdPerM, available }] }` |
-| GET | `/api/chats` | `{ sessionId, chats: [{ id, title, model, updatedAt, busy, messages, costUsd }], spentUsd, capUsd }`, newest first |
+| GET | `/api/chat/models` | `{ default, models: [{ id, name, contextLength, maxOutput, inputUsdPerM, outputUsdPerM, cacheReadUsdPerM, available }] }` |
+| GET | `/api/chats` | `{ sessionId, chats: [{ id, title, model, updatedAt, busy, messages, costUsd }], spentUsd }`, newest first |
 | POST | `/api/chats` | `{ model? }` → a new chat (nothing is sent) |
 | GET, PATCH, DELETE | `/api/chats/:id` | The chat with its messages (without `sent`) and `meter`; PATCH `{ title?, model? }`; DELETE |
 | POST | `/api/chats/:id/messages` | `{ content, mode?: "send" \| "edit" }` or `{ mode: "regenerate" }`. Validation errors are JSON (400, 404, 409); otherwise the response is a server-sent event stream: `start` (the question as saved, the reply's id), `thinking`, `delta`… , then `done` with the saved reply, the call row, and the updated chat (an `error` event comes before `done` when the reply failed) |
@@ -129,7 +126,7 @@ The **meter** (`GET /api/chats/:id`):
 
 - **Sidebar**, as in ChatGPT:
   - **+ New chat**, then this recording's chats, newest first, each with its model and cost; Rename and Delete appear on hover.
-  - At the bottom, the recording's chat spend against the cap, with a bar.
+  - At the bottom, the recording's chat spend.
 - **Top bar:** the model picker, and the chat's title.
 - **Messages:**
   - A question is a right-aligned strap with a chip saying what it carried ("Transcript · 120 lines · up to 10:12", "+44 new lines", "no new lines").
@@ -137,7 +134,7 @@ The **meter** (`GET /api/chats/:id`):
   - Replies render as Markdown (paragraphs, headings, lists, quotes, code, tables, bold, italic, links). The renderer is hand-written, needs no dependency, and builds DOM nodes rather than HTML, so a reply cannot inject markup. Cited `[m:ss]` times are yellow buttons.
   - Actions: Copy on every message. Edit on the last question (or ↑ in an empty box), which edits in place. Regenerate on the last reply, which reads Retry after an error.
 - **Empty chat:** a short explanation and four starter questions.
-- **Meter** (above the composer): a context bar ("31k of 1.05M · 1.02M left"); input (cached), output (thinking), this chat's cost, and the recording's chat spend against the cap. Then, on air, "Your next question brings N new lines (about T tokens)", refreshed at most every 4 s while the window is open.
+- **Meter** (above the composer): a context bar ("31k of 1.05M · 1.02M left"); input (cached), output (thinking), this chat's cost, and the recording's chat spend. Then, on air, "Your next question brings N new lines (about T tokens)", refreshed at most every 4 s while the window is open.
 - **Composer:**
   - The question box grows up to 200 px. Enter sends, Shift+Enter adds a line, and Esc stops a reply.
   - Send becomes Stop while a reply is written.

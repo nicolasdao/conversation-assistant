@@ -1,6 +1,5 @@
 {
   "server": { "port": 4317 },
-  "budget": { "sessionCapUsd": 10, "devCapUsd": 3 },
   "vad": { "threshold": 0.5, "minSpeechDuration": 0.25, "minSilenceDuration": 0.5, "maxSpeechDuration": 30 },
   "echoGate": { "mode": "auto", "thresholdDbfs": -45, "holdMs": 250 },
   "speakers": { "threshold": 0.65, "minEmbedSeconds": 1.5, "maxEmbeddingsPerSpeaker": 20, "voicesPerStream": { "host": 1, "remote": 2 } },
@@ -31,12 +30,12 @@
                  "rewriteOnFalseAlarms": 3, "rewriteOnMisses": 2, "rewriteCooldownMs": 180000, "replayMaxItems": 300 },
   "labelsAssist": { "model": "openai/gpt-6-luna", "effort": "high",
                    "provider": { "order": ["openai"], "allow_fallbacks": false, "require_parameters": true, "data_collection": "deny" },
-                   "timeoutMs": 90000, "maxAttempts": 2, "capUsd": 1 },
+                   "timeoutMs": 90000, "maxAttempts": 2 },
   "chat": { "defaultModel": "openai/gpt-6-luna",
             "models": ["openai/gpt-6-luna", "openai/gpt-6-sol", "openai/gpt-6-astra",
                        "anthropic/claude-sonnet-5", "anthropic/claude-opus-5.5", "anthropic/claude-fable-5.1",
                        "google/gemini-3.8-flash", "x-ai/grok-4.7", "deepseek/deepseek-v4.1-flash", "moonshotai/kimi-k3",
                        "qwen/qwen3.8-max-prime", "z-ai/glm-5.3", "meta/muse-spark-1.3", "mistralai/mistral-large-2512"],
             "provider": { "data_collection": "deny" },
-            "effort": "low", "capUsd": 2, "timeoutMs": 120000, "maxAttempts": 2 }
+            "effort": "low", "timeoutMs": 120000, "maxAttempts": 2 }
 }

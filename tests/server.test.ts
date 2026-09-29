@@ -468,16 +468,6 @@ describe("Try on a recording (POST /api/label-sets/try), with a fake Jev", () =>
     expect(log[0]).toMatchObject({ kind: "jev_call", purpose: "try", session_id: "20260929-100000", cost_usd: 0.0001 });
   });
 
-  test("like Chat, it ignores the development cap (a developer's past spend over $3)", async () => {
-    writeFileSync(join(root, "deleted-spend.jsonl"), JSON.stringify({ kind: "deleted_session", cost_usd: 6.03 }) + "\n");
-    try {
-      const r: any = await withKey.labelSetApi.tryOn({ set: draft(), sessionId: "20260929-110000" });
-      expect(r.segments.length).toBe(4);
-    } finally {
-      writeFileSync(join(root, "deleted-spend.jsonl"), "");
-    }
-  });
-
   test("a transcript-only recording is tried too: its segments, and no labels of its own", async () => {
     asked.length = 0;
     const r: any = await withKey.labelSetApi.tryOn({ set: draft(), sessionId: "20260929-110000" });
@@ -522,20 +512,14 @@ describe("Create with AI (POST /api/label-sets/assist)", () => {
 
   test("answers with the reply, what the conversation spent, and its cap; logs the call beside the recordings", async () => {
     const r: any = await engine.labelSetApi.assist(body());
-    expect(r).toMatchObject({ reply: "Here you go.", set: null, costUsd: 0.6, spentUsd: 0.6, capUsd: 1 });
+    expect(r).toMatchObject({ reply: "Here you go.", set: null, costUsd: 0.6, spentUsd: 0.6 });
+    expect("capUsd" in r).toBe(false);
     expect(JSON.parse(readFileSync(join(root, "label-assist.jsonl"), "utf8").trim())).toMatchObject({ kind: "s2_call", purpose: "labels_assist", cost_usd: 0.6 });
   });
 
-  test("like Chat, it ignores the development cap (a developer's past spend over $3)", async () => {
-    const dev = mkdtempSync(join(tmpdir(), "assist-dev-"));
-    writeFileSync(join(dev, "deleted-spend.jsonl"), JSON.stringify({ kind: "deleted_session", cost_usd: 6.03 }) + "\n");
-    const e = new Engine({ sessionsDir: dev, fetch: f, openrouterKey: "sk-or-v1-test-key-000000000000" });
-    await expect(e.labelSetApi.assist(body("dev"))).resolves.toMatchObject({ reply: "Here you go." });
-  });
-
-  test("a conversation past its $1 cap is refused; a new one starts afresh", async () => {
+  test("no spending cap: a conversation keeps going past $1, and each keeps its own total", async () => {
     await engine.labelSetApi.assist(body()); // 1.20 spent
-    await expect(engine.labelSetApi.assist(body())).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/\$1 cap/) });
+    expect(((await engine.labelSetApi.assist(body())) as any).spentUsd).toBeCloseTo(1.8);
     await expect(engine.labelSetApi.assist(body("c2"))).resolves.toMatchObject({ spentUsd: 0.6 });
   });
 

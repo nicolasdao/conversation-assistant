@@ -14,7 +14,6 @@ const int = z.number().int().positive();
 
 export const AppConfigSchema = z.object({
   server: z.object({ port: z.number().int().min(1).max(65535) }).strict(),
-  budget: z.object({ sessionCapUsd: positive, devCapUsd: positive }).strict(),
   vad: z.object({
     threshold: probability, minSpeechDuration: positive, minSilenceDuration: positive, maxSpeechDuration: positive,
   }).strict(),
@@ -94,8 +93,6 @@ export const AppConfigSchema = z.object({
     effort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
     provider: z.object({}).passthrough(),
     timeoutMs: int, maxAttempts: int,
-    /** The most one Create with AI conversation may spend. */
-    capUsd: positive,
   }).strict(),
   // The chat window: questions about the transcript, to any of `models` through OpenRouter (see docs/chat.md)
   chat: z.object({
@@ -103,7 +100,7 @@ export const AppConfigSchema = z.object({
     models: z.array(z.string().min(1)).min(1),
     provider: z.object({}).passthrough(),
     effort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
-    capUsd: positive, timeoutMs: int, maxAttempts: int,
+    timeoutMs: int, maxAttempts: int,
   }).strict().refine((c) => c.models.includes(c.defaultModel), { message: "chat.defaultModel must be one of chat.models" }),
 }).strict();
 export type AppConfig = z.infer<typeof AppConfigSchema>;

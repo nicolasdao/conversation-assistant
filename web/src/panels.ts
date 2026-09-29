@@ -1032,27 +1032,24 @@ export async function renderS1(st: State) {
 
 export function renderCost(st: State) {
   const c = st.cost;
-  const cap = c.sessionCapUsd || 10;
-  const pct = Math.min(100, (c.session / cap) * 100);
   const box = $("#cost")!;
   box.classList.toggle("exhausted", !!st.budgetExhausted);
-  box.setAttribute("aria-label", `Session spend ${usd(c.session)} of ${usd(cap)} cap`);
+  box.setAttribute("aria-label", `Session spend ${usd(c.session)}`);
   const archived = st.session?.status === "archived";
   box.removeAttribute("data-tip"); // its hover breakdown explains it; a tooltip would sit on top of it
   replace(box,
     h("span", { class: "k" }, archived ? "Cost" : "Spend"),
-    h("span", { class: "v" }, usd(c.session), " ", h("small", {}, `/ $${Number.isInteger(cap) ? cap : cap.toFixed(2)}`)),
-    h("span", { class: "bar" }, h("b", { class: pct > 80 ? "warn" : "", style: `width:${pct}%` })),
+    h("span", { class: "v" }, usd(c.session)),
     h("div", { class: "pop", role: "tooltip" },
-      h("div", { class: "pop-h" }, archived ? "This recording cost" : `Session spend · cap ${usd(cap)}`),
+      h("div", { class: "pop-h" }, archived ? "This recording cost" : "Session spend"),
       h("dl", {},
         h("dt", {}, "Transcription"), h("dd", {}, usd(c.transcription)),
         h("dt", {}, "Jev"), h("dd", {}, usd(c.jev)),
         h("dt", {}, "System 2"), h("dd", {}, usd(c.s2)),
         h("dt", {}, "Chat"), h("dd", {}, usd(c.chat ?? 0))),
       archived ? h("p", { class: "note" }, "What this recording cost when it ran, plus any chats about it. Opening it costs nothing.") : null,
-      c.chat ? h("p", { class: "note" }, "Chat has its own cap per recording, so it never stops the pipeline.") : null,
-      st.budgetExhausted ? h("p", { class: "error-text" }, `Budget exhausted: ${st.budgetExhausted}`) : null));
+      h("p", { class: "note" }, "The app sets no spending limit: the OpenRouter key's own credit limit is the only one."),
+      st.budgetExhausted ? h("p", { class: "error-text" }, `OpenRouter stopped: ${st.budgetExhausted}`) : null));
 }
 
 /**

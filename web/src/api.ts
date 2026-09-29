@@ -47,7 +47,7 @@ export interface ChatMeter {
 }
 export interface Chat { id: string; title: string; model: string; createdAt: string; updatedAt: string; busy: boolean; messages: ChatMessage[]; meter: ChatMeter }
 export interface ChatList {
-  sessionId: string | null; spentUsd: number; capUsd: number;
+  sessionId: string | null; spentUsd: number;
   chats: { id: string; title: string; model: string; updatedAt: string; busy: boolean; messages: number; costUsd: number }[];
 }
 export type ChatStreamEvent =
@@ -114,7 +114,7 @@ export interface LabelSetCheck { ok: boolean; errors: string[]; tokens: number; 
 export interface AssistTurn {
   reply: string; question: string; choices: string[]; set: any | null; skipped: string[];
   checklist: { items: { id: string; label: string; status: "todo" | "recommended" | "done" | "skipped"; detail?: string }[]; complete: boolean; errors: string[] };
-  costUsd: number; spentUsd: number; capUsd: number; error?: string;
+  costUsd: number; spentUsd: number; error?: string;
 }
 /** Try on a recording: the draft's labels for the segments of its first minutes, and the recording's own. */
 export interface LabelTry {
@@ -193,7 +193,7 @@ export const api = {
   pause: () => call<{ paused: boolean }>("POST", "/api/session/pause"),
   resume: () => call<{ paused: boolean }>("POST", "/api/session/resume"),
   deleteSession: (id: string) => call<{ deleted: string }>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),
-  chatModels: () => call<{ default: string; capUsd: number; models: ChatModel[] }>("GET", "/api/chat/models"),
+  chatModels: () => call<{ default: string; models: ChatModel[] }>("GET", "/api/chat/models"),
   chats: () => call<ChatList>("GET", "/api/chats"),
   chat: (id: string) => call<Chat>("GET", `/api/chats/${encodeURIComponent(id)}`),
   createChat: (model: string) => call<Chat>("POST", "/api/chats", { model }),

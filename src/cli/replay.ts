@@ -1,5 +1,5 @@
 // npm run replay -- --host <wav> --remote <wav> --speed max|1 [--engine apple|openai] [--no-factcheck] [--no-labels]
-//                    [--export <file>] [--allow-over-dev-cap]
+//                    [--export <file>]
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";
 import { FileSource, type AudioSource } from "../audio/source.ts";
@@ -14,7 +14,7 @@ const { values } = parseArgs({
   allowNegative: true,
   options: {
     host: { type: "string" }, remote: { type: "string" }, speed: { type: "string", default: "max" },
-    export: { type: "string" }, "allow-over-dev-cap": { type: "boolean", default: false }, quiet: { type: "boolean", default: false },
+    export: { type: "string" }, quiet: { type: "boolean", default: false },
     engine: { type: "string" }, factcheck: { type: "boolean", default: true }, labels: { type: "boolean", default: true },
   },
 });
@@ -71,7 +71,7 @@ if (!values.quiet) {
 }
 
 const session = new Session({
-  mode: "replay", sources, config: cfg, bus, allowOverDevCap: values["allow-over-dev-cap"], exportBoundary: values.export,
+  mode: "replay", sources, config: cfg, bus, exportBoundary: values.export,
   engine, features: { factcheck: values.factcheck, labels: values.labels },
 });
 console.log(`transcription: ${engine === "apple" ? "on this Mac (Apple Speech)" : "OpenAI"}; fact-checking ${values.factcheck ? "on" : "off"}, labels ${values.labels ? "on" : "off"}`);
@@ -87,6 +87,6 @@ console.log(`speakers    ${session.speakers.active().map((s) => `${s.displayName
 console.log(`segments    ${session.timeline.segments.length}`);
 console.log(`claims      ${fc.flagged} flagged, ${fc.repeats} repeats, ${fc.duplicates} duplicates, ${fc.dropped} dropped`);
 console.log(`verdicts    ${Object.entries(fc.verdicts).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(", ") || "none"}`);
-console.log(`cost        $${st.cost.session.toFixed(4)} (transcription $${st.cost.transcription.toFixed(4)}, Jev $${st.cost.jev.toFixed(4)}, System 2 $${st.cost.s2.toFixed(4)}); dev total $${st.cost.dev.toFixed(4)}`);
+console.log(`cost        $${st.cost.session.toFixed(4)} (transcription $${st.cost.transcription.toFixed(4)}, Jev $${st.cost.jev.toFixed(4)}, System 2 $${st.cost.s2.toFixed(4)})`);
 if (values.export) console.log(`export      ${values.export}`);
 process.exit(0);

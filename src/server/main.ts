@@ -194,7 +194,6 @@ export type CaptureStatusHandler = (type: "error" | "health", data: Record<strin
 export interface EngineOptions {
   config?: Config;
   sessionsDir?: string;
-  allowOverDevCap?: boolean;
   session?: Partial<SessionOptions>;
   /** Tier 2: starts the native capture helper. */
   live?: (mic: string | undefined, onStatus: CaptureStatusHandler) => Promise<LiveCapture>;
@@ -333,8 +332,7 @@ export class Engine implements EngineApi {
   private chatSpent(src: ChatSource) {
     if (src.budget || this.archived !== src.sessionId) return;
     const s = this.library.get(src.sessionId);
-    const cap = this.library.snapshot(src.sessionId).cost.sessionCapUsd;
-    this.bus.emit("cost", { ...s.cost, session: s.costUsd, sessionCapUsd: cap }, { transient: true });
+    this.bus.emit("cost", { ...s.cost, session: s.costUsd }, { transient: true });
   }
 
   get current(): Session | null {
@@ -546,7 +544,7 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features, engine, labelSet, stories,
+      healthDetail: () => this.captureDetail, liveText, features, engine, labelSet, stories,
       // how many people are on the call (the remote stream); 0 means no limit
       ...(Number.isInteger(req.voices) && req.voices! >= 0 ? { voices: { remote: req.voices } } : {}),
       ...this.opts.session,
@@ -581,7 +579,7 @@ export class Engine implements EngineApi {
     assist: (body) => this.assist(body),
   };
 
-  /** What each Create with AI conversation has spent, by the id the page gave it (capped at `labelsAssist.capUsd`). */
+  /** What each Create with AI conversation has spent, by the id the page gave it (shown under its chat). */
   private readonly assistSpent = new Map<string, number>();
 
   private async assist(body: unknown) {
@@ -595,15 +593,10 @@ export class Engine implements EngineApi {
       throw new ApiError(400, "messages must be 1 to 80 { role: user | assistant, content } of at most 8,000 characters");
     }
     const cfg = this.config.app;
-    const cap = cfg.labelsAssist.capUsd;
     const spent = this.assistSpent.get(conversation) ?? 0;
-    if (spent >= cap) throw new ApiError(409, `This conversation reached its $${cap} cap: start a new one.`);
     const draft = b.draft && typeof b.draft === "object" ? (() => { const { builtIn: _b, ...d } = asDraft(b.draft); return d; })() : null;
     const log = join(this.library.root, "label-assist.jsonl");
-    const budget = new Budget({
-      // like Chat: the host asks for each turn, and the conversation has its own cap; the development cap guards replays
-      sessionCapUsd: cap - spent, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0,
-    });
+    const budget = new Budget();
     const assistant = new LabelsAssistant(cfg.labelsAssist, {
       fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
       apiKey: (this.opts.openrouterKey ?? this.opts.session?.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "").trim(),
@@ -614,11 +607,11 @@ export class Engine implements EngineApi {
       const r = await assistant.turn(assistSystemPrompt(this.config.labels), messages as AssistMessage[], draft, skipped);
       const total = spent + r.costUsd;
       this.assistSpent.set(conversation, total);
-      return { ...r, spentUsd: total, capUsd: cap };
+      return { ...r, spentUsd: total };
     } catch (e) {
       this.assistSpent.set(conversation, spent + budget.totals().session);
       if (e instanceof AssistError) throw new ApiError(e.status, e.message);
-      if (e instanceof BudgetExhaustedError) throw new ApiError(409, e.cap === "session" ? `This conversation reached its $${cap} cap: start a new one.` : e.message);
+      if (e instanceof BudgetExhaustedError) throw new ApiError(402, e.message);
       throw new ApiError(400, e instanceof Error ? e.message : String(e));
     }
   }
@@ -626,7 +619,7 @@ export class Engine implements EngineApi {
   /**
    * Try on a recording (`POST /api/label-sets/try { set, sessionId, minutes }`): asks Jev the draft's questions about
    * the segments that start in the recording's first minutes (at most 40), 4 at a time, with the background retry
-   * rules. Its calls are logged to `label-tries.jsonl` beside the recordings (so the development total counts them),
+   * rules. Its calls are logged to `label-tries.jsonl` beside the recordings,
    * never into the recording's folder.
    */
   private async tryOn(body: unknown) {
@@ -648,10 +641,7 @@ export class Engine implements EngineApi {
     if (segments.length === 0) return { segments: [], labels: [], recording, costUsd: 0, failed: 0, window };
     const cfg = this.config.app;
     const log = join(this.library.root, "label-tries.jsonl");
-    const budget = new Budget({
-      // like Chat: the host asks for it, and a try is at most 40 calls; the development cap guards replays
-      sessionCapUsd: cfg.budget.sessionCapUsd, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0,
-    });
+    const budget = new Budget();
     const jev = new JevClient(cfg.jev, {
       fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
       apiKey: (this.opts.openrouterKey ?? this.opts.session?.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "").trim(),
@@ -661,7 +651,7 @@ export class Engine implements EngineApi {
       const r = await tryLabelSet(checked.set, segments, { ask: (s, q, m) => jev.ask(s, q, m), concurrency: cfg.jev.segmentConcurrency, story: this.config.timeline.story });
       return { segments: bounds, labels: r.labels, recording, costUsd: r.costUsd, failed: r.failed, window };
     } catch (e) {
-      if (e instanceof BudgetExhaustedError) throw new ApiError(409, e.message);
+      if (e instanceof BudgetExhaustedError) throw new ApiError(402, e.message);
       throw e;
     }
   }
@@ -1076,7 +1066,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
  * with native capture, and returns the API server for them, not yet listening: `npm run serve` listens on a port, the
  * Mac app serves it in-process (src/server/inProcess.ts).
  */
-export function bootEngine(opts: { allowOverDevCap?: boolean } = {}) {
+export function bootEngine() {
   migrateAppSupportDir(); // before the keys are read: the folder from before the rename to Tattle
   const keys = new KeyStore().load();
   const config = loadConfig();
@@ -1095,7 +1085,7 @@ export function bootEngine(opts: { allowOverDevCap?: boolean } = {}) {
     required: () => (transcription.engine === "openai" ? ["openai"] : []),
   });
   engine = new Engine({
-    config, allowOverDevCap: opts.allowOverDevCap, transcription,
+    config, transcription,
     live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
     devices: () => listDevices(),
   });
@@ -1108,10 +1098,9 @@ async function main() {
   const { values } = parseArgs({
     options: {
       replay: { type: "string" }, speed: { type: "string", default: "1" }, port: { type: "string" },
-      "allow-over-dev-cap": { type: "boolean", default: false },
     },
   });
-  const { keys, config, engine, transcription, ready, server } = bootEngine({ allowOverDevCap: values["allow-over-dev-cap"] });
+  const { keys, config, engine, transcription, ready, server } = bootEngine();
   await ready;
   const port = Number(values.port ?? config.app.server.port);
   // what is missing for this engine; a replay also runs fact-checking and labels, which need OpenRouter

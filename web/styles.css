@@ -182,9 +182,6 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; line-height:
 .cost { position: relative; display: grid; gap: 3px; width: 108px; cursor: default; }
 .cost .v { font: 700 21px/1 var(--cond); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cost .v small { font-size: 14px; font-weight: 600; color: var(--mute); }
-.cost .bar { height: 4px; background: var(--deck-3); }
-.cost .bar b { display: block; height: 100%; min-width: 3px; background: var(--good); }
-.cost .bar b.warn { background: var(--warn); }
 .cost.exhausted .v { color: var(--live); }
 .cost .k { font: 700 10.5px/1 var(--cond); letter-spacing: 0.16em; color: var(--mute); text-transform: uppercase; }
 .pop {
@@ -859,9 +856,6 @@ dialog.chat-dlg { width: min(1240px, calc(100vw - 32px)); height: min(92vh, 1000
 .chat-spend { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--rule); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .chat-spend:empty { display: none; }
 .chat-spend .k { font: 700 11px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
-.chat-spend .bar { grid-column: 1 / -1; height: 4px; background: var(--deck-3); }
-.chat-spend .bar b { display: block; height: 100%; min-width: 2px; background: var(--good); }
-.chat-spend .bar b.warn { background: var(--warn); }
 
 .chat-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .chat-top { display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--rule); }

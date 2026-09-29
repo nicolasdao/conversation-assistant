@@ -223,7 +223,7 @@ export class LiveTranscriber {
     l.awaitingCommit.push(utteranceId);
     l.sentSinceCommit = 0;
     this.bill(l);
-    // An open connection must not keep streaming past a spend cap: check the budget at every turn.
+    // An open connection must not keep streaming once a provider refused for good: check the budget at every turn.
     try {
       this.deps.budget.assertCanSpend("transcription:live");
     } catch {

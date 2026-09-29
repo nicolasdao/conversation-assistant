@@ -89,12 +89,12 @@ describe("chat service", () => {
     const c: any = await svc.create();
     expect(c).toMatchObject({ id: "chat_1", title: "New chat", model: "openai/gpt-6-luna", messages: [] });
     expect(or.bodies).toHaveLength(0);
-    expect(svc.list()).toMatchObject({ spentUsd: 0, capUsd: cfg.capUsd, chats: [{ id: "chat_1" }] });
+    expect(svc.list()).toMatchObject({ spentUsd: 0, chats: [{ id: "chat_1" }] });
   });
 
   test("streams a reply, records its cost, and sends only new lines with the next question", async () => {
     const lines = [line(1), line(2)];
-    const budget = new Budget({ sessionCapUsd: 10, devCapUsd: 3, enforceDevCap: false, devSpentUsd: 0 });
+    const budget = new Budget();
     const { svc, or, ask, dir, spends } = setup(lines, { budget });
     await svc.create();
     const ev = await ask("chat_1", { content: "Who spoke first?" });
@@ -144,12 +144,12 @@ describe("chat service", () => {
     expect(((await svc.chat("chat_1")) as any).messages).toHaveLength(4);
   });
 
-  test("refuses questions once the recording's chat spend reaches the cap", async () => {
+  test("no spending cap: questions keep going whatever the recording's chat has spent", async () => {
     const { svc, ask } = setup([line(1)]);
-    const small = new ChatService({ ...cfg, capUsd: 0.001 }, { fetch: fakeOpenRouter().fetchFn, apiKey: "k", source: () => (svc as any).deps.source(), sleep: async () => {} });
-    await small.create();
+    await svc.create();
     await ask("chat_1", { content: "q" });
-    expect(() => small.prepare("chat_1", { content: "again" })).toThrow(/reached its cap/);
+    expect(svc.list().spentUsd).toBeGreaterThan(0);
+    expect(() => svc.prepare("chat_1", { content: "again" })).not.toThrow();
   });
 
   test("renames, model changes, and deletes are appended; unknown models are refused", async () => {

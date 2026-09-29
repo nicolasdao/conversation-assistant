@@ -36,7 +36,7 @@ export interface Health {
 }
 export interface S1Version { id: string; parent: string | null; status: string; kind: string; rationale: string; gate: any; errors: string[] | null }
 export interface S1Outcome { active: string; candidate: string | null; outcome: string; rationale: string; gate: any; errors: string[] | null; at: string }
-export interface Cost { transcription: number; jev: number; s2: number; chat?: number; session: number; sessionCapUsd: number }
+export interface Cost { transcription: number; jev: number; s2: number; chat?: number; session: number }
 /** A label set, as the engine defines it (src/labels/model.ts): up to 2 categories, 2 scores, 8 markers. */
 export interface LabelOption { id: string; name: string; description: string; color: string; group?: string }
 export interface LabelCategory {
@@ -147,7 +147,7 @@ export function emptyState(): State {
     session: null, pauses: [], speakers: new Map(), utterances: new Map(), missing: new Map(), partials: new Map(), segments: new Map(), sections: [], claims: new Map(), health: {},
     s1: { active: "s1@1", versions: [], memorySize: 0, last: null, misses: 0, audits: 0, auditsSeen: new Set() },
     labels: { set: null, stories: [], version: "" },
-    cost: { transcription: 0, jev: 0, s2: 0, session: 0, sessionCapUsd: 10 },
+    cost: { transcription: 0, jev: 0, s2: 0, session: 0 },
     stats: null, errors: [], budgetExhausted: null, calls: emptyCalls(),
   };
 }

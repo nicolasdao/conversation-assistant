@@ -6,7 +6,7 @@ import { applyFixes, isFiller, Transcriber, TRANSCRIBE_URL, type TranscriptionRo
 const cfg = loadConfig().app;
 
 function budget() {
-  return new Budget({ sessionCapUsd: 5, devCapUsd: 3, enforceDevCap: true, devSpentUsd: 0 });
+  return new Budget();
 }
 
 function fakeFetch(responses: (() => Response | Promise<Response>)[]) {
@@ -133,10 +133,10 @@ describe("transcription", () => {
     expect(applyFixes("jeff and Jeffrey", [{ pattern: "jeff", replace: "Jev" }])).toBe("Jev and Jeffrey");
   });
 
-  test("refuses when the budget is exhausted", async () => {
-    const b = new Budget({ sessionCapUsd: 0.000001, devCapUsd: 3, enforceDevCap: true, devSpentUsd: 0 });
-    b.record("jev", 0.01);
+  test("refuses once OpenRouter said the credit is used up", async () => {
+    const b = new Budget();
+    try { b.exhaust("provider", "jev", "OpenRouter credits or key limit exhausted (402)"); } catch { /* expected */ }
     const t = new Transcriber(cfg.transcription, { fetch: fakeFetch([]).f, apiKey: "k", budget: b, log: () => {} });
-    await expect(t.transcribe("u_1", oneSecond)).rejects.toThrow(/cap/);
+    await expect(t.transcribe("u_1", oneSecond)).rejects.toThrow(/credits or key limit exhausted/);
   });
 });

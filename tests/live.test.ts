@@ -26,7 +26,7 @@ function setup() {
   const partials: LivePartial[] = [];
   const rows: LiveTranscriptionRow[] = [];
   const errors: string[] = [];
-  const budget = new Budget({ sessionCapUsd: 5, devCapUsd: 3, enforceDevCap: false, devSpentUsd: 0 });
+  const budget = new Budget();
   const lt = new LiveTranscriber(cfg.transcription, live, {
     apiKey: "sk-test", budget, log: (r) => rows.push(r), onPartial: (p) => partials.push(p), onError: (m) => errors.push(m),
     connect: (url, headers) => { const s = new FakeSocket(url, headers); sockets.push(s); return s; },
@@ -120,14 +120,14 @@ describe("live transcription", () => {
     expect(rows.length).toBe(2);
   });
 
-  test("stops streaming once the session budget is exhausted", () => {
+  test("stops streaming once OpenRouter or OpenAI refused for good (the budget is exhausted)", () => {
     const { lt, sockets, budget } = setup();
     lt.warm("host");
     const ws = sockets[0];
     ws.onopen?.({});
     ws.server({ type: "session.updated" });
     lt.feed("host", frame(), true);
-    budget.record("jev", 5); // another component spends the whole $5 session cap
+    try { budget.exhaust("provider", "jev", "credits used up"); } catch { /* another component hit a 402 */ }
     lt.commit("host", "u_1");
     const sent = ws.appends.length;
     for (let i = 0; i < 20; i++) lt.feed("host", frame(), true);

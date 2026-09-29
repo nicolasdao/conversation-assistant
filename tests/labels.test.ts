@@ -404,13 +404,13 @@ describe("Create with AI, as an interview, with a fake OpenRouter", () => {
   const reply = (content: unknown, cost = 0.01) => new Response(JSON.stringify({
     id: "gen-1", model: "openai/gpt-6-luna", choices: [{ message: { content: JSON.stringify(content) } }], usage: { cost, prompt_tokens: 5000, completion_tokens: 900 },
   }), { status: 200 });
-  const run = (answers: unknown[], cap = 1) => {
+  const run = (answers: unknown[]) => {
     const bodies: any[] = [];
     const rows: any[] = [];
     let i = 0;
     const f = (async (_u: string, init: RequestInit) => { bodies.push(JSON.parse(String(init.body))); return reply(answers[Math.min(i++, answers.length - 1)]); }) as unknown as typeof fetch;
     const cfg = { ...loadConfig().app.labelsAssist };
-    const budget = new Budget({ sessionCapUsd: cap, devCapUsd: 100, enforceDevCap: false, devSpentUsd: 0 });
+    const budget = new Budget();
     const a = new LabelsAssistant(cfg, { fetch: f, apiKey: "sk-or-test", budget, log: (r) => rows.push(r), sleep: async () => {} });
     return { a, bodies, rows };
   };
@@ -469,12 +469,10 @@ describe("Create with AI, as an interview, with a fake OpenRouter", () => {
     expect(bodies[0].messages.at(-1).content).toContain("Current draft (the host may have edited it)");
   });
 
-  test("the conversation's cap stops the next call", async () => {
-    const { a, bodies } = run([turn(null)], 0.015);
-    await a.turn(system, ask, null);
-    await a.turn(system, ask, null);
-    await expect(a.turn(system, ask, null)).rejects.toThrow(/cap/);
-    expect(bodies.length).toBe(2);
+  test("no spending cap: the conversation keeps going", async () => {
+    const { a, bodies } = run([turn(null)]);
+    for (let i = 0; i < 5; i++) await a.turn(system, ask, null);
+    expect(bodies.length).toBe(5);
   });
 
   test("the reply schema's icons are the library's, and the model's nulls normalise away", () => {

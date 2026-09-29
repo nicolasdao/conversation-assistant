@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import type { Config, LabelSet } from "../config.ts";
-import { Budget, sumDevSpend } from "../budget.ts";
+import { Budget } from "../budget.ts";
 import { mergeSources, type AudioSource, type StreamName } from "../audio/source.ts";
 import { EchoGate, type OutputKind } from "../audio/echoGate.ts";
 import { LoudTagger, rmsDbfs, type Tag } from "../audio/tags.ts";
@@ -66,7 +66,6 @@ export interface SessionOptions {
   bus: EventBus;
   sessionsDir?: string;
   sessionPrefix?: string;
-  allowOverDevCap?: boolean;
   /** Real services are built from fetch and the keys unless given. */
   services?: (ctx: { budget: Budget; log: (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => void }) => Services;
   fetch?: typeof fetch;
@@ -152,12 +151,8 @@ export class Session {
     this.store = new SessionStore({ root: opts.sessionsDir, prefix: opts.sessionPrefix, streams, redact: processSecrets() });
 
     this.budget = new Budget({
-      sessionCapUsd: cfg.app.budget.sessionCapUsd,
-      devCapUsd: cfg.app.budget.devCapUsd,
-      enforceDevCap: opts.mode !== "live" && !opts.allowOverDevCap,
-      devSpentUsd: sumDevSpend(opts.sessionsDir),
       onExhausted: (e) => this.emit("budget.exhausted", { cap: e.cap, purpose: e.purpose, message: e.message, totals: e.totals }),
-      onCost: (t) => this.emit("cost", { ...t, sessionCapUsd: cfg.app.budget.sessionCapUsd }),
+      onCost: (t) => this.emit("cost", { ...t }),
     });
 
     const log = (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => {
@@ -651,7 +646,7 @@ export class Session {
         activeSet: { questions: this.factcheck.active.questions, thresholds: this.factcheck.active.thresholds },
         memory: this.factcheck.memoryQuestions,
       },
-      cost: { ...this.budget.totals(), sessionCapUsd: this.opts.config.app.budget.sessionCapUsd },
+      cost: { ...this.budget.totals() },
       stats: this.stats(),
     };
   }

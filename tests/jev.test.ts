@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { Budget, BudgetExhaustedError, sumDevSpend } from "../src/budget.ts";
+import { Budget, BudgetExhaustedError } from "../src/budget.ts";
 import { loadConfig } from "../src/config.ts";
 import { backoffMs, classifyError, DECISIONS_URL, HttpError, JevClient, parseRetryAfter, type JevCallRow } from "../src/jev/client.ts";
 
@@ -24,9 +24,7 @@ function setup(responses: Fake[], budgetOpts: Partial<ConstructorParameters<type
   const sleeps: number[] = [];
   const rows: JevCallRow[] = [];
   const exhausted: string[] = [];
-  const budget = new Budget({
-    sessionCapUsd: 5, devCapUsd: 3, enforceDevCap: true, devSpentUsd: 0, onExhausted: (e) => exhausted.push(e.cap), ...budgetOpts,
-  });
+  const budget = new Budget({ onExhausted: (e) => exhausted.push(e.cap), ...budgetOpts });
   const f = (async (url: string, init: RequestInit) => {
     expect(url).toBe(DECISIONS_URL);
     calls.push(init);
@@ -145,31 +143,18 @@ describe("Jev client", () => {
     expect(budget.isExhausted).toBe(true);
   });
 
-  test("a call refused by the budget never reaches the network", async () => {
-    const { client, calls, exhausted } = setup([res(200, OK_BODY)], { devSpentUsd: 3.01 });
+  test("once OpenRouter said the credit is used up, later calls never reach the network", async () => {
+    const { client, calls, budget } = setup([res(402, { error: { code: 402, message: "no credits" } }), res(200, OK_BODY)]);
+    await expect(client.ask({}, QUESTIONS, { purpose: "relabel" })).rejects.toBeInstanceOf(BudgetExhaustedError);
+    const sent = calls.length;
     await expect(client.ask({}, QUESTIONS, { purpose: "utterance" })).rejects.toBeInstanceOf(BudgetExhaustedError);
-    expect(calls.length).toBe(0);
-    expect(exhausted).toEqual(["dev"]);
+    expect(calls.length).toBe(sent);
+    expect(budget.isExhausted).toBe(true);
   });
 
-  test("live sessions ignore the dev cap", async () => {
-    const { client } = setup([res(200, OK_BODY)], { devSpentUsd: 3.01, enforceDevCap: false });
+  test("the app sets no dollar limit: a session that has spent a lot still calls Jev", async () => {
+    const { client, budget } = setup([res(200, OK_BODY)]);
+    budget.record("jev", 1_000);
     await expect(client.ask({}, QUESTIONS, { purpose: "utterance" })).resolves.toBeDefined();
-  });
-
-  test("the dev total is summed from existing session files, call rows only", () => {
-    const dir = mkdtempSync(join(tmpdir(), "sessions-"));
-    mkdirSync(join(dir, "a"));
-    mkdirSync(join(dir, "smoke-20260924-100000"));
-    writeFileSync(join(dir, "a", "jev_calls.jsonl"), [
-      JSON.stringify({ kind: "jev_call", cost_usd: 0.25 }),
-      JSON.stringify({ kind: "jev_call", cost_usd: 0.5 }),
-      "",
-    ].join("\n"));
-    writeFileSync(join(dir, "a", "events.jsonl"), JSON.stringify({ kind: "cost", cost_usd: 99 }) + "\n");
-    writeFileSync(join(dir, "smoke-20260924-100000", "s2_calls.jsonl"),
-      JSON.stringify({ kind: "s2_call", cost_usd: 1 }) + "\n" + JSON.stringify({ kind: "transcription", cost_usd: 0.125 }) + "\n{torn");
-    expect(sumDevSpend(dir)).toBeCloseTo(1.875);
-    expect(sumDevSpend(join(dir, "missing"))).toBe(0);
   });
 });

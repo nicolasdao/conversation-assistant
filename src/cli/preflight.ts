@@ -90,14 +90,14 @@ if (hasOpenRouter) await check("OpenRouter key limit and remaining credit", asyn
   const d = (await res.json()).data ?? {};
   const remaining = d.limit_remaining;
   const detail = `limit ${d.limit === null ? "none" : `$${d.limit}`}, remaining ${remaining === null || remaining === undefined ? "n/a" : `$${Number(remaining).toFixed(2)}`}, used $${Number(d.usage ?? 0).toFixed(2)}`;
-  if (typeof remaining === "number" && cfg && remaining < cfg.app.budget.sessionCapUsd) throw new Error(`${detail}: less than the session cap`);
+  if (typeof remaining === "number" && remaining <= 0) throw new Error(`${detail}: no credit left`);
   return detail;
 });
 
 if (cfg) {
   const c: Config = cfg;
   const store = new SessionStore({ prefix: "preflight-", redact: processSecrets() });
-  const budget = new Budget({ sessionCapUsd: c.app.budget.sessionCapUsd, devCapUsd: c.app.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0 });
+  const budget = new Budget();
   const openrouter = process.env.OPENROUTER_API_KEY ?? "";
 
   await check(engine === "apple" ? "transcription on this Mac" : "transcription call", async () => {

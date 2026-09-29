@@ -492,7 +492,7 @@ describe("S2 client", () => {
       bodies.push(JSON.parse(init.body as string));
       return responses.shift()!();
     }) as unknown as typeof fetch;
-    const budget = new Budget({ sessionCapUsd: 5, devCapUsd: 3, enforceDevCap: true, devSpentUsd: 0 });
+    const budget = new Budget();
     const c = new S2Client(cfg.app.s2, { fetch: f, apiKey: "k", budget, log: (r) => rows.push(r), sleep: async () => {}, today: () => "24 September 2026" });
     return { c, bodies, rows, budget };
   }

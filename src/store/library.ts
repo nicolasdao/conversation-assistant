@@ -317,18 +317,9 @@ export class SessionLibrary {
     return { rows: rows.slice(-Math.max(1, limit)), models: { s1: cfg?.jev?.model ?? null, s2: cfg?.s2?.model ?? null } };
   }
 
-  /**
-   * Deletes a recording's folder for good. Its spend is first appended to deleted-spend.jsonl beside the folders, so the
-   * development budget (sumDevSpend) still counts it.
-   */
+  /** Deletes a recording's folder for good. */
   remove(id: string): void {
     const dir = this.dirOf(id);
-    const summary = this.load(id).summary;
-    // an imported recording's spend was someone else's, and never counted here
-    if (summary.costUsd > 0 && !summary.imported) {
-      appendFileSync(join(this.root, "deleted-spend.jsonl"),
-        JSON.stringify({ kind: "deleted_session", session_id: id, deleted_at: new Date().toISOString(), cost_usd: summary.costUsd }) + "\n");
-    }
     rmSync(dir, { recursive: true, force: true });
     this.cache.delete(id);
   }
@@ -344,7 +335,7 @@ export class SessionLibrary {
         features: { factcheck: session.features?.factcheck !== false, labels: session.features?.labels !== false } },
       labels: this.labelsOf(session),
       s1: { active: session.s1Version ?? "s1@1", versions: [], memory: [] },
-      cost: { ...s.cost, session: s.costUsd, sessionCapUsd: session.config?.budget?.sessionCapUsd ?? 5 },
+      cost: { ...s.cost, session: s.costUsd },
       archived: true,
     };
   }
