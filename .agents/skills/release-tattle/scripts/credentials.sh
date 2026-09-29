@@ -15,11 +15,12 @@ else
   elif [ "$days" -lt 30 ]; then echo "warning: $name expires in $days days ($end): create a new one in Xcode soon"
   else echo "ok: $name, valid for $days more days"; fi
   # Apple's first Developer ID intermediate expires on 1 Feb 2027 and caps every certificate it issued; the G2 one
-  # issues certificates for 5 years
-  issuer="$(printf '%s\n' "$cert" | openssl x509 -noout -issuer | sed -E 's/.*CN ?= ?([^,/]*).*/\1/')"
+  # issues certificates for 5 years. Both are named "Developer ID Certification Authority": only the G2 one has
+  # OU=G2, so the whole issuer is checked, not its CN.
+  issuer="$(printf '%s\n' "$cert" | openssl x509 -noout -issuer)"
   case "$issuer" in
-    *G2*) ;;
-    *) echo "note: issued by the older \"$issuer\", so it cannot outlive 1 Feb 2027: create a new Developer ID Application certificate on developer.apple.com, choosing the G2 Sub-CA (5 years), then remove this one from the keychain (do not revoke it)";;
+    *G2*) echo "ok: issued by the G2 Developer ID authority (certificates for up to 5 years)";;
+    *) echo "note: issued by the older \"Developer ID Certification Authority\", so it cannot outlive 1 Feb 2027: create a new Developer ID Application certificate on developer.apple.com, choosing the G2 Sub-CA (5 years), then remove this one from the keychain (do not revoke it)";;
   esac
 fi
 if [ -n "${APPLE_API_KEY:-}${APPLE_ID:-}${APPLE_KEYCHAIN_PROFILE:-}" ]; then
