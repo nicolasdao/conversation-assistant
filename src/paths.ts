@@ -19,6 +19,8 @@ export interface AppPaths {
   sessions: string;
   /** The tattle-capture helper. */
   helper: string;
+  /** The tattle-transcribe helper: on-device transcription with Apple Speech (macOS 26+). */
+  transcriber: string;
   /** The third-party notices, THIRD_PARTY_NOTICES.md (in the Mac app, a .txt copy next to the full texts). */
   notices: string;
   /** The full license texts the notices point to: licenses/. */
@@ -36,6 +38,7 @@ const DEFAULTS: AppPaths = {
   models: "models",
   sessions: "sessions",
   helper: "native/capture/.build/release/tattle-capture",
+  transcriber: "native/transcribe/.build/release/tattle-transcribe",
   notices: join(ROOT, "THIRD_PARTY_NOTICES.md"),
   licenses: join(ROOT, "licenses"),
   src: join(ROOT, "src"),

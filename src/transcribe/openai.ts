@@ -8,6 +8,8 @@ const FILLER = /^(uh|um|mm|hmm|mm-hmm|yeah|yes|no|okay|ok|right|so)\W*$/i;
 
 export interface TranscriptionRow {
   kind: "transcription";
+  /** Which engine transcribed the line (rows from before engines existed have none: OpenAI). */
+  engine: "openai" | "apple";
   utterance_id: string;
   ok: boolean;
   latency_ms: number;
@@ -157,6 +159,7 @@ export class Transcriber {
   private log(utteranceId: string, r: { ok: boolean; attempts: number; started: number; audioSeconds: number; cost: number; error?: string }) {
     this.deps.log({
       kind: "transcription",
+      engine: "openai",
       utterance_id: utteranceId,
       ok: r.ok,
       latency_ms: Date.now() - r.started,

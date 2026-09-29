@@ -43,6 +43,14 @@ export const AppConfigSchema = z.object({
       hangoverMs: nonNegative,
       usdPerMinute: nonNegative,
     }).strict().optional(),
+    /** On-device transcription with Apple Speech (macOS 26+): one clip per utterance, live text from stream analyzers. */
+    apple: z.object({
+      locale: z.string().min(1).default("en-US"),
+      clipPadMs: nonNegative.default(300),
+      clipConcurrency: int.default(2),
+      /** Plus twice the clip's length: it only catches a stuck helper, and a busy Mac (or a --speed max replay) is slow. */
+      clipTimeoutMs: int.default(20000),
+    }).strict().default({ locale: "en-US", clipPadMs: 300, clipConcurrency: 2, clipTimeoutMs: 20000 }),
   }).strict(),
   jev: z.object({
     model: z.string().min(1), utteranceTimeoutMs: int, segmentTimeoutMs: int, maxAttempts: int,

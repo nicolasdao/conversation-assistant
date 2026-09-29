@@ -9,6 +9,7 @@ import { SAMPLE_RATE } from "../audio/wav.ts";
 import { Embedder, SpeakerRegistry, type VoiceLimits } from "../speakers/registry.ts";
 import { Transcriber, type TranscriptionContext, type TranscriptionResult } from "../transcribe/openai.ts";
 import { LiveTranscriber, type LiveDeps } from "../transcribe/live.ts";
+import { AppleSpeech, type SpawnHelper, type Span } from "../transcribe/apple.ts";
 import { JevClient, type JevCallMeta, type JevCallRow } from "../jev/client.ts";
 import type { JevResponse, QuestionSet } from "../jev/types.ts";
 import { S2Client } from "../factcheck/s2.ts";
@@ -40,8 +41,20 @@ const NO_FACTCHECK = { questions: () => ({ questions: {}, version: "off" }), onA
 /** Streamed to the page but never stored in the replayable history or events.jsonl. */
 const TRANSIENT = new Set<EventType>(["utterance.partial", "call.started", "call"]);
 
+/** Which engine turns speech into text: Apple Speech on this Mac (macOS 26+), or OpenAI. */
+export type TranscriptionEngine = "apple" | "openai";
+
+/** The live-text side of an engine, fed every frame and told when the VAD closes a line. */
+interface LiveText {
+  warm(stream: StreamName): void;
+  feed(stream: StreamName, samples: Float32Array, speaking: boolean, sessionMs?: number): void;
+  commit(stream: StreamName, utteranceId: string, endMs?: number): void;
+  close(): void | Promise<void>;
+}
+
 export interface Services {
-  transcribe(utteranceId: string, samples: Float32Array, context?: TranscriptionContext): Promise<TranscriptionResult>;
+  /** `span` places the line in its stream (Apple cuts a padded clip from it); retries have none. OpenAI ignores it. */
+  transcribe(utteranceId: string, samples: Float32Array, context?: TranscriptionContext, span?: Span): Promise<TranscriptionResult>;
   ask(state: unknown, questions: QuestionSet, meta: JevCallMeta): Promise<JevResponse>;
   s2: S2Api;
 }
@@ -67,6 +80,10 @@ export interface SessionOptions {
   liveText?: boolean;
   /** Test seam for the realtime WebSocket. */
   liveConnect?: LiveDeps["connect"];
+  /** The transcription engine; OpenAI unless given. */
+  engine?: TranscriptionEngine;
+  /** Test seam for the tattle-transcribe helper. */
+  appleSpawn?: SpawnHelper;
   /** Overrides `speakers.voicesPerStream`, e.g. how many people are on the call tonight. */
   voices?: VoiceLimits;
   /** Both on unless set to false. */
@@ -119,7 +136,8 @@ export class Session {
   private readonly timers: NodeJS.Timeout[] = [];
   private stopRequested = false;
   private exportRows: unknown[] = [];
-  private live: LiveTranscriber | null = null;
+  private live: LiveText | null = null;
+  private apple: AppleSpeech | null = null;
   private done: Promise<void> | null = null;
 
   constructor(private readonly opts: SessionOptions) {
@@ -145,9 +163,21 @@ export class Session {
       // every Jev and System 2 call also streams to the page, as it completes
       if (file === "jev_calls" || file === "s2_calls") this.emit("call", { ...(row as Record<string, unknown>), ...(live ?? {}) });
     };
-    this.services = opts.services ? opts.services({ budget: this.budget, log }) : this.realServices(log);
     const liveCfg = opts.config.app.transcription.live;
-    if (opts.liveText && liveCfg?.enabled) {
+    if (this.engine === "apple") {
+      // Apple needs every frame even without live text: each line's clip is cut from the helper's own audio
+      this.apple = new AppleSpeech(opts.config.app.transcription, {
+        emitPartials: !!(opts.liveText && liveCfg?.enabled),
+        log: (r) => this.store.append("transcriptions", r),
+        onPartial: (p) => this.emit("utterance.partial", { ...p }),
+        onError: (m) => this.emit("error", { component: "transcription", message: m }),
+        spawn: opts.appleSpawn,
+      });
+      this.live = this.apple;
+      for (const s of streams) this.apple.warm(s);
+    }
+    this.services = opts.services ? opts.services({ budget: this.budget, log }) : this.realServices(log);
+    if (this.engine === "openai" && opts.liveText && liveCfg?.enabled) {
       this.live = new LiveTranscriber(opts.config.app.transcription, liveCfg, {
         apiKey: opts.keys?.openai ?? process.env.OPENAI_API_KEY ?? "",
         budget: this.budget,
@@ -222,6 +252,16 @@ export class Session {
     return this.opts.mode;
   }
 
+  get engine(): TranscriptionEngine {
+    return this.opts.engine ?? "openai";
+  }
+
+  /** What session.json and session.started record about the engine. */
+  get transcription(): { engine: TranscriptionEngine; model?: string; locale?: string } {
+    const cfg = this.opts.config.app.transcription;
+    return this.engine === "apple" ? { engine: "apple", locale: cfg.apple.locale } : { engine: "openai", model: cfg.model };
+  }
+
   get features(): Features {
     return { factcheck: this.opts.features?.factcheck !== false, labels: this.opts.features?.labels !== false };
   }
@@ -241,8 +281,11 @@ export class Session {
       fetch: f, apiKey: openrouter, budget: this.budget, log: (r) => log("s2_calls", r),
       onStart: (purpose) => this.emit("call.started", { system: "s2", purpose }),
     });
+    const apple = this.apple;
     return {
-      transcribe: (id, samples, context) => transcriber.transcribe(id, samples, context),
+      transcribe: apple
+        ? (id, samples, _context, span) => apple.transcribe(id, samples, span)
+        : (id, samples, context) => transcriber.transcribe(id, samples, context),
       ask: (s, q, m) => jev.ask(s, q, m),
       s2,
     };
@@ -267,13 +310,14 @@ export class Session {
       // the version that made the recording, which an export carries along
       id: this.id, app: appInfo(), mode: this.opts.mode, startedAt: this.startedAt.toISOString(),
       streams: this.opts.sources.map((s) => s.stream),
-      config: cfg.app, voices: this.voices, features: this.features, labelSet: cfg.labels, labelSetVersion: this.timeline.version,
+      config: cfg.app, voices: this.voices, features: this.features, transcription: this.transcription,
+      labelSet: cfg.labels, labelSetVersion: this.timeline.version,
       s1Version: this.factcheck.active.id, s1: cfg.s1,
     });
     this.emit("session.started", {
       sessionId: this.id, mode: this.opts.mode, dir: this.store.dir, s1Version: this.factcheck.active.id,
       labelSetVersion: this.timeline.version, streams: this.opts.sources.map((s) => s.stream), startedAt: this.startedAt.toISOString(),
-      features: this.features,
+      features: this.features, transcription: this.transcription,
     });
     if (this.echoGate.active) this.emitEchoGate();
     this.timers.push(setInterval(() => this.emitHealth(), 1000));
@@ -298,7 +342,7 @@ export class Session {
         if (h.recent.length > 32) h.recent.shift();
         const vad = this.vads.get(f.stream)!;
         const utts = vad.accept(f.samples, f.sessionMs);
-        this.live?.feed(f.stream, f.samples, vad.isDetected());
+        this.live?.feed(f.stream, f.samples, vad.isDetected(), f.sessionMs);
         for (const u of utts) this.onUtterance(u);
         this.segmenter.poll();
         if (++n % 64 === 0) await new Promise<void>((r) => setImmediate(r)); // let network I/O progress at speed max
@@ -325,9 +369,9 @@ export class Session {
       speaker_inferred: a.inferred, tags,
     });
     this.segmenter.emitted(u);
-    this.live?.commit(u.stream, u.id);
+    this.live?.commit(u.stream, u.id, u.endMs);
     const context = this.transcriptionContext();
-    const p = this.services.transcribe(u.id, u.samples, context)
+    const p = this.services.transcribe(u.id, u.samples, context, { stream: u.stream, startMs: u.startMs, endMs: u.endMs })
       .catch((e): TranscriptionResult => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
       .then((r) => {
         if (!r.ok) {
@@ -496,7 +540,7 @@ export class Session {
     if (!drained) this.emit("error", { component: "factcheck", message: "fact-check work still running after 180 s; ending anyway" });
     this.factcheck.stop();
     for (const t of this.timers) clearInterval(t);
-    this.live?.close();
+    await this.live?.close();
     this.emitStats(); // 5.
     this.store.writeJson("speakers.json", this.speakers.list());
     if (this.opts.exportBoundary) {
