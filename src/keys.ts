@@ -1,4 +1,5 @@
-// The two API keys: where they are stored, how they are loaded, and how a key is checked before it is saved.
+// The two API keys, both optional (OpenAI's is required only when OpenAI transcribes; OpenRouter's only for fact-checking,
+// labels, and Chat): where they are stored, how they are loaded, and how a key is checked before it is saved.
 // Keys live in the environment (a shell variable or .env) or in a credentials file in the user's Library, outside
 // the project folder, so they can never be committed. The environment wins. See docs/setup.md.
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
@@ -182,11 +183,13 @@ export async function checkKey(name: KeyName, key: string, opts: { fetch: typeof
 
 /** The setup routes' logic: what is missing, and saving keys that passed their check. */
 export class KeySetup {
-  constructor(private readonly store: KeyStore, private readonly opts: { fetch: typeof fetch; models: string[] }) {}
+  /** `required`: the keys the app cannot run without, which follow the transcription engine (OpenAI's, or none). */
+  constructor(private readonly store: KeyStore, private readonly opts: { fetch: typeof fetch; models: string[]; required?: () => KeyName[] }) {}
 
   status() {
     const keys = this.store.status();
-    return { configured: keys.every((k) => k.set), keys, path: this.store.path.replace(homedir(), "~") };
+    const required = this.opts.required?.() ?? ["openai"];
+    return { configured: required.every((r) => keys.some((k) => k.name === r && k.set)), required, keys, path: this.store.path.replace(homedir(), "~") };
   }
 
   /** Checks every key given; saves them only if none is refused. */

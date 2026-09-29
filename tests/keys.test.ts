@@ -103,7 +103,9 @@ describe("checking a key", () => {
 describe("the server before the keys are set", () => {
   const env: NodeJS.ProcessEnv = {};
   const store = new KeyStore({ path: tmpFile(), env }).load();
-  const setup = new KeySetup(store, { fetch: fakeFetch().f, models: [] });
+  // the required keys follow the transcription engine: OpenAI's key for OpenAI, none for Apple Speech on this Mac
+  let transcription: "openai" | "apple" = "openai";
+  const setup = new KeySetup(store, { fetch: fakeFetch().f, models: [], required: () => (transcription === "openai" ? ["openai"] : []) });
   const engine = { bus: new EventBus(), state: () => ({ session: null }) } as unknown as EngineApi;
   const server = createApiServer(engine, { webRoot: mkdtempSync(join(tmpdir(), "web-")), setup });
   let port = 0;
@@ -125,14 +127,22 @@ describe("the server before the keys are set", () => {
       req.end();
     });
 
-  test("only the setup routes answer until both keys are saved", async () => {
+  test("with Apple Speech no key is required: the app opens at once", async () => {
+    transcription = "apple";
+    const s = await call("GET", "/api/setup");
+    expect(s.json).toMatchObject({ configured: true, required: [], keys: [{ name: "openai", set: false }, { name: "openrouter", set: false }] });
+    expect((await call("GET", "/api/state")).status).toBe(200);
+  });
+
+  test("with OpenAI only the setup routes answer until the OpenAI key is saved; OpenRouter is never required", async () => {
+    transcription = "openai";
     expect((await call("GET", "/api/state")).status).toBe(503);
     expect((await call("GET", "/api/licenses")).status).toBe(200); // Help → Licenses works on the setup screen too
     const s = await call("GET", "/api/setup");
-    expect(s.json).toMatchObject({ configured: false, keys: [{ name: "openai", set: false }, { name: "openrouter", set: false }] });
-    expect((await call("POST", "/api/setup/keys", { openai: OPENAI })).json).toMatchObject({ saved: true, configured: false });
+    expect(s.json).toMatchObject({ configured: false, required: ["openai"], keys: [{ name: "openai", set: false }, { name: "openrouter", set: false }] });
+    expect((await call("POST", "/api/setup/keys", { openrouter: OPENROUTER })).json).toMatchObject({ saved: true, configured: false });
     expect((await call("GET", "/api/state")).status).toBe(503);
-    expect((await call("POST", "/api/setup/keys", { openrouter: OPENROUTER })).json).toMatchObject({ saved: true, configured: true });
+    expect((await call("POST", "/api/setup/keys", { openai: OPENAI })).json).toMatchObject({ saved: true, configured: true });
     expect((await call("GET", "/api/state")).status).toBe(200);
   });
 

@@ -4,7 +4,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
-import { Session, type Features, type SessionOptions } from "../pipeline/session.ts";
+import { Session, type Features, type SessionOptions, type TranscriptionEngine } from "../pipeline/session.ts";
 import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
 import { LabelConflictError } from "../pipeline/timeline.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
@@ -19,7 +19,8 @@ import {
   discard, exportEstimate, exportFileName, exportRecording, importRecording, MAX_UPLOAD_BYTES, saveUpload, TransferError, type AudioChoice,
 } from "../store/transfer.ts";
 import { appInfo } from "../version.ts";
-import { KeyError, KeySetup, KeyStore } from "../keys.ts";
+import { KeyError, KeySetup, KeyStore, type KeyName } from "../keys.ts";
+import { TranscriptionSettings, type TranscriptionStatus } from "../settings.ts";
 import { appPaths, migrateAppSupportDir } from "../paths.ts";
 import { licenses } from "../licenses.ts";
 
@@ -49,9 +50,20 @@ export interface ChatApi {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  /** `extra` joins the error body: `needsKey` tells the page which key to ask for, `preparing` that Apple's model is not ready. */
+  constructor(readonly status: number, message: string, readonly extra?: Record<string, unknown>) {
     super(message);
   }
+}
+
+/** Fact-checking and labels ask Jev and GPT-6 Luna, through OpenRouter: the only features that need its key. */
+const OPENROUTER_MESSAGE = "Please provide your OpenRouter API key to configure fact-checking or labeling.";
+
+/** The transcription engine setting, as the routes see it (see docs/transcription.md). */
+export interface TranscriptionApi {
+  status(): TranscriptionStatus;
+  set(engine: unknown): Promise<TranscriptionStatus>;
+  install(): TranscriptionStatus;
 }
 
 /** `features`: what runs beyond the transcript, fixed for the session; both on unless set to false. */
@@ -103,6 +115,10 @@ export interface EngineApi {
   chat?: ChatApi;
   /** Absent: the export and import routes answer 501. */
   transfer?: TransferApi;
+  /** Absent: the transcription routes answer 501. */
+  transcription?: TranscriptionApi;
+  /** Whether the OpenRouter key is set (the chat checks it before calling OpenRouter). */
+  openrouterKeySet?(): boolean;
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -134,6 +150,8 @@ export interface EngineOptions {
   /** The chat window's network access (tests pass a fake). */
   fetch?: typeof fetch;
   openrouterKey?: string;
+  /** The engine setting; without it, sessions transcribe with OpenAI. */
+  transcription?: TranscriptionSettings;
 }
 
 /** The engine: owns one session at a time, its event bus, and the host commands. */
@@ -267,6 +285,40 @@ export class Engine implements EngineApi {
     return this.session;
   }
 
+  openrouterKeySet(): boolean {
+    return !!(this.opts.openrouterKey ?? this.opts.session?.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "").trim();
+  }
+
+  private openaiKeySet(): boolean {
+    return !!(this.opts.session?.keys?.openai ?? process.env.OPENAI_API_KEY ?? "").trim();
+  }
+
+  private get engineChoice(): TranscriptionEngine {
+    return this.opts.transcription?.engine ?? "openai";
+  }
+
+  get transcription(): TranscriptionApi | undefined {
+    return this.opts.transcription && this.transcriptionApi;
+  }
+
+  private readonly transcriptionApi: TranscriptionApi = {
+    status: () => this.opts.transcription!.status(),
+    set: async (engine) => {
+      const t = this.opts.transcription!;
+      if (engine !== "apple" && engine !== "openai") throw new ApiError(400, "engine must be apple or openai");
+      if (this.session && this.session.status !== "ended") throw new ApiError(409, "the transcription engine can be changed when no session is on air");
+      if (engine === "openai" && !this.openaiKeySet()) throw new ApiError(400, "Transcribing with OpenAI needs an OpenAI API key.", { needsKey: "openai" });
+      if (engine === "apple" && !t.appleAvailable) throw new ApiError(400, `On-device transcription is not available: ${t.appleReason ?? "unknown reason"}`);
+      return t.set(engine);
+    },
+    install: () => {
+      const t = this.opts.transcription!;
+      if (!t.appleAvailable) throw new ApiError(400, `On-device transcription is not available: ${t.appleReason ?? "unknown reason"}`);
+      void t.install();
+      return t.status();
+    },
+  };
+
   /** Imports wait for the show to end: unpacking and decoding a recording competes with live capture. */
   private notOnAir() {
     if (this.session?.status === "running") throw new ApiError(409, "a session is on air: import the recording after it ends");
@@ -394,6 +446,16 @@ export class Engine implements EngineApi {
   async start(req: StartRequest): Promise<{ sessionId: string }> {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
     const features = parseFeatures(req?.features);
+    // what this session needs before anything starts: the keys its features and engine use, and Apple's model
+    const engine = this.engineChoice;
+    const realServices = !this.opts.session?.services; // tests inject services, which need no key
+    if (realServices && (features.factcheck !== false || features.labels !== false) && !this.openrouterKeySet()) {
+      throw new ApiError(400, OPENROUTER_MESSAGE, { needsKey: "openrouter" as KeyName });
+    }
+    if (realServices && engine === "openai" && !this.openaiKeySet()) throw new ApiError(400, "Transcribing with OpenAI needs an OpenAI API key.", { needsKey: "openai" as KeyName });
+    if (engine === "apple" && !this.opts.transcription!.ready) {
+      throw new ApiError(409, "On-device speech recognition is getting ready: try again when it is.", { preparing: true });
+    }
     let sources: AudioSource[];
     let mode: "replay" | "live";
     let liveText = false;
@@ -424,7 +486,7 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features, engine,
       // how many people are on the call (the remote stream); 0 means no limit
       ...(Number.isInteger(req.voices) && req.voices! >= 0 ? { voices: { remote: req.voices } } : {}),
       ...this.opts.session,
@@ -669,10 +731,13 @@ function fromThisPage(req: IncomingMessage): boolean {
   return !origin || origin === `http://${host}`;
 }
 
-/** Routes that work before the keys are set: the setup page's own, the page's footer, and the licenses. */
-const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/about", "/api/licenses", "/api/engine"]);
+/**
+ * Routes that work before the required keys are set: the setup page's own, the transcription engine (the setup screen
+ * says why it needs a key), the page's footer, and the licenses.
+ */
+const OPEN_ROUTES = new Set(["/api/setup", "/api/setup/keys", "/api/transcription", "/api/about", "/api/licenses", "/api/engine"]);
 
-export function createApiServer(engine: EngineApi, opts: { webRoot?: string; setup?: SetupApi } = {}): Server {
+export function createApiServer(engine: EngineApi, opts: { webRoot?: string; setup?: SetupApi; ready?: Promise<unknown> } = {}): Server {
   const webRoot = opts.webRoot ?? appPaths().web;
   const setup = opts.setup;
   return createServer(async (req, res) => {
@@ -680,6 +745,8 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
     const path = url.pathname;
     const m = req.method ?? "GET";
     try {
+      // the engine setting resolves at boot (which keys are required depends on it): answer once it has
+      await opts.ready;
       if (!fromThisPage(req)) throw new ApiError(403, "this server answers only its own page at 127.0.0.1");
       if (setup && path.startsWith("/api/setup")) {
         if (m === "GET" && path === "/api/setup") return send(res, 200, setup.status());
@@ -688,7 +755,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
           return send(res, 200, await setup.save(await readJson(req)));
         }
       }
-      // until both keys are set, the engine's routes wait: the page shows only the setup screen
+      // until the keys the engine needs are set, its routes wait: the page shows only the setup screen
       if (setup && path.startsWith("/api/") && !OPEN_ROUTES.has(path) && !setup.status().configured) {
         return send(res, 503, { error: "API keys are missing: open the page to add them", setup: true });
       }
@@ -711,6 +778,13 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
       if (m === "GET" && path === "/api/licenses") return send(res, 200, licenses());
       if (m === "GET" && path === "/api/engine") return send(res, 200, { startedAt: new Date(BOOTED_AT).toISOString(), stale: engineStale() });
       if (m === "GET" && path === "/api/stats") return send(res, 200, engine.stats());
+      if (path === "/api/transcription" || path === "/api/transcription/install") {
+        const t = engine.transcription;
+        if (!t) throw new ApiError(501, "the transcription setting is not available");
+        if (m === "GET" && path === "/api/transcription") return send(res, 200, t.status());
+        if (m === "PUT" && path === "/api/transcription") return send(res, 200, await t.set((await readJson(req)).engine));
+        if (m === "POST" && path === "/api/transcription/install") return send(res, 202, t.install());
+      }
       if (m === "GET" && path === "/api/devices") return send(res, 200, await engine.devices());
       if (m === "POST" && path === "/api/session/start") return send(res, 200, await engine.start(await readJson(req)));
       if (m === "POST" && path === "/api/session/stop") return send(res, 200, await engine.stop());
@@ -746,6 +820,10 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
       if (path === "/api/chat/models" || path.startsWith("/api/chats")) {
         const chat = engine.chat;
         if (!chat) throw new ApiError(501, "chat is not available");
+        // asking needs OpenRouter: say which key is missing before calling it (reading past chats does not)
+        if (m === "POST" && engine.openrouterKeySet && !engine.openrouterKeySet()) {
+          throw new ApiError(400, "Please provide your OpenRouter API key to use Chat.", { needsKey: "openrouter" });
+        }
         if (m === "GET" && path === "/api/chat/models") return send(res, 200, await chat.models());
         if (m === "GET" && path === "/api/chats") return send(res, 200, chat.list());
         if (m === "POST" && path === "/api/chats") return send(res, 200, await chat.create((await readJson(req)).model));
@@ -791,7 +869,7 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
       return send(res, 404, { error: "not found" });
     } catch (e) {
       const status = e instanceof ApiError || e instanceof ChatError || e instanceof KeyError ? e.status : 400;
-      return send(res, status, { error: e instanceof Error ? e.message : String(e) });
+      return send(res, status, { error: e instanceof Error ? e.message : String(e), ...(e instanceof ApiError ? e.extra : {}) });
     }
   });
 }
@@ -807,16 +885,26 @@ export function bootEngine(opts: { allowOverDevCap?: boolean } = {}) {
   migrateAppSupportDir(); // before the keys are read: the folder from before the rename to Tattle
   const keys = new KeyStore().load();
   const config = loadConfig();
+  const keySet = (name: KeyName) => keys.status().some((k) => k.name === name && k.set);
+  let engine: Engine | null = null;
+  const transcription = new TranscriptionSettings({
+    openaiKeySet: () => keySet("openai"),
+    // transient, like live text: the engine choice and the model's progress are not part of any session
+    onChange: (s) => engine?.bus.emit("transcription.status", { ...s }, { transient: true }),
+  });
+  const ready = transcription.init().catch((e) => console.error("transcription setting:", e));
   const setup = new KeySetup(keys, {
     fetch: (...a) => fetch(...a),
     models: [config.app.transcription.model, ...(config.app.transcription.live?.enabled ? [config.app.transcription.live.model] : [])],
+    // only the engine's key is required: OpenRouter is asked for when a feature or the chat needs it
+    required: () => (transcription.engine === "openai" ? ["openai"] : []),
   });
-  const engine = new Engine({
-    config, allowOverDevCap: opts.allowOverDevCap,
+  engine = new Engine({
+    config, allowOverDevCap: opts.allowOverDevCap, transcription,
     live: (mic, onStatus) => startNativeCapture({ mic: mic === "builtin" ? undefined : mic, onStatus }),
     devices: () => listDevices(),
   });
-  return { keys, config, engine, server: createApiServer(engine, { setup }) };
+  return { keys, config, engine, transcription, ready, server: createApiServer(engine, { setup, ready }) };
 }
 
 // ---------- CLI: npm run serve [-- --replay <dir> --speed 1|max] ----------
@@ -828,15 +916,17 @@ async function main() {
       "allow-over-dev-cap": { type: "boolean", default: false },
     },
   });
-  const { keys, config, engine, server } = bootEngine({ allowOverDevCap: values["allow-over-dev-cap"] });
+  const { keys, config, engine, transcription, ready, server } = bootEngine({ allowOverDevCap: values["allow-over-dev-cap"] });
+  await ready;
   const port = Number(values.port ?? config.app.server.port);
+  // what is missing for this engine; a replay also runs fact-checking and labels, which need OpenRouter
+  const missing = (extra: KeyName[] = []) => keys.missing().filter((k) => (transcription.engine === "openai" && k === "openai") || extra.includes(k));
   server.listen(port, "127.0.0.1", () => {
-    console.log(`Tattle on http://127.0.0.1:${port}`);
-    const missing = keys.missing();
-    if (missing.length) console.log(`API keys missing (${missing.join(", ")}): open the page above to add them`);
+    console.log(`Tattle on http://127.0.0.1:${port} (transcription: ${transcription.engine === "apple" ? "on this Mac, Apple Speech" : "OpenAI"})`);
+    if (missing().length) console.log(`API key missing (${missing().join(", ")}): open the page above to add it`);
   });
-  if (values.replay && keys.missing().length) {
-    console.error("--replay needs both API keys: open the page to add them, then start the replay from there");
+  if (values.replay && missing(["openrouter"]).length) {
+    console.error(`--replay needs ${missing(["openrouter"]).join(" and ")} (fact-checking and labels run): open the page to add them, then start the replay from there`);
   } else if (values.replay) {
     const { sessionId } = await engine.start({ mode: "replay", dir: values.replay, speed: values.speed === "max" ? "max" : 1 });
     console.log(`replaying ${values.replay} at speed ${values.speed} as session ${sessionId}`);

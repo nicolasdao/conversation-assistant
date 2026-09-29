@@ -13,6 +13,8 @@ export const EVENT_SCHEMAS = {
   // speaker mode switched on or off: the microphone is muted while the call plays through the speakers
   "echo.gate": obj({ active: z.boolean(), device: str.nullable(), atMs: num }),
   health: obj({ stream: z.enum(["host", "remote"]), rmsDbfs: num, msSinceLastFrame: num, utterancesLastMinute: num }),
+  // the transcription engine and Apple's model: which engine, and install progress (transient, like partials)
+  "transcription.status": obj({ engine: z.enum(["apple", "openai"]) }),
   "utterance.partial": obj({ stream: z.enum(["host", "remote"]), itemId: str, text: str, utteranceId: str.nullable(), final: z.boolean() }),
   // a line whose final transcript failed: "retrying" (its audio is kept and retried), "failed" (given up), "empty" (the retry heard nothing)
   "utterance.failed": obj({ id: str, stream: str, startMs: num, endMs: num, speakerId: str, status: z.enum(["retrying", "failed", "empty"]) }),
