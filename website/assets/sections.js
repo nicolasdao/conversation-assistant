@@ -54,7 +54,7 @@
 
     const answerHtml = (id, v) => {
       const t = Q[id].type;
-      if (t === "noul") return `<span class="bar"><i style="--p:${v}"></i></span><span class="num tab">${v.toFixed(2)}</span>`;
+      if (t === "noul") return `<span class="pbar"><i style="--p:${v}"></i></span><span class="num tab">${v.toFixed(2)}</span>`;
       if (t === "choice") return `<span class="choice">${esc(v[0])}</span><span class="num tab">${v[1].toFixed(2)}</span>`;
       const pips = [0, 1, 2, 3, 4].map((n) => `<b class="${v >= n + 0.5 ? "on" : ""}"></b>`).join("");
       return `<span class="pips">${pips}</span><span class="num tab">${v.toFixed(1)}<small>/4</small></span>`;

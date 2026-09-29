@@ -27,6 +27,7 @@ Tattle's official website is **https://hey-tattle.com**. It is one page whose jo
 
 The page was chosen from experiment `02-record-button`. Its sections, top to bottom:
 
+0. **The header bar** (`assets/nav.js`), pinned to the top as the page scrolls: the app's own header strap (the ON AIR block, which the record key turns on, the name, the record clock), the show's rundown as tabs (`01 Rundown` … `05 Credits`; the section on screen lights up red like a segment going on air), a compact Download that slides in once the hero's is off screen, and a playhead along its bottom edge with a tick where each section starts. On a phone the tabs are a swipeable second row.
 1. **The record key** (`assets/scene.js`, Three.js): the app icon as a glossy 3D key. Pressing it takes the page "on air" with rings, rising captions, and fact-check lower thirds. Without WebGL, `assets/main.js` draws a CSS key instead; with reduced motion, a calm version.
 2. **Rundown**: what the app does, in five steps.
 3. **Jev** (`#jev`): why a decision model makes live judgment affordable, with a replaying **Jev call** (`assets/sections.js`). The questions shown are Tattle's real ones; the answers are labelled as examples. It links to [TypeSafe AI](https://typesafe.ai) and [Jev's documentation](https://docs.typesafe.ai/). See [Jev](jev.md).

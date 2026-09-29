@@ -1,6 +1,6 @@
 #!/bin/sh
 # Writes the published release v<version> into the website's page (website/index.html), so hey-tattle.com names it and
-# links its DMG even without JavaScript or GitHub's API: the Download for Mac links, the version and size under the
+# links its DMG even without JavaScript or GitHub's API: the three Download for Mac links (hero, header bar, sign-off), the version and size under the
 # button, the footer's "Latest release" line (date and release notes), and the JSON-LD softwareVersion and downloadUrl.
 # Reads everything from the published GitHub Release, so run it only after deploy.sh. Changes no other file, commits
 # nothing, and can be run again. The page's own script still refreshes these from GitHub when it loads.
@@ -24,7 +24,7 @@ const v = { tag: r.tagName, url: dmg.url, size: `${Math.round(dmg.size / 1e6)} M
 let html = readFileSync(page, "utf8");
 // [pattern, replacement, how many the page must have]
 const edits = [
-  [/(data-download href=")[^"]*(")/g, `$1${v.url}$2`, 2],
+  [/(data-download href=")[^"]*(")/g, `$1${v.url}$2`, 3],
   [/(<span data-version>)[^<]*(<\/span>)/g, `$1${v.tag}$2`, 1],
   [/(<b data-version>)[^<]*(<\/b>)/g, `$1${v.tag}$2`, 1],
   [/(<span data-size>)[^<]*(<\/span>)/g, `$1${v.size}$2`, 1],

@@ -47,8 +47,36 @@
 <script src="assets/download.js" defer></script>
 <script type="module" src="assets/main.js"></script>
 <script src="assets/sections.js" defer></script>
+<script src="assets/nav.js" defer></script>
 </head>
 <body>
+
+<!-- The app's header strap, pinned: the ON AIR block, the name, the record clock, the show's rundown as tabs, and a
+     playhead along its bottom edge. assets/nav.js lights the tab of the section on screen and moves the playhead. -->
+<div class="bar" id="bar">
+  <div class="bar-in">
+    <div class="topstrap">
+      <div class="onair" id="onair"><i></i><span id="onair-label">Off air</span></div>
+      <div class="strap">
+        <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
+        <h1 class="name"><a href="#top">Tattle</a></h1>
+      </div>
+      <div class="clock" aria-hidden="true"><span class="eyebrow">Rec</span><time id="clock">00:00</time></div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <a href="#rundown"><em>01</em><span>Rundown</span></a>
+      <a href="#jev"><em>02</em><span>Jev</span></a>
+      <a href="#systems"><em>03</em><span>Fast and slow</span></a>
+      <a href="#preshow"><em>04</em><span>Pre-show</span></a>
+      <a href="#credits"><em>05</em><span>Credits</span></a>
+    </nav>
+    <a class="bar-dl" data-when="mac" data-download href="https://github.com/nicolasdao/tattle/releases/download/v0.8.0/Tattle-0.8.0-arm64.dmg" tabindex="-1">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+      Download
+    </a>
+  </div>
+  <div class="bar-track" id="bar-track" aria-hidden="true"><i class="bar-fill" id="bar-fill"></i></div>
+</div>
 
 <header class="hero" id="top">
   <!-- The studio: the record key, its sound rings, and the captions that rise out of them. -->
@@ -66,15 +94,6 @@
   </div>
 
   <div class="hero-copy">
-    <div class="topstrap">
-      <div class="onair" id="onair"><i></i><span id="onair-label">Off air</span></div>
-      <div class="strap">
-        <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
-        <h1 class="name">Tattle</h1>
-      </div>
-      <div class="clock" aria-hidden="true"><span class="eyebrow">Rec</span><time id="clock">00:00</time></div>
-    </div>
-
     <p class="lede">Tattle listens to your calls. It transcribes them as people speak, maps the conversation on a timeline, and <b>fact-checks claims as they're said.</b></p>
 
     <div class="dl" data-when="mac">

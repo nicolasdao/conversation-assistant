@@ -306,7 +306,7 @@ main { position: relative; z-index: 1; }
 .jc-json .s { color: var(--ink); }
 .jc-json .hl { background: rgba(43, 212, 240, 0.14); box-shadow: 0 0 0 2px rgba(43, 212, 240, 0.14); }
 .jc-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.jc-row { display: grid; grid-template-columns: 96px 66px minmax(0, 1fr) 236px; gap: 12px; align-items: center; padding: 8px 10px; background: var(--deck-2); }
+.jc-row { display: grid; grid-template-columns: 96px 74px minmax(0, 1fr) 236px; gap: 12px; align-items: center; padding: 8px 10px; background: var(--deck-2); }
 .jc-row.mem { box-shadow: inset 3px 0 0 var(--good); }
 .jc-row code { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
 .qt { justify-self: start; font: 700 11px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 6px; color: var(--paper-ink); background: var(--host); }
@@ -316,16 +316,16 @@ main { position: relative; z-index: 1; }
 .ans { display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 10px; align-items: center; transition: opacity 0.2s; }
 .ans .num { text-align: right; font: 700 16px/1 var(--cond); color: var(--ink); }
 .ans .num small { font-size: 12px; color: var(--mute); }
-.bar { height: 10px; background: var(--deck-3); position: relative; overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); background: var(--accent); transform-origin: left; }
+.pbar { height: 10px; background: var(--deck-3); position: relative; overflow: hidden; }
+.pbar i { position: absolute; inset: 0 auto 0 0; width: calc(var(--p) * 100%); background: var(--accent); transform-origin: left; }
 .choice { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 12.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--paper-ink); background: var(--paper); padding: 4px 7px; }
 .pips { display: flex; gap: 4px; }
 .pips b { flex: 1; height: 10px; background: var(--deck-3); }
 .pips b.on { background: var(--hype); }
 /* while the call is in flight, answers wait; they land together */
 .jevcall:not(.landed) .ans { opacity: 0.25; }
-.jevcall:not(.landed) .bar i { transform: scaleX(0); }
-.jevcall.landed .bar i { transform: scaleX(1); transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1); }
+.jevcall:not(.landed) .pbar i { transform: scaleX(0); }
+.jevcall.landed .pbar i { transform: scaleX(1); transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1); }
 .jc-out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 58px; padding: 12px 18px; border-top: 1px solid var(--rule); }
 .jc-out b { font: 800 19px/1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; padding: 8px calc(14px + 10px) 8px 12px; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
 .jc-out span { color: var(--ink-2); font-size: 15.5px; }
@@ -430,6 +430,68 @@ main { position: relative; z-index: 1; }
 .fine-cols b { color: var(--ink-2); font-weight: 600; }
 .fine-cols a { color: var(--ink-2); }
 
+/* ---------- the pinned header bar: the app's strap, the rundown as tabs, the playhead ---------- */
+:root { --bar-h: 64px; }
+html { scroll-behavior: smooth; }
+.sect { scroll-margin-top: calc(var(--bar-h) + 12px); }
+.hero-copy { padding-top: calc(var(--bar-h) + 34px); }
+
+.bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding-top: env(safe-area-inset-top, 0px);
+  background: rgba(15, 32, 56, 0.72); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  border-bottom: 1px solid transparent; transition: background 0.3s, border-color 0.3s;
+}
+.bar.scrolled { background: rgba(15, 32, 56, 0.94); border-bottom-color: var(--rule); }
+.bar-in { display: flex; align-items: stretch; height: 60px; gap: 18px; padding-right: 16px; }
+.bar .topstrap { height: 60px; flex: none; filter: none; }
+.bar .onair { font-size: 19px; padding: 0 22px 0 16px; }
+.bar .strap .name { font-size: 23px; }
+.bar .strap .name a { color: inherit; text-decoration: none; }
+.bar .clock time { font-size: 22px; }
+
+/* the rundown as tabs: the section on screen goes "on air", like a segment in the app */
+.tabs { display: flex; align-items: center; gap: 4px; margin-left: auto; min-width: 0; }
+.tabs a {
+  display: flex; align-items: center; gap: 8px; height: 38px; padding-right: 12px; text-decoration: none; white-space: nowrap;
+  font: 700 14.5px/1 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2);
+}
+.tabs em {
+  font: 800 13px/1 var(--cond); font-style: normal; letter-spacing: 0.04em; color: var(--mute); background: var(--deck-2);
+  padding: 6px 15px 5px 7px; clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); transition: background 0.25s, color 0.25s;
+}
+.tabs span { display: flex; align-items: center; gap: 7px; }
+.tabs a:hover { color: var(--ink); }
+.tabs a:hover em { background: var(--deck-3); color: var(--ink-2); }
+.tabs a[aria-current] { color: var(--ink); }
+.tabs a[aria-current] em { background: var(--live); color: #fff; }
+.tabs a[aria-current] span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); animation: pulse 1.2s ease-in-out infinite; }
+.tabs a:focus-visible { outline-offset: 2px; }
+
+/* the compact Download, which slides in once the hero's big one has scrolled away: a full-height strap that bookends the bar,
+   its left edge slanted like the name strap's, its right edge flush with the screen, as ON AIR is on the left */
+.bar-dl {
+  align-self: stretch; display: inline-flex; align-items: center; gap: 9px; flex: none; overflow: hidden; white-space: nowrap;
+  text-decoration: none; background: var(--accent); color: var(--paper-ink); font: 800 19px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase;
+  clip-path: polygon(var(--slant) 0, 100% 0, 100% 100%, 0 100%);
+  max-width: 0; padding: 0; margin-left: -18px; opacity: 0;
+  transition: max-width 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), padding 0.4s cubic-bezier(0.2, 0.9, 0.25, 1), margin 0.4s, opacity 0.25s;
+}
+.bar-dl svg { width: 18px; height: 18px; flex: none; }
+.bar-dl:hover { color: var(--paper-ink); filter: brightness(1.08); }
+.show-dl .bar-in { padding-right: 0; }
+.show-dl .bar-dl { max-width: 240px; padding: 0 24px 0 calc(20px + var(--slant)); margin-left: 0; opacity: 1; }
+
+/* the playhead: how far through the show you are, with a tick where each segment starts */
+.bar-track { position: relative; height: 3px; background: rgba(33, 58, 94, 0.55); }
+.bar-fill { position: absolute; inset: 0; background: var(--live); transform-origin: left; transform: scaleX(0); }
+.bar-track b { position: absolute; top: -2px; width: 2px; height: 7px; margin-left: -1px; background: var(--ink-2); opacity: 0.7; }
+
+@media (max-width: 1240px) { .bar .clock { display: none; } }
+@media (max-width: 1080px) and (min-width: 900px) {
+  .tabs em { display: none; }
+  .tabs a { padding-right: 8px; letter-spacing: 0.08em; }
+}
+
 /* ---------- narrow screens ---------- */
 @media (max-width: 1080px) {
   .seg { grid-template-columns: 96px minmax(0, 1fr); }
@@ -517,3 +579,23 @@ main { position: relative; z-index: 1; }
   .cue-arrow { animation: none; }
 }
 .reduced .cap { animation: none; transform: translate(calc(var(--x) - 50%), calc(var(--y) - 60px)); }
+
+/* ---------- the header bar on phones: the strap, then the tabs as a swipeable row ---------- */
+@media (max-width: 899px) {
+  :root { --bar-h: 105px; }
+  .hero-copy { padding-top: calc(var(--bar-h) + 16px); }
+  .bar-in { flex-wrap: wrap; height: auto; gap: 0; padding-right: 0; }
+  .bar .topstrap { height: 52px; width: auto; flex: 1 1 50%; min-width: 0; }
+  .bar.show-dl .strap .eyebrow { display: none; }
+  .bar .onair { font-size: 16px; padding: 0 18px 0 12px; }
+  .bar .strap .name { font-size: 20px; }
+  .bar-dl { font-size: 16px; margin-left: 0; }
+  .bar-dl svg { width: 16px; height: 16px; }
+  .show-dl .bar-dl { padding: 0 16px 0 calc(14px + var(--slant)); margin-left: calc(-1 * var(--slant)); }
+  .tabs {
+    order: 3; flex: 0 0 100%; height: 49px; margin: 0; padding: 0 16px; gap: 6px;
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs a { font-size: 14px; letter-spacing: 0.08em; padding-right: 10px; flex: none; }
+}
