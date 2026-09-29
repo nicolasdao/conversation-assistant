@@ -1,6 +1,6 @@
 # SPEC — On-device transcription with Apple Speech, as the default, and no required API keys
 
-Created 28 September 2026. Status: not started.
+Created 28 September 2026. Status: Phase 0 done (29 September 2026); §4.1 onward in progress.
 
 ## §0 How to use this spec (read first)
 
@@ -98,6 +98,19 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 - p95 finalize latency > 5 s, or overall word error rate more than 10 points worse than OpenAI → ask whether Apple Speech should still be the default.
 - `contextualStrings` clearly helps → ask whether to feed it the speakers' names and `transcription.keywords` (small addition to §4.1/§4.2).
 
+**Results (29 Sep 2026; the user chose clips for the final layer).** Measured on the reference episode, against OpenAI's text with fillers and number words normalized:
+- Two analyses at once ran for the whole 1 h 57 min with no error; four at once (two streams plus two clips) also did.
+- `finalize(through:)` at each utterance end **destroys words** whatever its timing (through end + 400 ms, or called 2 s late): 25 % disagreement, 17 % of words deleted, ~22 % of lines empty. It returns in 74 ms p50 / 179 ms p95.
+- Unfinalized streaming finals disagree 9.6 %, but arrive 3.4 s p50 / 12.6 s p95 / 22.8 s max after the speaker stops.
+- **One clip per utterance** (its own short-lived analyzer, ±300 ms of padding, two at once): 9.3 % disagreement, 8 of 1,581 lines empty, 0.3 s p50 / 0.9 s p95 per clip; "Jev" 23 times where OpenAI has 36 (others become "Jeff", "Jeb", "Javi"). The first analyzer and the first clip start cold: 0.35–7 s and 11 s.
+- Runs are word-level and all carry `audioTimeRange`, but the first word after a pause has its start stretched back over the pause: word **end** times are reliable, starts and midpoints are not.
+- First live (volatile) text: 2.0 s p50, 3.8 s p95 after speech starts (OpenAI's live layer: ~1.2 s).
+- `contextualStrings`: no effect (16 "Jev" with and without). Punctuation and capitalization: yes.
+- No Speech Recognition permission request (none in the `tccd` log). The en-US model (~155 MB) was already on this Mac; `--install` only allocated it (1.3 s), with no prompt. The download on a Mac without it is unmeasured.
+- The model runs in Apple's `localspeechrecognition` XPC service: 4.5 % of one core p50 with two real-time streams, 135–209 MB.
+
+So the final text comes from clips, and the stream analyzers only feed live text and are **never finalized** (§4.1, §4.2).
+
 ---
 
 ### §4.1 The `tattle-transcribe` Swift helper
@@ -107,24 +120,25 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 **Commands.**
 - `--status` → one JSON line: `{"available":bool,"reason":string|null,"locale":"en_US"|null,"installed":bool}`. `available` is `SpeechTranscriber.isAvailable` and a supported locale equivalent to `--locale` (default `en-US`).
 - `--install` → JSON lines `{"type":"progress","fraction":0.42}` … then `{"type":"installed"}` or `{"type":"error","message":…}`; exit 0 / non-zero. Idempotent.
-- Default (run) mode: reads binary frames from **stdin**, writes **JSON lines to stdout**, diagnostics as JSON lines to **stderr** (same convention as capture's stderr). Exits cleanly when stdin closes, after `finalizeAndFinishThroughEndOfInput()` on both analyzers.
+- Default (run) mode: reads binary frames from **stdin**, writes **JSON lines to stdout**, diagnostics as JSON lines to **stderr** (same convention as capture's stderr). Options: `--locale` (default `en-US`), `--live` (run the stream analyzers for live text), `--clip-concurrency` (2). Exits cleanly when stdin closes, after the queued clips finish and `finalizeAndFinishThroughEndOfInput()` on the stream analyzers.
 
 **Stdin frames (little-endian).** Header: magic `PTRX` (4 bytes), `kind` u8, `stream` u8 (0 host, 1 remote), 2 reserved bytes. Then by kind:
-- `0` audio: `startMs` f64 (session time of the first sample), `count` u32, `count` × PCM16 at 16 kHz mono.
-- `1` finalize: `throughMs` f64, `idLen` u32, UTF-8 utterance id.
-- `2` clip: `idLen` u32, id, `count` u32, samples. Transcribed standalone by a separate short-lived analyzer (`analyzeSequence` then `finalizeAndFinishThroughEndOfInput`); `stream` is ignored.
+- `0` audio (sent only with `--live`): `startMs` f64 (session time of the first sample), `count` u32, `count` × PCM16 at 16 kHz mono, fed to that stream's analyzer.
+- `1` retired: a clip cut by the helper from streamed audio. Built first, it failed the §4.2 replay: at `--speed max` the engine streams audio faster than the helper reads it (about 30× real time per stream), so every clip waited behind it and timed out. The engine cuts clips itself (§4.2).
+- `2` clip: `idLen` u32, UTF-8 utterance id, `count` u32, samples; `stream` is ignored. Kept for `scripts/transcribe-test.sh`.
+- `3` clip in a file: `idLen` u32, id, `pathLen` u32, UTF-8 path of a file of PCM16 samples, which the helper reads and deletes. The engine uses this one: a clip (100–300 KB) is larger than a pipe holds, so on stdin a busy engine delivered it over several turns of its event loop (40 clips: 49 s with 50 ms turns, 139 s with 200 ms turns; 16 s either way through files, measured in §4.2). The engine writes each clip into its own `mkdtemp` folder (mode 0600), deletes any the helper did not, and removes the folder at `close`.
+
+Every clip is transcribed by its own short-lived `SpeechAnalyzer` (`analyzeSequence`, then `finalizeAndFinishThroughEndOfInput`), at most `--clip-concurrency` at once, in arrival order. **Never call `finalize(through:)` on a stream analyzer**: Phase 0 showed it drops the words that follow (§4.0). Without `--live`, one analyzer is started and never fed, to keep the model loaded between clips (found in §4.2: without it a clip's p90 was 2.1 s and its max 3.4 s, against 0.7 s and 0.8 s). Do not use `SpeechAnalyzer.Options(modelRetention: .lingering | .processLifetime)` for this: with either, a later clip never answered.
 
 **Stdout lines.**
-- `{"type":"ready","locale":"en_US"}` once both analyzers have started.
-- `{"type":"volatile","stream":"host","runs":[{"text":…,"startMs":…,"endMs":…}]}`
-- `{"type":"final","stream":"host","runs":[…]}` — one entry per attributed-string run that has an `audioTimeRange`, times in session ms (analyzer time + the `bufferStartTime` base).
-- `{"type":"finalized","stream":"host","id":"u_12","throughMs":…}` — written **after** every final result up to `throughMs` has been written.
+- `{"type":"ready","locale":"en_US"}` once the stream analyzers (with `--live`) have started **and** one warm-up clip (1 s of silence) has finished: the first clip starts cold (11 s in Phase 0).
+- `{"type":"volatile","stream":"host","runs":[{"text":…,"startMs":…,"endMs":…}]}` and `{"type":"final","stream":"host","runs":[…]}` from the stream analyzers (with `--live` only), for live text: one entry per attributed-string run that has an `audioTimeRange`, times in session ms (analyzer time + the `bufferStartTime` base).
 - `{"type":"clip","id":…,"text":…}` or `{"type":"clip","id":…,"error":…}`
 - `{"type":"error","message":…,"fatal":bool}`
 
-**How.** One `SpeechAnalyzer` per stream, created lazily on that stream's first audio frame, each with its own `AsyncStream<AnalyzerInput>` continuation. `AnalyzerInput(buffer:bufferStartTime:)` with `CMTime(seconds: startMs/1000, preferredTimescale: 16000)`. Convert with one `AVAudioConverter` per stream to `bestAvailableAudioFormat(compatibleWith:considering:)`. Before the run, if the model is not installed, write a fatal error (`"model not installed"`) and exit 3; the engine installs it first (§4.3). Use Phase 0's code for everything it proved.
+**How.** With `--live`, one `SpeechAnalyzer` per stream, created lazily on that stream's first audio frame, each with its own `AsyncStream<AnalyzerInput>` continuation. `AnalyzerInput(buffer:bufferStartTime:)` with `CMTime(seconds: startMs/1000, preferredTimescale: 16000)`. Convert with one `AVAudioConverter` per stream to `bestAvailableAudioFormat(compatibleWith:considering:)` (16 kHz Int16 mono on macOS 26.2: no conversion needed). Before the run, if the model is not installed, write a fatal error (`"model not installed"`) and exit 3; the engine installs it first (§4.3). Use Phase 0's code for everything it proved.
 
-**Done when:** `swift build -c release --package-path native/transcribe` succeeds; `--status` prints `installed: true` on this Mac; piping a 30 s excerpt of `host.wav` as audio frames plus one finalize frame prints volatile, final, and finalized lines in that order (write this as a small script under `scripts/`, see §4.9).
+**Done when:** `swift build -c release --package-path native/transcribe` succeeds; `--status` prints `installed: true` on this Mac; piping a 30 s excerpt of `host.wav` as audio frames with `--live`, plus one clip frame, prints volatile lines and then the clip line (write this as a small script under `scripts/`, see §4.9).
 
 **Stop and ask if:** a result run carries no `audioTimeRange`, or run times do not line up with `bufferStartTime` (off by more than 100 ms from the audio).
 
@@ -139,20 +153,19 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 
 **How.**
 1. `AppleSpeech` spawns the helper (`appPaths().transcriber`, §4.8) once per session, with the NativeSource pattern for restarts (`src/audio/nativeSource.ts`): an unexpected exit is restarted up to 3 times per session, 1 s apart, with an `error` event each time.
-2. It implements **LiveTranscriber's public shape** (`warm`, `feed`, `commit`, `close`, `onPartial`), so the session holds it in `this.live`. When the engine is `apple`, the session constructs it **always** (the final layer needs the audio), passing `emitPartials: opts.liveText && liveCfg.enabled`.
-3. `feed(stream, samples, _speaking)` sends **every** frame, silence included, as audio frames. `startMs` comes from a per-stream sample counter from session start. The session already feeds contiguous frames with gaps filled by silence, and after pause and speaker-mode muting, so what Apple hears is exactly what is stored in the WAVs. After a helper restart, send from the current counter.
+2. It implements **LiveTranscriber's public shape** (`warm`, `feed`, `commit`, `close`, `onPartial`), so the session holds it in `this.live`. When the engine is `apple`, the session constructs it **always** (clips are cut from the audio it is fed), passing `emitPartials: opts.liveText && liveCfg.enabled`, which starts the helper with `--live`.
+3. `feed(stream, samples, _speaking)` keeps the last 60 s of **every** frame, silence included, and with live text also sends it as audio frames. `startMs` comes from a per-stream sample counter from session start. The session already feeds contiguous frames with gaps filled by silence, and after pause and speaker-mode muting, so what Apple hears is exactly what is stored in the WAVs. After a helper restart, send from the current counter.
 4. **Final text.** Extend `Services.transcribe` with an optional 4th argument, `span?: { stream; startMs; endMs }`. `onUtterance` passes it; the retry pass does not. OpenAI ignores it.
-   - With a `span`: send a finalize frame `(stream, throughMs = endMs, id)`. When `finalized` arrives for that id, take the final runs of that stream not yet claimed whose midpoint lies in `[startMs − wordSlackMs, endMs + wordSlackMs]`, join their text, and mark them claimed. Put this in a **pure exported function** `assignRuns(runs, span, claimed, slackMs)` and unit-test it. Drop claimed runs older than 60 s.
-   - If `finalized` does not arrive within `apple.finalizeTimeoutMs`, or the helper died → fall back to a **clip** request with `samples`. If that fails too, return `{ ok:false, error, retryable:true }`, so the existing retry machinery keeps the line (`docs/transcription.md` § "A failed line keeps its place").
-   - Without a `span` (retries) → clip request.
+   - With a `span`: cut `[startMs − clipPadMs, endMs + clipPadMs]` from that stream's last 60 s and send it as a clip (kind 3, a file). Without one (retries), or when that audio is no longer held: send `samples`. The engine sends at most `clipConcurrency` clips at a time and queues the rest, and a clip's timeout starts when it is sent, so a `--speed max` replay does not time out a backlog.
+   - No `clip` answer within `apple.clipTimeoutMs`, a clip `error`, or the helper died → return `{ ok:false, error, retryable:true }`, so the existing retry machinery keeps the line (`docs/transcription.md` § "A failed line keeps its place").
    - Then apply the same post-processing the OpenAI path applies (`transcription.fixes`, the filler rule, empty → dropped). Reuse those functions; do not copy them.
-5. **Live text.** From `volatile` lines, emit `utterance.partial` `{ stream, itemId: "apple-<stream>-<n>", text, utteranceId: null, final: false }`. Keep only runs that start at or after the stream's last committed `endMs`, so text already handed to a finished line never reappears. On `commit(stream, id)`, re-emit the current partial with `utteranceId: id`, `final: true`, then increment `n`. The page then removes it when the final line lands — no page change needed.
+5. **Live text.** From the stream's `volatile` and `final` lines, emit `utterance.partial` `{ stream, itemId: "apple-<stream>-<n>", text, utteranceId: null, final: false }`, built from the stream's final runs whose `endMs − 100` lies after its last committed `endMs + 150`, then its current volatile text, so text already handed to a finished line never reappears. Use end times, never starts or midpoints: the first word after a pause has its start stretched back over the pause (§4.0). A volatile result is **one run over its whole unsettled range, with no word times** (found in §4.1), and it lags the speech by a second or two, so a line's last words arrive after the VAD has closed it. So each closed line remembers how many words of the unsettled text (same range start) are its own: first as many as had arrived at the commit, then, once its clip is transcribed, as many as the clip has. Those words are stripped from later volatile text with that range start, and a partial that becomes empty is sent empty (the page hides it). Found in §4.2: without the clip's count, 9 of 12 live items on the fixture began with the previous line's tail; with it, the tail shows for about 0.3 s. On `commit(stream, id)`, re-emit the current partial with `utteranceId: id`, `final: true`, then increment `n`. The page then removes it when the final line lands — no page change needed.
 6. **Cost and logging.** Nothing goes to the budget. Log a `transcriptions.jsonl` row per utterance, shaped like the OpenAI row (read what `src/transcribe/openai.ts:131` logs), with `engine: "apple"` and `usd: 0`. Add `engine: "openai"` to the OpenAI rows.
-7. Config: add `transcription.apple: { locale: "en-US", finalizeTimeoutMs: 8000, wordSlackMs: 150 }` to `config/app.json` and to the strict zod schema in `src/config.ts:29` (optional, with those defaults). The **engine choice is not in `config/app.json`** (it is a user setting, §4.3).
+7. Config: add `transcription.apple: { locale: "en-US", clipPadMs: 300, clipConcurrency: 2, clipTimeoutMs: 20000 }` (the timeout is `clipTimeoutMs` plus twice the clip's length: it catches a stuck helper; the §4.2 replay on a loaded Mac took up to 5.4 s for a short clip, so 8 s failed lines that were only slow) to `config/app.json` and to the strict zod schema in `src/config.ts:29` (optional, with those defaults). The **engine choice is not in `config/app.json`** (it is a user setting, §4.3).
 
-**Done when:** unit tests cover `assignRuns` (boundary words, the slack, no double claims), the frame encoder, finalize-timeout → clip fallback, and helper death → `retryable` — all with a fake child process. `npm run replay -- --host sessions/20260925-202620/host.wav --remote sessions/20260925-202620/remote.wav --speed max --engine apple` completes and writes a transcript.
+**Done when:** unit tests cover the frame encoder, the padded cut vs the samples (retries), clip timeout → `retryable`, helper death → `retryable`, and the live-text end-time filter — all with a fake child process. `npm run replay -- --host sessions/20260925-202620/host.wav --remote sessions/20260925-202620/remote.wav --speed max --engine apple` completes and writes a transcript.
 
-**Stop and ask if:** more than 5 % of final runs in the replay fall outside every utterance's window (words lost), or the page shows duplicated live text that §4.2.5 does not remove.
+**Stop and ask if:** the replay's transcript disagrees with the reference session's OpenAI text by more than 12 % (Phase 0: 9.3 %), more than 2 % of its lines come back empty, or the page shows duplicated live text that §4.2.5 does not remove.
 
 ### §4.3 The engine setting: resolution, storage, API
 
@@ -286,7 +299,7 @@ This Mac: macOS 26.2, Xcode SDK 26.5, Swift 6.3.3. The SDK's `Speech.swiftinterf
 ### §4.10 Docs, through `update-doc`
 
 Run `/update-doc` after the code. It must cover:
-- `docs/transcription.md`: two engines; Apple's final and live layers; `finalize` and the word assignment; the clip fallback; config keys; cost $0.
+- `docs/transcription.md`: two engines; Apple's final layer (one clip per utterance) and live layer (stream analyzers, never finalized, and why: §4.0); the end-time filter for live text; config keys; cost $0.
 - `docs/setup.md`: keys are optional; `required` follows the engine; the first-run screen is OpenAI-only on macOS < 26; the Start and Chat prompts; the new routes.
 - `docs/architecture.md`: the helper, the Features section's cost line, `session.json`'s `transcription`.
 - `docs/desktop.md`: the second binary, `NSSpeechRecognitionUsageDescription`, first launch.
@@ -322,14 +335,14 @@ Findings from the research, quoted where they were hedged:
 
 | # | Uncertainty | Safe behavior |
 |---|---|---|
-| 1 | Two analyses at once on macOS 26: "the system limits how many analyses run at once 'to a conservative number' (going over throws `insufficientResources`)… I found no documented number for how many can run at once on macOS 26, so two streams there needs a real test." | Phase 0 measures it. Stop per §4.0. |
-| 2 | Speech Recognition permission: Apple says that flow "only applies to… SFSpeechRecognizer", but one CLI author saw a prompt anyway. "Not verified either way." | Always ship `NSSpeechRecognitionUsageDescription` (app and helper). Request up front only if Phase 0 saw a prompt (§4.8). |
-| 3 | Custom vocabulary: `contextualStrings` is documented for `DictationTranscriber` only. "SpeechTranscriber has no documented way to bias vocabulary." | Phase 0 tests it. Without evidence, do not wire it; `transcription.fixes` stays the tool. |
-| 4 | Punctuation: "The WWDC transcript doesn't say whether SpeechTranscriber adds punctuation automatically… Not verified in the docs." | Phase 0 reports it. If there is none, stop and ask before adding any. |
-| 5 | Latency of `finalize(through:)` on live audio: unmeasured. | Phase 0 measures it; §4.2 has an 8 s timeout that falls back to a clip. |
-| 6 | Granularity of `audioTimeRange` runs (word vs phrase): unmeasured. | If runs are phrase-sized and straddle utterances, `assignRuns` puts a whole run in the utterance holding its midpoint. Report in Phase 0; stop if more than 5 % of words land in the wrong line. |
-| 7 | Whether the model download shows any prompt, and its size: unmeasured. | Phase 0 reports it. If there is a prompt, stop and ask: it breaks "no question asked". |
-| 8 | Accuracy against OpenAI on this show: no published comparison. | Phase 0 measures it against a real episode. |
+| 1 | Two analyses at once on macOS 26. | **Measured (§4.0):** two, and four, ran with no error. |
+| 2 | Speech Recognition permission. | **Measured:** no request in the `tccd` log. Still ship `NSSpeechRecognitionUsageDescription` (app and helper); request nothing up front (§4.8). |
+| 3 | Custom vocabulary with `contextualStrings`. | **Measured:** no effect. Do not wire it; `transcription.fixes` stays the tool. |
+| 4 | Punctuation. | **Measured:** punctuation and capitalization are present. |
+| 5 | Latency and effect of `finalize(through:)`. | **Measured:** fast (179 ms p95) but it destroys words. Not used: finals come from clips (§4.1). |
+| 6 | Granularity of `audioTimeRange` runs. | **Measured:** word-level; starts are stretched over pauses, ends are reliable. Live text filters on end times (§4.2.5). |
+| 7 | Whether the model download shows any prompt, and its size. | Allocating an already-downloaded model showed none. A Mac without the model is unmeasured: check it in §4.8 if one is available; if a prompt appears, stop and ask. |
+| 8 | Accuracy against OpenAI on this show. | **Measured:** 9.3 % disagreement with clips. |
 | 9 | Signing and notarizing a second helper binary: expected to work like the capture helper, but untested. | Verify with `codesign`, `spctl`, and a notarized `dist:mac` before calling §4.8 done. |
 
 ## §7 Guardrails
@@ -386,6 +399,7 @@ The user's real keys live in `~/Library/Application Support/Tattle/credentials.j
 | Utterance | One VAD-delimited piece of speech on one stream (`Utterance` in `src/audio/vad.ts:7`). |
 | Stream | `host` (the Mac's microphone) or `remote` (the tap of everything the Mac plays, i.e. the call). |
 | Volatile / final result | Apple's provisional text, which may still change, and its settled text. |
+| Clip | One utterance's audio transcribed by its own short-lived analyzer: Apple's final layer. |
 | Features | Fact-checking and labels, chosen per show in the Start live window, fixed for the session. |
 | Helper | A native Swift command-line binary spawned by the engine: `tattle-capture` (exists), `tattle-transcribe` (new). |
 
