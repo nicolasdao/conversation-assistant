@@ -32,7 +32,7 @@ The project is open source under the BSD 3-Clause license (Cloudless Consulting 
 - **Reliability matters as much as features on air.** Short timeouts with fallbacks on every live call, spend caps, every session recorded so it can be reopened exactly as it was (or its audio replayed), and a rehearsal kit with a recorded fallback (see [Rehearsal kit](rehearsal.md)).
 - **Plain files, no database.** One folder per session, append-only and readable (see [Recordings](recordings.md)).
 - **Keys stay on the Mac.** They live in `.env` or in a credentials file only the user can read, outside the project folder ([Setup](setup.md)); they never appear in logs, session files, events, or exports, and the API returns only their last 4 characters. OpenRouter calls deny provider data collection.
-- **Plug and play for anyone.** No terminal at all: the Mac app installs from a signed, notarized DMG and updates itself (since 27 September 2026, see [The Mac app](desktop.md)). A first run asks for the two keys, explains how to get and fund them, and checks them before saving, then asks for the two macOS permissions before any show.
+- **Plug and play for anyone.** No terminal at all: the Mac app installs from a signed, notarized DMG and updates itself (since 27 September 2026, see [The Mac app](desktop.md)). On macOS 26 or later a first run asks for nothing but the macOS permissions. Transcription runs on the Mac, and the OpenRouter key is asked for only when fact-checking, labels, or Chat need it. Older macOS asks for an OpenAI key, explaining how to get and fund it and checking it before saving (since 29 September 2026, see [Setup](setup.md)).
 
 ## Non-goals
 
