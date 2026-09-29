@@ -1,5 +1,6 @@
-// Pre-show checks (§4.16): models, capture helper and permissions, keys, config, OpenRouter credit,
-// one live call per service (about $0.02), and free disk. npm run preflight
+// Pre-show checks (§4.16): models, capture helper and permissions, the transcription engine, keys, config, OpenRouter
+// credit, one live call per service (about $0.02 with OpenAI and OpenRouter; nothing with Apple Speech and no OpenRouter
+// key), and free disk. npm run preflight
 import { execFile, spawn } from "node:child_process";
 import { existsSync, statfsSync } from "node:fs";
 import { promisify } from "node:util";
@@ -12,6 +13,9 @@ import { S2Client } from "../factcheck/s2.ts";
 import { appPaths, speakerModelPath, vadModelPath } from "../paths.ts";
 import { processSecrets } from "../store/events.ts";
 import { KeyStore } from "../keys.ts";
+import { resolveEngine, SettingsStore } from "../settings.ts";
+import { AppleSpeech, appleSpeechStatus } from "../transcribe/apple.ts";
+import type { TranscriptionEngine } from "../pipeline/session.ts";
 import { SessionStore } from "../store/sessionStore.ts";
 
 const run = promisify(execFile);
@@ -47,11 +51,29 @@ await check("capture helper is built and has both permissions", async () => {
   return `system audio peak ${lv.remote.peakDbfs} dBFS, microphone peak ${lv.host.peakDbfs} dBFS`;
 });
 
+const keys = new KeyStore().load();
+const apple = await appleSpeechStatus();
+// the engine the app would use: the one saved in Settings, resolved as a first run would
+const engine: TranscriptionEngine = resolveEngine({
+  saved: new SettingsStore().read().transcriptionEngine, openaiKeySet: !keys.missing().includes("openai"), apple,
+}).engine;
+const hasOpenRouter = !keys.missing().includes("openrouter");
+
+await check("transcription engine", async () => {
+  if (engine === "openai") return "OpenAI (Settings → Transcription)";
+  if (!apple.available) throw new Error(`Apple Speech is not available: ${apple.reason ?? apple.error ?? "unknown reason"}`);
+  if (!apple.installed) throw new Error("the on-device speech model is not installed: open the app, which installs it, or run npm run build:transcribe && native/transcribe/.build/release/tattle-transcribe --install");
+  return `on this Mac (Apple Speech, ${apple.locale}), model installed`;
+});
+
 await check("keys are set", async () => {
-  const keys = new KeyStore().load();
-  const missing = keys.status().filter((k) => !k.set).map((k) => k.env);
-  if (missing.length) throw new Error(`missing: ${missing.join(", ")} (run npm run serve and add them on the page, or set them in .env)`);
-  return keys.status().map((k) => `${k.env} (${k.source === "file" ? "saved from the page" : ".env or shell"})`).join(", ");
+  const where = (k: { env: string; source: string | null }) => `${k.env} (${k.source === "file" ? "saved from the page" : ".env or shell"})`;
+  if (engine === "openai" && keys.missing().includes("openai")) {
+    throw new Error("missing: OPENAI_API_KEY, which OpenAI transcription needs (run npm run serve and add it on the page, or set it in .env)");
+  }
+  const set = keys.status().filter((k) => k.set).map(where);
+  const optional = hasOpenRouter ? "" : "; no OpenRouter key: fact-checking, labels, and Chat ask for it when turned on";
+  return `${set.length ? set.join(", ") : "none needed"}${optional}`;
 });
 
 let cfg: Config | null = null;
@@ -60,7 +82,7 @@ await check("config is valid", async () => {
   return `app, labels, and ${cfg.s1.id}`;
 });
 
-await check("OpenRouter key limit and remaining credit", async () => {
+if (hasOpenRouter) await check("OpenRouter key limit and remaining credit", async () => {
   const res = await fetch("https://openrouter.ai/api/v1/key", {
     headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` }, signal: AbortSignal.timeout(10_000),
   });
@@ -78,16 +100,25 @@ if (cfg) {
   const budget = new Budget({ sessionCapUsd: c.app.budget.sessionCapUsd, devCapUsd: c.app.budget.devCapUsd, enforceDevCap: false, devSpentUsd: 0 });
   const openrouter = process.env.OPENROUTER_API_KEY ?? "";
 
-  await check("transcription call", async () => {
+  await check(engine === "apple" ? "transcription on this Mac" : "transcription call", async () => {
     const src = existsSync("fixtures/conversation/remote.wav") ? readWav16k("fixtures/conversation/remote.wav") : null;
     if (!src) throw new Error("fixtures missing: run npm run fixtures");
-    const t = new Transcriber(c.app.transcription, { fetch, apiKey: process.env.OPENAI_API_KEY ?? "", budget, log: (r) => store.append("transcriptions", r) });
-    const r = await t.transcribe("preflight", src.slice(8 * SAMPLE_RATE, 15 * SAMPLE_RATE));
+    const clip = src.slice(8 * SAMPLE_RATE, 15 * SAMPLE_RATE);
+    const log = (r: unknown) => store.append("transcriptions", r);
+    if (engine === "apple") {
+      const a = new AppleSpeech(c.app.transcription, { emitPartials: false, log, onPartial: () => {}, onError: () => {} });
+      const r = await a.transcribe("preflight", clip);
+      await a.close();
+      if (!r.ok) throw new Error(r.error);
+      return `"${r.text}"`;
+    }
+    const t = new Transcriber(c.app.transcription, { fetch, apiKey: process.env.OPENAI_API_KEY ?? "", budget, log });
+    const r = await t.transcribe("preflight", clip);
     if (!r.ok) throw new Error(r.error);
     return `"${r.text}"`;
   });
 
-  await check("Jev call", async () => {
+  if (hasOpenRouter) await check("Jev call", async () => {
     const jev = new JevClient(c.app.jev, { fetch, apiKey: openrouter, budget, log: (r) => store.append("jev_calls", r) });
     const res = await jev.ask(
       { current_segment: [], new_utterance: { speaker: "Nic", text: "OpenRouter listed Jev on September eighteenth.", tags: [] } },
@@ -96,7 +127,7 @@ if (cfg) {
     return `${res.model}, claim ${(res.answers.claim as { noul: number }).noul.toFixed(2)}`;
   });
 
-  await check("System 2 call (research with web search)", async () => {
+  if (hasOpenRouter) await check("System 2 call (research with web search)", async () => {
     const s2 = new S2Client(c.app.s2, { fetch, apiKey: openrouter, budget, log: (r) => store.append("s2_calls", r) });
     const v = await s2.research({ speaker: "Nic", utterance: "OpenRouter listed Jev on September eighteenth.", segment: "" });
     return `${v.verdict}, ${v.sources.length} sources`;

@@ -1,22 +1,48 @@
-// npm run replay -- --host <wav> --remote <wav> --speed max|1 [--export <file>] [--allow-over-dev-cap]
+// npm run replay -- --host <wav> --remote <wav> --speed max|1 [--engine apple|openai] [--no-factcheck] [--no-labels]
+//                    [--export <file>] [--allow-over-dev-cap]
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";
 import { FileSource, type AudioSource } from "../audio/source.ts";
 import { Session } from "../pipeline/session.ts";
 import { EventBus, processSecrets } from "../store/events.ts";
 import { loadKeys } from "../keys.ts";
+import { resolveEngine, SettingsStore } from "../settings.ts";
+import { appleSpeechStatus, installAppleModel } from "../transcribe/apple.ts";
+import type { TranscriptionEngine } from "../pipeline/session.ts";
 
 const { values } = parseArgs({
+  allowNegative: true,
   options: {
     host: { type: "string" }, remote: { type: "string" }, speed: { type: "string", default: "max" },
     export: { type: "string" }, "allow-over-dev-cap": { type: "boolean", default: false }, quiet: { type: "boolean", default: false },
+    engine: { type: "string" }, factcheck: { type: "boolean", default: true }, labels: { type: "boolean", default: true },
   },
 });
 if (!values.host && !values.remote) {
-  console.error("usage: npm run replay -- --host <host.wav> --remote <remote.wav> --speed max|1 [--export <file>]");
+  console.error("usage: npm run replay -- --host <host.wav> --remote <remote.wav> --speed max|1 [--engine apple|openai] [--no-factcheck] [--no-labels] [--export <file>]");
   process.exit(1);
 }
-loadKeys();
+if (values.engine !== undefined && values.engine !== "apple" && values.engine !== "openai") {
+  console.error("--engine must be apple or openai");
+  process.exit(1);
+}
+const keys = loadKeys();
+// the engine: --engine, else the one saved from the app's Settings (resolved as the app does on a first run)
+const apple = await appleSpeechStatus();
+const engine: TranscriptionEngine = (values.engine as TranscriptionEngine | undefined) ?? resolveEngine({
+  saved: new SettingsStore().read().transcriptionEngine, openaiKeySet: !keys.missing().includes("openai"), apple,
+}).engine;
+if (engine === "apple") {
+  if (!apple.available) {
+    console.error(`on-device transcription is not available: ${apple.reason ?? apple.error ?? "unknown reason"}`);
+    process.exit(1);
+  }
+  if (!apple.installed) {
+    console.log("installing the on-device speech model...");
+    await installAppleModel((f) => process.stdout.write(`\r  ${Math.round(f * 100)} %`), { locale: loadConfig().app.transcription.apple.locale });
+    console.log("");
+  }
+}
 const speed = values.speed === "1" ? 1 : "max";
 const sources: AudioSource[] = [];
 if (values.host) sources.push(new FileSource(values.host, "host", speed));
@@ -41,7 +67,9 @@ if (!values.quiet) {
 
 const session = new Session({
   mode: "replay", sources, config: loadConfig(), bus, allowOverDevCap: values["allow-over-dev-cap"], exportBoundary: values.export,
+  engine, features: { factcheck: values.factcheck, labels: values.labels },
 });
+console.log(`transcription: ${engine === "apple" ? "on this Mac (Apple Speech)" : "OpenAI"}; fact-checking ${values.factcheck ? "on" : "off"}, labels ${values.labels ? "on" : "off"}`);
 process.on("SIGINT", () => { void session.stop(); });
 await session.run();
 
