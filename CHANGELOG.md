@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-29
+
+### Added
+- Label sets: the timeline's labels are now a set you pick in Start live, with up to 2 categories (lanes), 2 scores (chart lines), and 8 markers (pins with an icon). The built-in AI podcast set asks the same questions as before
+- Cog → Labels, a library of label sets: create, clone the built-in one, edit, rename, delete, and share them as `.tattle-labels` files (Export, Import, or drop one on the window). Sets are files on your Mac and need no key
+- Try on a recording: see what a draft set would draw on the first 10 minutes of a recording, next to what that recording showed
+- Create with AI: GPT-6 Luna interviews you, one question at a time with answers to click, until the set is complete; it proposes what you leave out and explains any rule. You review, edit, and save
+- Start live: a Labels picker (your sets, or Off) and a Tonight's stories box
+- Insights shows each category's share of time, and every score's average per speaker
+
+### Changed
+- The timeline, transcript filters, and Insights follow the session's label set; marker chips (Humour included) scroll on one line, with the speaker and category dropdowns always visible
+- Clip-worthy is a yes/no marker, like the others
+- Each recording keeps a copy of the set it was made with; recordings made before label sets open as before
+- The header shows what a session spends, with no cap
+
+### Removed
+- Every spending limit the app set itself: $10 per session, Chat's $2 per recording, and the $3 development cap (with `--allow-over-dev-cap`). The credit limit on your OpenRouter key is the only one
+- The Labels window's live question editor, Save stories, and Relabel closed segments: a session's labels are fixed when it starts, and stories are typed in Start live
+
 ## [0.9.0] - 2026-09-29
 
 ### Added
