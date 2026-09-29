@@ -188,7 +188,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 242,
+      "line_count": 249,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -256,7 +256,7 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 110,
+      "line_count": 111,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
