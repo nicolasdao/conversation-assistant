@@ -402,6 +402,17 @@ main { position: relative; z-index: 1; }
 .sys-foot { margin: 28px 0 0; max-width: 52em; color: var(--ink-2); font-size: 17px; line-height: 1.6; }
 .sys-foot b { color: var(--ink); }
 
+/* ---------- credits: who made it ---------- */
+.tag-paper { background: var(--paper); color: var(--paper-ink); }
+.credits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.credit { background: var(--deck); padding: 24px 26px 26px; display: grid; align-content: start; justify-items: start; gap: 12px; border-left: 5px solid var(--icon-top); }
+.credit-role { margin: 0; font: 700 13px/1 var(--cond); letter-spacing: 0.18em; text-transform: uppercase; color: var(--mute); }
+.credit-name { margin: 0; font: 800 clamp(38px, 4vw, 52px)/0.95 var(--cond); text-transform: uppercase; letter-spacing: 0.01em; }
+.credit-name a { color: var(--ink); text-decoration: none; }
+.credit-name a:hover { color: var(--accent); }
+.credit p:not(.credit-role) { margin: 0; color: var(--ink-2); font-size: 16.5px; line-height: 1.6; max-width: 34em; }
+.credit .lnk { margin-top: 4px; }
+
 /* ---------- fine print ---------- */
 .fine { border-top: 1px solid var(--rule); background: var(--deck); }
 .fine-in { max-width: 1240px; margin: 0 auto; padding: 44px 48px 56px; }
@@ -409,6 +420,8 @@ main { position: relative; z-index: 1; }
 .fine-rel { margin: -6px 0 20px; font: 600 14px/1.4 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--mute); }
 .fine-rel b { color: var(--accent); font-weight: 800; }
 .fine-rel a { color: var(--ink-2); }
+.fine-by { margin: -6px 0 14px; color: var(--ink-2); font-size: 15px; }
+.fine-by a { color: var(--ink); font-weight: 600; }
 .fine-links { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 28px; }
 .fine-links a { font: 700 14px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--ink-2); }
 .fine-links a:hover { color: var(--accent); }
@@ -494,6 +507,8 @@ main { position: relative; z-index: 1; }
   .sys-h { font-size: 32px; margin-top: 44px; }
   .fine-in { padding: 36px 16px 48px; }
   .fine-cols { grid-template-columns: minmax(0, 1fr); }
+  .credits { grid-template-columns: minmax(0, 1fr); }
+  .credit { padding: 20px 18px 22px; }
 }
 
 /* ---------- calm version ---------- */

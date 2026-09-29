@@ -32,7 +32,8 @@ The page was chosen from experiment `02-record-button`. Its sections, top to bot
 3. **Jev** (`#jev`): why a decision model makes live judgment affordable, with a replaying **Jev call** (`assets/sections.js`). The questions shown are Tattle's real ones; the answers are labelled as examples. It links to [TypeSafe AI](https://typesafe.ai) and [Jev's documentation](https://docs.typesafe.ai/). See [Jev](jev.md).
 4. **Fast and slow** (`#systems`): System 1 and System 2, with a live stream of lines and the two systems' costs. See [System 1 and System 2](system1-system2.md).
 5. **Before you go live**: the keys, the cost, privacy, signing.
-6. **Fine print**: license, consent, trademarks, and the latest release line.
+6. **Credits** (`#credits`): who made Tattle, [Nicolas Dao](https://nicolasdao.com) at [Cloudless Labs](https://cloudlesslabs.com). The JSON-LD names them as `author` and `publisher`, and the head carries `<link rel="author">`.
+7. **Fine print**: made by, license, consent, trademarks, and the latest release line.
 
 Every figure on the page comes from the docs (`jev.md`, `system1-system2.md`, `mission.md`). Change the page's claims only from there: it must not say Tattle is free to run or needs no keys while that is untrue.
 

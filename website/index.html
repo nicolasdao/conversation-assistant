@@ -6,6 +6,8 @@
 <title>Tattle · Live transcripts and fact-checks for your Mac</title>
 <meta name="description" content="Tattle is a free, open-source Mac app that transcribes your calls live, maps the conversation on a timeline, and fact-checks claims as they're said. Built on Jev, TypeSafe AI's decision model.">
 <meta name="theme-color" content="#0a1628">
+<meta name="author" content="Nicolas Dao">
+<link rel="author" href="https://nicolasdao.com">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Tattle: live transcripts and fact-checks for your Mac">
 <meta property="og:description" content="An open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.">
@@ -28,7 +30,8 @@
   "license": "https://opensource.org/license/bsd-3-clause",
   "downloadUrl": "https://github.com/nicolasdao/tattle/releases/download/v0.8.0/Tattle-0.8.0-arm64.dmg",
   "codeRepository": "https://github.com/nicolasdao/tattle",
-  "author": { "@type": "Organization", "name": "Cloudless Consulting Pty Ltd" }
+  "author": { "@type": "Person", "name": "Nicolas Dao", "url": "https://nicolasdao.com", "jobTitle": "Cloud & AI engineer", "worksFor": { "@type": "Organization", "name": "Cloudless Labs", "url": "https://cloudlesslabs.com" } },
+  "publisher": { "@type": "Organization", "name": "Cloudless Labs", "legalName": "Cloudless Consulting Pty Ltd", "url": "https://cloudlesslabs.com" }
 }
 </script>
 <script type="importmap">
@@ -283,7 +286,29 @@
     </div>
   </section>
 
-  <!-- 5. The sign-off. -->
+  <!-- 5. The credits: who made it. -->
+  <section class="sect" id="credits" aria-labelledby="credits-title">
+    <div class="sect-head">
+      <span class="tag tag-paper">Credits</span>
+      <div class="strap"><span class="eyebrow">Who's behind the show</span><h2 class="name" id="credits-title">Made by</h2></div>
+    </div>
+    <div class="credits">
+      <article class="credit">
+        <p class="credit-role">Created by</p>
+        <h3 class="credit-name"><a href="https://nicolasdao.com">Nicolas Dao</a></h3>
+        <p>A cloud and AI engineer and solo founder based in Sydney, Australia. He built Tattle with AI agents, as a working example of an idea he writes about: one person, directing AI agents well, can build what used to take a whole team.</p>
+        <a class="lnk" href="https://nicolasdao.com">nicolasdao.com</a>
+      </article>
+      <article class="credit">
+        <p class="credit-role">Made at</p>
+        <h3 class="credit-name"><a href="https://cloudlesslabs.com">Cloudless Labs</a></h3>
+        <p>Nicolas's consultancy in Sydney, for AWS, AI and e-learning: cloud migrations, serverless architecture, and custom AI agents, for startups, enterprises and government. Tattle is open source under its name.</p>
+        <a class="lnk" href="https://cloudlesslabs.com">cloudlesslabs.com</a>
+      </article>
+    </div>
+  </section>
+
+  <!-- 6. The sign-off. -->
   <section class="sect signoff" aria-labelledby="signoff-title">
     <span class="ca-mark signoff-mark" style="--s:72px" aria-hidden="true"></span>
     <h2 id="signoff-title">Your next show,<br><span>checked live.</span></h2>
@@ -310,6 +335,7 @@
   <div class="fine-in">
     <h2 id="fine-title" class="fine-h"><span class="ca-mark" style="--s:22px" aria-hidden="true"></span>Tattle</h2>
     <p class="fine-rel" data-release>Latest release <b data-version>v0.8.0</b> · <time data-released datetime="2026-09-28">28 Sept 2026</time> · <a data-notes href="https://github.com/nicolasdao/tattle/releases/tag/v0.8.0">Release notes</a></p>
+    <p class="fine-by">Made by <a href="https://nicolasdao.com">Nicolas Dao</a> at <a href="https://cloudlesslabs.com">Cloudless Labs</a>, in Sydney.</p>
     <nav class="fine-links" aria-label="Project links">
       <a href="https://github.com/nicolasdao/tattle">Source code</a>
       <a href="https://github.com/nicolasdao/tattle/releases">Releases</a>
@@ -319,7 +345,7 @@
       <a href="https://github.com/nicolasdao/tattle/blob/master/SECURITY.md">Security</a>
     </nav>
     <div class="fine-cols">
-      <p><b>License.</b> Tattle is free and open-source software under the <a href="https://github.com/nicolasdao/tattle/blob/master/LICENSE">BSD 3-Clause License</a>, © 2026 Cloudless Consulting Pty Ltd. It's provided as is, without warranty of any kind. The app includes third-party components under their own licenses, listed in its Help menu.</p>
+      <p><b>License.</b> Tattle is free and open-source software under the <a href="https://github.com/nicolasdao/tattle/blob/master/LICENSE">BSD 3-Clause License</a>, © 2026 Cloudless Consulting Pty Ltd (<a href="https://cloudlesslabs.com">Cloudless Labs</a>). It's provided as is, without warranty of any kind. The app includes third-party components under their own licenses, listed in its Help menu.</p>
       <p><b>Record with consent.</b> Tattle records and transcribes everyone on a call. Many places require the consent of everyone recorded, so tell the people on the call and get their consent before you record. You're responsible for how you use the app and its recordings.</p>
       <p><b>Verdicts can be wrong.</b> Fact-checks come from AI models. Treat them as leads to check, not as facts. The only official downloads are the project's <a href="https://github.com/nicolasdao/tattle/releases">GitHub Releases</a>; <a href="https://github.com/nicolasdao/tattle/blob/master/SECURITY.md">here's how to check a download is genuine</a>.</p>
       <p><b>Trademarks.</b> Tattle is an independent project, not affiliated with, sponsored or endorsed by Apple, OpenAI, OpenRouter or TypeSafe AI. Jev is TypeSafe AI's, GPT-6 Luna is OpenAI's, and macOS is Apple's. These names are used only to say what the app works with.</p>
