@@ -1,8 +1,8 @@
 # Security headers for every page and file on hey-tattle.com (Cloudflare Workers static assets reads this file at deploy).
 # The CSP allows scripts only from this site and jsDelivr (three.js, pinned by integrity in the page's import map), plus
-# the import map itself by its hash: after editing that <script type="importmap"> block, recompute its sha256 (see docs/website.md).
+# Cloudflare Web Analytics (its beacon script, and the visit it reports), and the import map itself by its hash: after editing that <script type="importmap"> block, recompute its sha256 (see docs/website.md).
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'sha256-mya8lPJXErB8mSeQkeworyK5W4Syd+9fFdtxxcasD4o='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://static.cloudflareinsights.com 'sha256-mya8lPJXErB8mSeQkeworyK5W4Syd+9fFdtxxcasD4o='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

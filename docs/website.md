@@ -52,6 +52,8 @@ The site is the Cloudflare **Worker `tattle-website`**, in the project's Cloudfl
 | TLS | Minimum TLS 1.2 |
 | `workers.dev` and preview URLs | Off (`workers_dev: false`, `preview_urls: false`): the site answers only on its domain |
 
+**Visit counts** come from Cloudflare Web Analytics, which is on for the zone: Cloudflare adds its beacon script to the page as it serves it, and the counts are in the dashboard under **Analytics & Logs → Web Analytics**. It sets no cookies. The Content Security Policy must keep allowing its two addresses, or the beacon is blocked and nothing is counted (the browser console says so).
+
 The zone is on Cloudflare's Free plan. Nothing in the repository holds the account ID, zone ID, or any token: Wrangler and the build find the account from the token.
 
 ## Deploying
@@ -88,7 +90,7 @@ Set `CLOUDFLARE_ACCOUNT_ID` too if the token can see more than one account.
 
 | Header | Why |
 | --- | --- |
-| `Content-Security-Policy` | Scripts only from the site itself and `cdn.jsdelivr.net` (Three.js), plus the page's inline import map by its SHA-256 hash; styles from the site (inline `style` attributes allowed); images from the site and `data:`; network calls only to the site and `api.github.com`; no plugins, forms, `<base>`, or framing |
+| `Content-Security-Policy` | Scripts only from the site itself, `cdn.jsdelivr.net` (Three.js), and `static.cloudflareinsights.com` (Web Analytics), plus the page's inline import map by its SHA-256 hash; styles from the site (inline `style` attributes allowed); images from the site and `data:`; network calls only to the site, `api.github.com`, and `cloudflareinsights.com` (the visit Web Analytics reports); no plugins, forms, `<base>`, or framing |
 | `Strict-Transport-Security` | Browsers use HTTPS for a year |
 | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` | No MIME sniffing, no framing, a minimal referrer, no camera/microphone/location/payment access, an isolated browsing context |
 
