@@ -505,7 +505,7 @@ describe("Try on a recording (POST /api/label-sets/try), with a fake Jev", () =>
 
 describe("Create with AI (POST /api/label-sets/assist)", () => {
   const root = mkdtempSync(join(tmpdir(), "assist-"));
-  const answer = { reply: "Here you go.", set: null };
+  const answer = { reply: "Here you go.", question: "What is it about?", choices: [], skip: [], set: null };
   const f = (async () => new Response(JSON.stringify({ id: "g", model: "openai/gpt-6-luna", choices: [{ message: { content: JSON.stringify(answer) } }], usage: { cost: 0.6 } }), { status: 200 })) as unknown as typeof fetch;
   const engine = new Engine({ sessionsDir: root, fetch: f, openrouterKey: "sk-or-v1-test-key-000000000000" });
   const body = (id = "c1") => ({ conversationId: id, messages: [{ role: "user", content: "A set for a cooking show." }], draft: null });

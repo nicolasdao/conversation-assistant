@@ -110,6 +110,12 @@ export interface LabelSetEntry {
 /** The library, and the locked boundary question every set shares (shown read-only in the editor). */
 export interface LabelSetList { sets: LabelSetEntry[]; boundary?: { instructions: string; criteria?: { true: string; false: string } } }
 export interface LabelSetCheck { ok: boolean; errors: string[]; tokens: number; perHourUsd: number; overLimit: boolean }
+/** One turn of Create with AI's interview (src/labels/assist.ts). */
+export interface AssistTurn {
+  reply: string; question: string; choices: string[]; set: any | null; skipped: string[];
+  checklist: { items: { id: string; label: string; status: "todo" | "recommended" | "done" | "skipped"; detail?: string }[]; complete: boolean; errors: string[] };
+  costUsd: number; spentUsd: number; capUsd: number; error?: string;
+}
 /** Try on a recording: the draft's labels for the segments of its first minutes, and the recording's own. */
 export interface LabelTry {
   segments: { id: string; startMs: number; endMs: number }[];
@@ -211,7 +217,6 @@ export const api = {
   checkLabelSet: (draft: unknown) => call<LabelSetCheck>("POST", "/api/label-sets/estimate", draft),
   labelSetExportUrl: (id: string) => `/api/label-sets/${encodeURIComponent(id)}/export`,
   tryLabelSet: (set: unknown, sessionId: string, minutes = 10) => call<LabelTry>("POST", "/api/label-sets/try", { set, sessionId, minutes }),
-  assistLabels: (conversationId: string, messages: { role: "user" | "assistant"; content: string }[], draft: unknown | null) =>
-    call<{ reply: string; set: any | null; costUsd: number; spentUsd: number; capUsd: number; error?: string }>(
-      "POST", "/api/label-sets/assist", { conversationId, messages, draft }),
+  assistLabels: (conversationId: string, messages: { role: "user" | "assistant"; content: string }[], draft: unknown | null, skipped: string[]) =>
+    call<AssistTurn>("POST", "/api/label-sets/assist", { conversationId, messages, draft, skipped }),
 };

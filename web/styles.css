@@ -1246,3 +1246,18 @@ dialog.labelsai-dlg { width: min(1360px, calc(100vw - 32px)); height: min(92vh, 
 @media (max-width: 900px) { .lai-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(220px, 0.8fr) minmax(0, 1.2fr); } }
 .lai-chat .composer-row .btn { margin-left: auto; }
 .lset-form > .btn, .lset-card > .btn { justify-self: start; }
+/* Create with AI's interview: the question, answers to click, and what is still to settle */
+.lai-question { margin-top: 8px; font-weight: 600; font-size: 15px; line-height: 1.45; color: var(--ink); }
+.lai-choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.lai-choice { height: auto; min-height: 27px; padding: 4px 10px; text-align: left; line-height: 1.25; }
+.lai-choice:disabled { opacity: 0.4; cursor: default; }
+.lai-progress { flex: none; max-height: 30%; overflow-y: auto; padding: 8px 16px; border-top: 1px solid var(--rule); background: var(--deck); display: grid; gap: 4px; }
+.lai-progress-h { font: 700 11.5px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.lai-progress ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 12.5px; }
+.lai-progress li { color: var(--ink-2); }
+.lai-progress .mk { display: inline-block; width: 14px; }
+.lai-progress .st-done { color: var(--mute); }
+.lai-progress .st-done .mk { color: var(--good); }
+.lai-progress .st-todo { color: var(--ink); }
+.lai-progress .st-todo .mk { color: var(--hype); }
+.lai-progress .st-skipped { color: var(--mute); text-decoration: line-through; }

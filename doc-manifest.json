@@ -318,7 +318,7 @@
         "The client — `src/jev/client.ts`",
         "Measured performance and cost"
       ],
-      "line_count": 199,
+      "line_count": 200,
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
@@ -341,6 +341,7 @@
         "src/labels/legacy.ts",
         "src/labels/try.ts",
         "src/labels/assist.ts",
+        "src/labels/interview.ts",
         "config/factcheck.s1.default.json"
       ],
       "source_unresolved": [],

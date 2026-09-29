@@ -79,7 +79,7 @@ export interface LabelSetApi {
   estimate(body: unknown): ReturnType<typeof checkDraft>;
   /** Try on a recording: Jev asked the draft about its first minutes. Needs the OpenRouter key; writes nothing there. */
   tryOn(body: unknown): Promise<unknown>;
-  /** Create with AI: one turn of a conversation with `labelsAssist.model`, which drafts a set. Needs the OpenRouter key. */
+  /** Create with AI: one turn of the interview with `labelsAssist.model`, which drafts a set. Needs the OpenRouter key. */
   assist(body: unknown): Promise<unknown>;
 }
 
@@ -586,13 +586,13 @@ export class Engine implements EngineApi {
 
   private async assist(body: unknown) {
     if (!this.openrouterKeySet()) throw new ApiError(400, "Please provide your OpenRouter API key to create labels with AI.", { needsKey: "openrouter" });
-    const b = (body ?? {}) as { conversationId?: unknown; messages?: unknown; draft?: unknown };
+    const b = (body ?? {}) as { conversationId?: unknown; messages?: unknown; draft?: unknown; skipped?: unknown };
     const conversation = typeof b.conversationId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(b.conversationId) ? b.conversationId : null;
     if (!conversation) throw new ApiError(400, "conversationId is required");
     const messages = Array.isArray(b.messages) ? b.messages : [];
-    if (messages.length === 0 || messages.length > 40
+    if (messages.length === 0 || messages.length > 80
       || messages.some((m: any) => (m?.role !== "user" && m?.role !== "assistant") || typeof m?.content !== "string" || m.content.length > 8000)) {
-      throw new ApiError(400, "messages must be 1 to 40 { role: user | assistant, content } of at most 8,000 characters");
+      throw new ApiError(400, "messages must be 1 to 80 { role: user | assistant, content } of at most 8,000 characters");
     }
     const cfg = this.config.app;
     const cap = cfg.labelsAssist.capUsd;
@@ -609,7 +609,8 @@ export class Engine implements EngineApi {
       budget, log: (r) => appendFileSync(log, JSON.stringify(r) + "\n"),
     });
     try {
-      const r = await assistant.turn(assistSystemPrompt(this.config.labels), messages as AssistMessage[], draft);
+      const skipped = Array.isArray(b.skipped) ? b.skipped.filter((x): x is string => typeof x === "string") : [];
+      const r = await assistant.turn(assistSystemPrompt(this.config.labels), messages as AssistMessage[], draft, skipped);
       const total = spent + r.costUsd;
       this.assistSpent.set(conversation, total);
       return { ...r, spentUsd: total, capUsd: cap };

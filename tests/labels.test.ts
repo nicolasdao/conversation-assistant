@@ -7,6 +7,7 @@ import { checkLabelSet, estimate, parseLabelSet, setQuestions, type LabelSet } f
 import { fromLegacy, fromLegacyEvent, isLegacySet } from "../src/labels/legacy.ts";
 import { LabelSetError, LabelSetStore, slug } from "../src/labels/store.ts";
 import { ASSIST_JSON_SCHEMA, assistSystemPrompt, LabelsAssistant, normalizeDraft } from "../src/labels/assist.ts";
+import { checklistText, interviewChecklist } from "../src/labels/interview.ts";
 import { Budget } from "../src/budget.ts";
 import { ICONS } from "../web/src/icons.ts";
 
@@ -350,7 +351,48 @@ describe("the label-set store", () => {
   });
 });
 
-describe("Create with AI, with a fake OpenRouter", () => {
+describe("the interview checklist (computed by code, not the model)", () => {
+  const status = (c: ReturnType<typeof interviewChecklist>, id: string) => c.items.find((x) => x.id === id)?.status;
+
+  test("an empty draft: the conversation first, every kind to decide, a name last", () => {
+    const c = interviewChecklist(null);
+    expect(c.next?.id).toBe("show");
+    expect(["show", "categories", "scores", "markers", "name"].map((id) => status(c, id))).toEqual(["todo", "todo", "todo", "todo", "todo"]);
+    expect(c.complete).toBe(false);
+  });
+
+  test("the built-in set is complete; declined kinds are skipped, not missing", () => {
+    const c = interviewChecklist(builtIn());
+    expect(c.complete).toBe(true);
+    expect(c.errors).toEqual([]);
+    expect(c.items.filter((x) => x.status === "todo")).toEqual([]);
+    // no wording on most of its markers: recommended, never blocking
+    expect(status(c, "marker1.wording")).toBe("recommended");
+    const partial = { ...builtIn(), scores: [] };
+    expect(status(interviewChecklist(partial), "scores")).toBe("todo");
+    expect(status(interviewChecklist(partial, ["scores"]), "scores")).toBe("skipped");
+    expect(interviewChecklist(partial, ["scores"]).complete).toBe(true);
+  });
+
+  test("a category without options, a fallback, or levels: each named, with what to do", () => {
+    const d = { ...builtIn(), description: "Sales calls", categories: [{ id: "stage", name: "Stage", instructions: "Which stage?", options: [{ id: "demo", name: "Demo", description: "Showing it", color: "#3f7df0" }] }],
+      scores: [{ id: "energy", name: "Energy", instructions: "How energetic?", levels: ["Low", "", "", "", ""] }] };
+    const c = interviewChecklist(d);
+    expect(status(c, "cat0.options")).toBe("todo");
+    expect(c.items.find((x) => x.id === "cat0.options")!.detail).toMatch(/1 usable option: it needs at least 2/);
+    expect(status(c, "cat0.fallback")).toBe("todo");
+    expect(status(c, "score0.levels")).toBe("todo");
+    expect(c.next?.id).toBe("cat0.options");
+    expect(checklistText(c)).toMatch(/\[ \] Stage: its options — .*\nNext to settle: Stage: its options\./s);
+  });
+
+  test("every kind declined still needs one label", () => {
+    const c = interviewChecklist({ name: "x", description: "y" }, ["categories", "scores", "markers"]);
+    expect(status(c, "some-label")).toBe("todo");
+  });
+});
+
+describe("Create with AI, as an interview, with a fake OpenRouter", () => {
   const set = builtIn();
   // the model's shape: optional fields as null, no format, version, or id
   const asModel = (s: LabelSet) => ({
@@ -358,6 +400,7 @@ describe("Create with AI, with a fake OpenRouter", () => {
     categories: s.categories.map((c) => ({ ...c, index: c.index ?? null, options: c.options.map((o) => ({ ...o, group: o.group ?? null })) })),
     scores: s.scores, markers: s.markers.map((m) => ({ ...m, criteria: m.criteria ?? null })),
   });
+  const turn = (setValue: unknown, extra: Record<string, unknown> = {}) => ({ reply: "Thanks.", question: "Which moments matter?", choices: ["Objections", "Next steps"], skip: [], set: setValue, ...extra });
   const reply = (content: unknown, cost = 0.01) => new Response(JSON.stringify({
     id: "gen-1", model: "openai/gpt-6-luna", choices: [{ message: { content: JSON.stringify(content) } }], usage: { cost, prompt_tokens: 5000, completion_tokens: 900 },
   }), { status: 200 });
@@ -372,47 +415,62 @@ describe("Create with AI, with a fake OpenRouter", () => {
     return { a, bodies, rows };
   };
   const system = assistSystemPrompt(set);
-  const ask = [{ role: "user" as const, content: "A set for sales calls." }];
+  const ask = [{ role: "assistant" as const, content: "What kind of conversation will you label?" }, { role: "user" as const, content: "Sales calls." }];
 
-  test("a valid draft comes back as a set that passes the same validation; the model is the configured one, with a strict schema", async () => {
-    const { a, bodies, rows } = run([{ reply: "Here is a draft.", set: asModel(set) }]);
+  test("the model is the configured one, at high effort, with a strict schema; the message carries the draft and the checklist", async () => {
+    const { a, bodies, rows } = run([turn(asModel(set))]);
     const r = await a.turn(system, ask, null);
-    expect(r.reply).toBe("Here is a draft.");
-    expect(checkLabelSet(r.set).ok).toBe(true);
-    expect(r.set!.categories[0].options.find((o) => o.id === "tech")!.group).toBeUndefined(); // nulls dropped
-    expect(r.costUsd).toBeCloseTo(0.01);
     expect(bodies[0].model).toBe("openai/gpt-6-luna");
+    expect(bodies[0].reasoning).toEqual({ effort: "high" });
     expect(bodies[0].response_format).toMatchObject({ type: "json_schema", json_schema: { name: "label_set_draft", strict: true } });
     expect(bodies[0].messages[0].content).toContain("thumbs-up"); // the icon list
-    expect(bodies[0].messages[1].content).toContain("There is no draft yet.");
+    expect(bodies[0].messages[0].content).toContain("## Why the rules are what they are");
+    expect(bodies[0].messages[1]).toEqual({ role: "assistant", content: "What kind of conversation will you label?" }); // the app's opener
+    expect(bodies[0].messages[2].content).toMatch(/^Sales calls\.\n\nThere is no draft yet\.\n\nChecklist \(computed by the app.*Next to settle: What the conversation is\./s);
+    expect(r).toMatchObject({ reply: "Thanks.", choices: ["Objections", "Next steps"], costUsd: 0.01 });
+    expect(checkLabelSet(r.set).ok).toBe(true);
+    expect(r.checklist.complete).toBe(true);
+    expect(r.question).toBe(""); // complete: nothing left to ask
     expect(rows[0]).toMatchObject({ kind: "s2_call", purpose: "labels_assist", ok: true, cost_usd: 0.01 });
   });
 
-  test("the draft on screen goes with the message, the host's edits included", async () => {
-    const { a, bodies } = run([{ reply: "Noted.", set: null }]);
-    const r = await a.turn(system, [...ask, { role: "assistant", content: "Here is a draft." }, { role: "user", content: "Add a marker for objections." }], { ...set, name: "Edited by hand" });
-    expect(r.set).toBeNull();
-    expect(bodies[0].messages.length).toBe(4);
-    expect(bodies[0].messages[3].content).toMatch(/^Add a marker for objections\.\n\nCurrent draft \(the host may have edited it\):\n\{.*"Edited by hand"/s);
+  test("an incomplete draft is kept, and the checklist names what is left: no retry", async () => {
+    const partial = { ...asModel(set), categories: [{ id: "stage", name: "Stage", instructions: "Which stage?", options: [], index: null }], scores: [], markers: [] };
+    const { a, bodies } = run([turn(partial)]);
+    const r = await a.turn(system, ask, null);
+    expect(bodies.length).toBe(1);
+    expect(r.set).not.toBeNull();
+    expect(r.set!.categories[0].name).toBe("Stage");
+    expect(r.question).toBe("Which moments matter?");
+    expect(r.checklist.next?.id).toBe("cat0.options");
+    expect(r.error).toBeUndefined();
   });
 
-  test("an invalid set is sent back once with its errors; still invalid, the reply is kept and the set dropped", async () => {
+  test("a draft that breaks a rule is sent back once; still broken, the draft is left as it was", async () => {
     const bad = { ...asModel(set), scores: [...set.scores, { ...set.scores[0], id: "third" }] };
-    const fixed = await run([{ reply: "Draft.", set: bad }, { reply: "Fixed.", set: asModel(set) }]);
+    const fixed = run([turn(bad), turn(asModel(set), { reply: "Fixed." })]);
     const r1 = await fixed.a.turn(system, ask, null);
     expect(r1).toMatchObject({ reply: "Fixed.", costUsd: 0.02 });
     expect(r1.set).not.toBeNull();
-    expect(fixed.bodies[1].messages.at(-1).content).toMatch(/at most 2 scores/);
-    const stuck = run([{ reply: "Draft.", set: bad }]);
-    const r2 = await stuck.a.turn(system, ask, null);
+    expect(fixed.bodies[1].messages.at(-1).content).toMatch(/breaks these rules.*at most 2 scores/s);
+    const stuck = run([turn(bad)]);
+    const r2 = await stuck.a.turn(system, ask, { ...set, name: "On screen" });
     expect(r2.set).toBeNull();
-    expect(r2.reply).toBe("Draft.");
-    expect(r2.error).toMatch(/did not pass validation: .*at most 2 scores/);
+    expect(r2.error).toMatch(/the draft was not changed: .*at most 2 scores/);
+    expect(r2.checklist.complete).toBe(true); // the checklist of the draft on screen, unchanged
     expect(stuck.bodies.length).toBe(2);
   });
 
+  test("what the host declines is kept across turns", async () => {
+    const { a, bodies } = run([turn(null, { skip: ["scores"] })]);
+    const r = await a.turn(system, ask, { ...set, scores: [] }, ["index"]);
+    expect(r.skipped.sort()).toEqual(["index", "scores"]);
+    expect(r.checklist.items.find((x) => x.id === "scores")!.status).toBe("skipped");
+    expect(bodies[0].messages.at(-1).content).toContain("Current draft (the host may have edited it)");
+  });
+
   test("the conversation's cap stops the next call", async () => {
-    const { a, bodies } = run([{ reply: "x", set: null }], 0.015);
+    const { a, bodies } = run([turn(null)], 0.015);
     await a.turn(system, ask, null);
     await a.turn(system, ask, null);
     await expect(a.turn(system, ask, null)).rejects.toThrow(/cap/);

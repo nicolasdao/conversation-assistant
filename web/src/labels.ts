@@ -1,6 +1,6 @@
 // Label sets on the page: the Labels library (cog → Labels), the editor, and export and import of `.tattle-labels`
 // files. Sets are plain files on this Mac: none of this needs an API key or calls a model. See docs/jev.md § label sets.
-import { api, ApiError, type LabelSetCheck, type LabelSetEntry, type LabelSetList, type LabelTry, type SessionSummary } from "./api.js";
+import { api, ApiError, type AssistTurn, type LabelSetCheck, type LabelSetEntry, type LabelSetList, type LabelTry, type SessionSummary } from "./api.js";
 import { $, clock, h, icon, replace } from "./dom.js";
 import { ICONS } from "./icons.js";
 import { keyPrompt, keySet, setupStatus } from "./keys.js";
@@ -591,33 +591,56 @@ function showTry(box: HTMLElement, draft: LabelSet, r: LabelTry, rec: SessionSum
     h("div", { class: "ltry-block" }, h("h3", {}, `This draft · ${draft.name || "untitled"}`), renderPreview(draft, r.segments, byId(r.labels), r.window)));
 }
 
-// ---------- Create with AI ----------
+// ---------- Create with AI: an interview ----------
+
+/** The interview's first question, asked by the app itself: instant, and free. */
+const OPENER = {
+  reply: "Let's build a label set together: what the timeline asks Jev about each stretch of your conversation. I'll ask one question at a time and fill in the draft on the right as we go. Answer in your own words, click a suggestion, or ask me what anything means.",
+  question: "What kind of conversation will you label, and what would you like to find in it afterwards?",
+  choices: ["A podcast about a topic", "A sales or customer call", "A team meeting", "A job interview"],
+};
+
+const STATUS_MARK = { done: "✓", todo: "•", recommended: "○", skipped: "–" } as const;
 
 /**
- * A chat with the one assistant model (GPT-6 Luna, fixed in config) on the left, the draft in the editor on the right.
- * A reply that carries a set replaces the draft; the host can edit the draft at any time, and the next message sends it
- * as edited. Nothing is saved until the host presses Save. Each conversation has its own spending cap ($1).
+ * Create with AI, as an interview: the assistant (GPT-6 Luna, fixed in config) asks one question at a time until the
+ * set is fully configured, proposing what the host leaves out and explaining anything asked; the app computes what is
+ * still missing and shows it as progress. The draft fills in on the right and can be edited by hand at any time; the
+ * next answer sends it as edited. Nothing is saved until the host presses Save. Each conversation has a $1 cap.
  */
 export function openCreateWithAi() {
   const dlg = $<HTMLDialogElement>("#dlg-labels-ai");
   const body = $("#labels-ai-body");
   if (!dlg || !body) return;
   const conversation = `lai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  const messages: { role: "user" | "assistant"; content: string }[] = [{ role: "assistant", content: `${OPENER.reply}\n\n${OPENER.question}` }];
+  let skipped: string[] = [];
   const editor = labelEditor(blankSet(), { readOnly: false });
-  const log = h("div", { class: "lai-log", "aria-live": "polite" },
-    h("p", { class: "chat-empty" }, "Describe the show: what it is about, who is on it, and what you want to see on the timeline. For example: “A weekly sales call review: the stage of the call, objections, next steps, and when a competitor comes up.”"));
-  const input = h("textarea", { class: "chat-input", rows: 3, placeholder: "Describe your show, or ask for a change…", "aria-label": "Message" });
+  const log = h("div", { class: "lai-log", "aria-live": "polite" });
+  const progress = h("div", { class: "lai-progress", "aria-label": "What is still to settle" }, h("span", { class: "note" }, "The checklist of what the set still needs appears after your first answer."));
+  const input = h("textarea", { class: "chat-input", rows: 2, placeholder: "Answer, or ask what something means…", "aria-label": "Your answer" });
   const send = h("button", { class: "btn primary", type: "button" }, "Send");
   const spend = h("span", { class: "lai-spend" });
   const keyBox = h("div", { class: "lai-key", hidden: true });
-  const chat = h("div", { class: "lai-chat-inner" }, log, h("div", { class: "composer" }, input, h("div", { class: "composer-row" }, spend, send)));
-  const bubble = (role: "user" | "assistant", text: string, note?: string, failed = false) => {
-    log.querySelector(".chat-empty")?.remove();
-    log.append(h("div", { class: `msg ${role}${failed ? " failed" : ""}` },
-      h("div", { class: "msg-meta" }, h("span", { class: "who" }, role === "user" ? "You" : "GPT-6 Luna"), note ? h("span", {}, note) : null),
-      role === "user" ? h("div", { class: "bubble" }, text) : h("div", { class: "lai-reply" }, text)));
+  const chat = h("div", { class: "lai-chat-inner" }, log, progress, h("div", { class: "composer" }, input, h("div", { class: "composer-row" }, spend, send)));
+
+  const userBubble = (text: string) => log.append(h("div", { class: "msg user" }, h("div", { class: "msg-meta" }, h("span", { class: "who" }, "You")), h("div", { class: "bubble" }, text)));
+  /** The assistant's turn: what it says, its one question, and answers to click (only the latest turn's stay clickable). */
+  const aiBubble = (t: { reply: string; question: string; choices: string[] }, note?: string, failed = false) => {
+    log.querySelectorAll<HTMLButtonElement>(".lai-choice").forEach((b) => { b.disabled = true; });
+    log.append(h("div", { class: `msg assistant${failed ? " failed" : ""}` },
+      h("div", { class: "msg-meta" }, h("span", { class: "who" }, "GPT-6 Luna"), note ? h("span", {}, note) : null),
+      t.reply ? h("div", { class: "lai-reply" }, t.reply) : null,
+      t.question ? h("div", { class: "lai-question" }, t.question) : null,
+      t.choices.length ? h("div", { class: "lai-choices" }, t.choices.map((c) =>
+        h("button", { class: "chip lai-choice", type: "button", onclick: () => { input.value = c; void submit(); } }, c))) : null));
     log.scrollTop = log.scrollHeight;
+  };
+  const showProgress = (c: AssistTurnChecklist) => {
+    const shown = c.items.filter((x) => x.status !== "done" || !x.id.includes("."));
+    replace(progress,
+      h("div", { class: "lai-progress-h" }, c.complete ? "Ready: try it on a recording, then save" : `Still to settle: ${c.items.filter((x) => x.status === "todo").length}`),
+      h("ul", {}, shown.map((x) => h("li", { class: `st-${x.status}`, title: x.detail ?? "" }, h("span", { class: "mk" }, STATUS_MARK[x.status]), x.label))));
   };
   const needKey = () => {
     const missing = !keySet("openrouter");
@@ -630,29 +653,33 @@ export function openCreateWithAi() {
     }
     return missing;
   };
-  const hasLabels = () => { const m = editor.model(); return m.categories.length + m.scores.length + m.markers.length > 0; };
+  const started = () => { const m = editor.model(); return !!(m.name.trim() || m.description.trim() || m.categories.length + m.scores.length + m.markers.length); };
   const submit = async () => {
     const text = input.value.trim();
     if (!text || send.disabled || needKey()) return;
     messages.push({ role: "user", content: text });
-    bubble("user", text);
+    userBubble(text);
     input.value = "";
     send.disabled = true;
-    const typing = h("div", { class: "typing" }, h("i", {}), h("i", {}), h("i", {}), "Drafting…");
+    const typing = h("div", { class: "typing" }, h("i", {}), h("i", {}), h("i", {}), "Thinking…");
     log.append(typing);
+    log.scrollTop = log.scrollHeight;
     try {
-      const r = await api.assistLabels(conversation, messages, hasLabels() ? fromModel(editor.model()) : null);
-      messages.push({ role: "assistant", content: r.reply });
+      const r = await api.assistLabels(conversation, messages, started() ? fromModel(editor.model()) : null, skipped);
+      typing.remove();
+      messages.push({ role: "assistant", content: [r.reply, r.question].filter(Boolean).join("\n\n") });
+      skipped = r.skipped;
       if (r.set) editor.load(r.set);
-      bubble("assistant", r.reply || (r.set ? "Here is a draft." : "…"), r.set ? "Draft updated on the right" : r.error ? "No draft this time" : undefined, !!r.error);
-      if (r.error) bubble("assistant", r.error, undefined, true);
+      aiBubble(r, r.set ? "Draft updated on the right" : undefined);
+      if (r.error) aiBubble({ reply: r.error, question: "", choices: [] }, undefined, true);
+      showProgress(r.checklist);
       replace(spend, `Spent ${money(r.spentUsd)} of ${money(r.capUsd)}`);
     } catch (e) {
-      messages.pop();
-      if (e instanceof ApiError && e.body?.needsKey === "openrouter") { await setupStatus(); input.value = text; log.lastElementChild?.remove(); typing.remove(); needKey(); return; }
-      bubble("assistant", e instanceof Error ? e.message : String(e), undefined, true);
-    } finally {
       typing.remove();
+      messages.pop();
+      if (e instanceof ApiError && e.body?.needsKey === "openrouter") { await setupStatus(); input.value = text; log.lastElementChild?.remove(); needKey(); return; }
+      aiBubble({ reply: e instanceof Error ? e.message : String(e), question: "", choices: [] }, undefined, true);
+    } finally {
       send.disabled = false;
     }
   };
@@ -675,7 +702,10 @@ export function openCreateWithAi() {
   });
   editor.footer.append(h("div", { class: "row end lset-actions" }, tryButton(editor), h("button", { class: "btn", type: "button", onclick: () => dlg.close() }, "Cancel"), save));
   replace(body, h("div", { class: "lai-chat" }, keyBox, chat), h("div", { class: "lai-draft" }, editor.el));
+  aiBubble(OPENER); // the app asks the first question itself
   needKey();
   dlg.showModal();
   input.focus();
 }
+
+type AssistTurnChecklist = AssistTurn["checklist"];
