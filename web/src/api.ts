@@ -1,7 +1,8 @@
 // The engine's HTTP API. The front end only reads /api/state and /api/events and posts commands.
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  /** `body`: the error's JSON, which may say which key is missing (`needsKey`) or that Apple's model is getting ready (`preparing`). */
+  constructor(readonly status: number, message: string, readonly body: Record<string, unknown> | null = null) {
     super(message);
   }
 }
@@ -15,7 +16,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const text = await res.text();
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-  if (!res.ok) throw new ApiError(res.status, json?.error ?? text ?? res.statusText);
+  if (!res.ok) throw new ApiError(res.status, json?.error ?? text ?? res.statusText, json && typeof json === "object" ? json : null);
   return json as T;
 }
 
@@ -86,7 +87,18 @@ async function streamChat(id: string, body: { content?: string; mode?: string },
 
 export type KeyName = "openai" | "openrouter";
 export interface KeyStatus { name: KeyName; env: string; set: boolean; source: "environment" | "file" | null; hint: string | null }
-export interface SetupStatus { configured: boolean; keys: KeyStatus[]; path: string }
+/** `required`: the keys the app cannot open without, which follow the transcription engine (OpenAI's, or none). */
+export interface SetupStatus { configured: boolean; required: KeyName[]; keys: KeyStatus[]; path: string }
+
+export type TranscriptionEngine = "apple" | "openai";
+export type ModelState = "missing" | "installing" | "installed" | "error";
+export interface TranscriptionStatus {
+  engine: TranscriptionEngine;
+  saved: TranscriptionEngine | null;
+  apple: { available: boolean; reason: string | null; model: ModelState; fraction: number | null; error: string | null };
+  openai: { keySet: boolean };
+}
+export type Features = { factcheck: boolean; labels: boolean };
 export interface KeyCheck { ok: boolean; message: string; warning?: string }
 export interface SaveKeysResult extends SetupStatus { saved: boolean; checks: Partial<Record<KeyName, KeyCheck>> }
 
@@ -126,6 +138,9 @@ export const api = {
   state: () => call<any>("GET", "/api/state"),
   setup: () => call<SetupStatus>("GET", "/api/setup"),
   saveKeys: (keys: Partial<Record<KeyName, string>>) => call<SaveKeysResult>("POST", "/api/setup/keys", keys),
+  transcription: () => call<TranscriptionStatus>("GET", "/api/transcription"),
+  setTranscription: (engine: TranscriptionEngine) => call<TranscriptionStatus>("PUT", "/api/transcription", { engine }),
+  installModel: () => call<TranscriptionStatus>("POST", "/api/transcription/install"),
   about: () => call<{ name: string; version: string; license: { id: string | null; holder: string | null; text: string } }>("GET", "/api/about"),
   licenses: () => call<Licenses>("GET", "/api/licenses"),
   closeView: () => call<{ closed: string | null }>("POST", "/api/sessions/close"),
@@ -134,8 +149,9 @@ export const api = {
   engine: () => call<{ startedAt: string; stale: boolean }>("GET", "/api/engine"),
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),
-  startReplay: (dir: string, speed: 1 | "max", voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices }),
-  startLive: (mic?: string, voices?: number, features?: { factcheck: boolean; labels: boolean }) =>
+  startReplay: (dir: string, speed: 1 | "max", voices?: number, features?: Features) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices, features }),
+  startLive: (mic?: string, voices?: number, features?: Features) =>
     call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices, features }),
   stop: () => call<{ sessionId: string }>("POST", "/api/session/stop"),
   rename: (id: string, displayName: string) => call("POST", `/api/speakers/${encodeURIComponent(id)}/rename`, { displayName }),
@@ -149,7 +165,8 @@ export const api = {
   sessions: (q = "") => call<SessionSummary[]>("GET", `/api/sessions${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   renameSession: (id: string, name: string) => call<SessionSummary>("PATCH", `/api/sessions/${encodeURIComponent(id)}`, { name }),
   openSession: (id: string) => call<{ sessionId: string; events: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/open`),
-  replaySession: (sessionId: string, speed: 1 | "max", voices?: number) => call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed, voices }),
+  replaySession: (sessionId: string, speed: 1 | "max", voices?: number, features?: Features) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed, voices, features }),
   pause: () => call<{ paused: boolean }>("POST", "/api/session/pause"),
   resume: () => call<{ paused: boolean }>("POST", "/api/session/resume"),
   deleteSession: (id: string) => call<{ deleted: string }>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),

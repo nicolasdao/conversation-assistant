@@ -82,8 +82,9 @@
           <button role="menuitem" data-open="dlg-insights"><b>Insights</b><span id="m-insights"></span></button>
           <button role="menuitem" data-open="dlg-speakers"><b>Speakers</b><span id="m-speakers"></span></button>
           <button role="menuitem" data-open="dlg-labels"><b>Labels</b><span id="m-labels"></span></button>
+          <button role="menuitem" data-open="dlg-transcription"><b>Transcription</b><span id="m-transcription"></span></button>
           <!-- the Mac app hides these (body.in-app): Settings… (⌘,) and About / Help → Licenses have them -->
-          <button role="menuitem" class="browser-only" data-open="dlg-keys"><b>API keys</b><span>OpenAI, OpenRouter</span></button>
+          <button role="menuitem" class="browser-only" data-open="dlg-keys"><b>API keys</b><span>OpenAI, OpenRouter · optional</span></button>
           <div class="menu-foot browser-only"><span id="app-version"></span><button id="license-link" class="linkbtn">Licenses</button></div>
         </div>
       </div>
@@ -199,8 +200,15 @@
     <div id="keys" class="dlg-body"></div>
   </dialog>
 
+  <dialog id="dlg-transcription" class="keys-dlg" aria-labelledby="h-transcription">
+    <div class="dlg-head"><h2 id="h-transcription">Transcription</h2><span class="sub">What turns speech into text</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="transcription" class="dlg-body"></div>
+  </dialog>
+
   <dialog id="dlg-chat" class="chat-dlg" aria-labelledby="h-chat">
     <div class="dlg-head"><h2 id="h-chat">Chat</h2><span id="chat-sub" class="sub">Ask about the transcript</span><button class="x" data-close aria-label="Close">×</button></div>
+    <!-- asked for here when no OpenRouter key is set: inside the dialog, which is modal (docs/gotchas.md) -->
+    <div id="chat-key" class="dlg-body" hidden></div>
     <div id="chat" class="chat"></div>
   </dialog>
 
@@ -228,6 +236,8 @@
         <span class="feat-text"><b>Labels</b><span>Jev labels each part of the timeline: subject, mode, heat and hype, and moments like hot takes, predictions, and clip-worthy segments.</span></span>
         <span class="toggle" aria-hidden="true"><i></i></span>
       </button>
+      <!-- the OpenRouter key, asked for here when a switch needs it: inside the dialog, which is modal (docs/gotchas.md) -->
+      <div id="start-key" hidden></div>
       <p id="start-summary" class="start-summary"></p>
       <p class="note">A feature you turn off stays off until the session ends. Pause, Resume, Stop, and chat work either way.</p>
       <div class="row end"><button class="btn" data-cancel>Cancel</button><button id="start-go" class="btn primary">Start live</button></div>

@@ -1065,6 +1065,22 @@ body.setup-mode > :not(#setup):not(#toasts) { display: none !important; }
 .key-actions { gap: 12px; }
 .key-actions .key-msg { margin-right: auto; }
 dialog.keys-dlg { width: min(680px, calc(100vw - 32px)); max-height: min(90vh, 820px); }
+.key-needed { font-weight: 600; color: var(--ink); }
+/* a key asked for where a feature needs it: Start live and Chat, inside their dialog */
+.key-prompt { display: grid; gap: 10px; padding: 12px 14px; background: var(--deck-2); border-left: 3px solid var(--hype); }
+.key-prompt-h { margin: 0; font: 700 15px/1.3 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); }
+#chat-key { padding: 20px; }
+/* Transcription: two choices, one on */
+.engine-list { display: grid; gap: 10px; }
+.engine-opt { display: grid; gap: 6px; }
+.engine-why { color: #ffc27a !important; }
+.engine-state { margin: 0 0 0 17px; font-size: 13.5px; color: var(--ink-2); }
+.engine-state .linkbtn { vertical-align: baseline; }
+.engine-onair { margin: 0 0 10px; color: #ffc27a; }
+.radio { flex: none; width: 20px; height: 20px; border: 2px solid var(--rule); display: grid; place-items: center; }
+.radio i { width: 10px; height: 10px; background: transparent; }
+.feat[aria-checked="true"] .radio { border-color: var(--accent); }
+.feat[aria-checked="true"] .radio i { background: var(--accent); }
 @media (max-width: 560px) {
   .setup { padding-top: 24px; }
   .setup h1 { font-size: 30px; }

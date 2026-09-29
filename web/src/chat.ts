@@ -4,6 +4,7 @@
 // created, sent, or spent until the first question of a new chat.
 import { api, type Chat, type ChatList, type ChatMessage, type ChatModel } from "./api.js";
 import { $, clock, glyph, h, replace, usd } from "./dom.js";
+import { keyPrompt, keySet, setupStatus } from "./keys.js";
 import { renderMarkdown } from "./markdown.js";
 import { ask, toast } from "./panels.js";
 import { readRoute, setRoute } from "./router.js";
@@ -128,7 +129,7 @@ function autosize() {
   t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
 }
 
-/** Opens the chat window (the header's Chat button and ⌘K). */
+/** Opens the chat window (the header's Chat button and ⌘K); without an OpenRouter key it asks for one first. */
 export function openChat() {
   const d = $<HTMLDialogElement>("#dlg-chat");
   if (!d) return;
@@ -137,6 +138,21 @@ export function openChat() {
     d.showModal();
   }
   chatOpened();
+}
+
+/** Chat asks OpenRouter's models: without its key, the window shows the key's card instead, and saving opens the chat. */
+function needKey(): boolean {
+  const box = $("#chat-key"), chat = $("#chat");
+  if (!box || !chat) return false;
+  const missing = !keySet("openrouter");
+  box.hidden = !missing;
+  chat.hidden = missing;
+  if (missing && !box.childElementCount) {
+    replace(box, keyPrompt("openrouter", "Please provide your OpenRouter API key to use Chat.", {
+      onSaved: () => { replace(box); needKey(); chatOpened(); },
+    }));
+  }
+  return missing;
 }
 
 /** Called on every render of the page: follows the session on screen, and keeps the meter's pending lines current. */
@@ -166,6 +182,11 @@ export function renderChat(st: State) {
 /** The window opened: put its chat in the URL (the URL's own chat, if not loaded yet, stays). */
 export function chatOpened() {
   setRoute({ panel: "chat" });
+  if (needKey()) {
+    // what the server says now: a key saved in the API keys window, or in .env and a restart
+    void setupStatus().then(() => { if (!needKey()) chatOpened(); });
+    return;
+  }
   // before the chat the URL names has loaded, keep it there
   if (current) setRoute({ chat: current.id });
   requestAnimationFrame(() => { scrollToEnd(true); if (!editing) el.input().focus(); });

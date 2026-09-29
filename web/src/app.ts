@@ -2,7 +2,7 @@
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
-  bindControls, bindInsights, bindSessionName, bindSplit, checkEngine, jumpToSegment, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
+  bindControls, bindInsights, bindSessionName, bindSplit, checkEngine, jumpToSegment, setPanelOpener, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
   renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches, SESSION_WINDOWS, showInsights,
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
@@ -11,7 +11,7 @@ import { bindChat, chatOpened, openChat, renderChat } from "./chat.js";
 import { bindBespoke } from "./ui.js";
 import { desktop } from "./desktop.js";
 import { bindTransfer, renderTransferButtons } from "./transfer.js";
-import { renderKeys } from "./keys.js";
+import { refreshTranscription, renderKeys, renderTranscription, setOnAir, setTranscription, setupStatus } from "./keys.js";
 import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
 import { panelName, PANELS, readRoute, setRoute, tabName, TABS, type Route } from "./router.js";
 import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
@@ -34,6 +34,7 @@ function schedule() {
     frame = 0;
     const all = dirty.has("session");
     if (all || dirty.has("session")) {
+      setOnAir(st.session?.status === "running" || st.session?.status === "ending");
       renderSession(st);
       renderTransferButtons(st);
       syncPlayer(st);
@@ -77,6 +78,7 @@ function onOpen(id: string) {
   if (id === "dlg-insights") showInsights(readRoute().section ?? "overview");
   if (id === "dlg-chat") chatOpened();
   if (id === "dlg-keys") void renderKeys((m) => toast(m, "ok"));
+  if (id === "dlg-transcription") void renderTranscription((m) => toast(m, "ok"));
 }
 
 function onFilter() {
@@ -224,6 +226,8 @@ function connect() {
   es.onmessage = () => {};
   const handle = async (ev: MessageEvent) => {
     const e = JSON.parse(ev.data);
+    // the engine setting and Apple's model are not part of any session
+    if (e.type === "transcription.status") { setTranscription(e.data); schedule(); return; }
     if (reloading) await reloading;
     if (applyEvent(st, e.type, e.data, e.at, dirty) === "reset") {
       reloading = reload();
@@ -235,7 +239,7 @@ function connect() {
     if (e.type === "s1.version") void api.state().then((snap) => { st.s1.versions = snap?.s1?.versions ?? st.s1.versions; dirty.add("s1"); schedule(); });
     schedule();
   };
-  for (const t of ["session.started", "session.ended", "session.paused", "session.resumed", "echo.gate", "call.started", "call", "health", "utterance", "utterance.failed", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
+  for (const t of ["transcription.status", "session.started", "session.ended", "session.paused", "session.resumed", "echo.gate", "call.started", "call", "health", "utterance", "utterance.failed", "utterance.partial", "speaker.created", "speaker.updated", "speaker.merged",
     "segment.closed", "segment.labels", "section.updated", "claim.flagged", "claim.duplicate", "claim.repeat", "claim.researching",
     "claim.verdict", "claim.dropped", "claim.disputed", "audit", "s1.version", "s1.memory", "cost", "budget.exhausted", "stats", "error"]) {
     es.addEventListener(t, (ev) => void handle(ev as MessageEvent));
@@ -249,6 +253,7 @@ function connect() {
 }
 
 bindControls(onOpen, () => void reload());
+setPanelOpener((id) => openPanel(panelName(id) ?? ""));
 bindSessionName(() => st, () => { dirty.add("session"); schedule(); });
 bindSplit();
 bindPlayer();
@@ -269,6 +274,8 @@ setInterval(() => void checkEngine(), 15_000);
 bindTimeline(() => { dirty.add("timeline"); schedule(); });
 renderLegend($("#legend"));
 void loadDevices();
+void setupStatus(); // which keys are set, for the prompts
+void refreshTranscription().then(() => schedule());
 await reload();
 await applyRoute(readRoute(), "load");
 connect();

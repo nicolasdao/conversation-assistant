@@ -1,7 +1,9 @@
-// The API keys: the first-run setup screen, shown instead of the app until both are set, and the API keys window
-// (cog menu) to replace one later. The server checks each key before saving it; it never
-// sends a key back, only its last 4 characters (see docs/setup.md).
-import { api, type KeyName, type KeyStatus, type SaveKeysResult, type SetupStatus } from "./api.js";
+// The API keys and the transcription engine: the first-run setup screen, shown instead of the app until the keys the
+// engine needs are set (only OpenAI's, and only when transcribing with OpenAI); the prompt for a key when a feature
+// needs it (OpenRouter, for fact-checking, labels, and chat); the API keys window (cog menu) to replace one later; and
+// the Transcription window. The server checks each key before saving it; it never sends a key back, only its last 4
+// characters (see docs/setup.md).
+import { api, type KeyName, type KeyStatus, type SaveKeysResult, type SetupStatus, type TranscriptionEngine, type TranscriptionStatus } from "./api.js";
 import { $, h, replace, s } from "./dom.js";
 import { desktop } from "./desktop.js";
 
@@ -20,9 +22,9 @@ const link = (href: string, text: string) => h("a", { href, target: "_blank", re
 const GUIDES: Record<KeyName, Guide> = {
   openai: {
     title: "OpenAI",
-    role: "Transcription",
+    role: "Transcription with OpenAI",
     short: "Turns what is said into text.",
-    what: "Turns what is said into text, live as people speak and again when they finish. It is most of the cost of a show: about $1.23 an hour.",
+    what: "Turns what is said into text, live as people speak and again when they finish, when OpenAI transcribes instead of this Mac. It is most of the cost of a show: about $1.23 an hour.",
     steps: [
       ["Sign in, or create an account, at ", link("https://platform.openai.com/signup", "platform.openai.com"), ". This is OpenAI's developer site, separate from a ChatGPT subscription."],
       ["Add credit: ", link("https://platform.openai.com/settings/organization/billing/overview", "Settings → Billing"), " → Add to credit balance. $10 is plenty to start. Leave automatic recharge off, so you are never charged more than you added."],
@@ -46,9 +48,40 @@ const GUIDES: Record<KeyName, Guide> = {
   },
 };
 
-/** The page's first question: are both keys set? Null when the server predates the setup routes. */
+let known: SetupStatus | null = null;
+
+/** The page's first question: are the keys the engine needs set? Null when the server predates the setup routes. */
 export async function setupStatus(): Promise<SetupStatus | null> {
-  try { return await api.setup(); } catch { return null; }
+  try { return (known = await api.setup()); } catch { return null; }
+}
+
+/** Whether a key is set, as last heard from the server (the prompts ask again before they show). */
+export function keySet(name: KeyName): boolean {
+  return !!known?.keys.find((k) => k.name === name)?.set;
+}
+
+// ---------- the transcription engine, as the page knows it ----------
+
+let transcription: TranscriptionStatus | null = null;
+const listeners = new Set<() => void>();
+
+export function transcriptionState(): TranscriptionStatus | null {
+  return transcription;
+}
+
+/** Called on every change (the engine, Apple's model, its install progress). */
+export function onTranscription(fn: () => void) {
+  listeners.add(fn);
+}
+
+export function setTranscription(t: TranscriptionStatus | null) {
+  transcription = t;
+  for (const fn of listeners) fn();
+}
+
+export async function refreshTranscription(): Promise<TranscriptionStatus | null> {
+  try { setTranscription(await api.transcription()); } catch { /* an older server has no engine setting */ }
+  return transcription;
 }
 
 interface Field { name: KeyName; input: HTMLInputElement; msg: HTMLElement; chip: HTMLElement }
@@ -111,15 +144,17 @@ const padlock = () => s("svg", { class: "setup-lock", viewBox: "0 0 24 24", "ari
 const trust = () => h("div", { class: "setup-trust" }, padlock(),
   h("div", {},
     h("b", {}, "Your keys stay on this Mac"),
-    h("span", {}, "Tattle has no server of its own. Your keys are saved on this computer and sent only to OpenAI and OpenRouter, to use your account with them. Never to us, never anywhere else.")));
+    h("span", {}, "Tattle has no server of its own. Your keys are saved on this computer and each is sent only to its own service, to use your account with it. Never to us, never anywhere else.")));
 
 /**
- * The first-run screen, instead of the app: nothing else loads until both keys are saved. What stands out is the two
- * required fields and one button; how to get each key folds away under its field, for whoever needs it.
+ * The first-run screen, instead of the app: nothing else loads until the required keys are saved, which is OpenAI's
+ * alone and only when OpenAI transcribes (a Mac that cannot run Apple Speech, or someone who chose OpenAI). What stands
+ * out is the field and one button; how to get the key folds away under it, for whoever needs it.
  */
-export function showSetup(status: SetupStatus) {
+export function showSetup(status: SetupStatus, t: TranscriptionStatus | null = null) {
   document.body.classList.add("setup-mode");
-  const names = status.keys.filter((k) => !k.set).map((k) => k.name);
+  const required = status.required ?? status.keys.map((k) => k.name);
+  const names = status.keys.filter((k) => !k.set && required.includes(k.name)).map((k) => k.name);
   const fields: Field[] = [];
   const save = h("button", { class: "btn primary setup-go", type: "button" });
   const progress = h("p", { class: "setup-progress", "aria-live": "polite" });
@@ -131,7 +166,7 @@ export function showSetup(status: SetupStatus) {
   const ready = (f: Field) => !!f.input.value.trim() && !formatProblem(f.name, f.input.value.trim());
   const refresh = () => {
     const n = fields.filter(ready).length;
-    progress.textContent = n === fields.length ? `Both keys added: press ${label()}` : `${n} of ${fields.length} key${fields.length > 1 ? "s" : ""} added`;
+    progress.textContent = n === fields.length ? `${fields.length > 1 ? "Both keys" : "Key"} added: press ${label()}` : `${n} of ${fields.length} key${fields.length > 1 ? "s" : ""} added`;
     progress.classList.toggle("done", n === fields.length);
     save.classList.toggle("armed", n === fields.length);
   };
@@ -208,10 +243,14 @@ export function showSetup(status: SetupStatus) {
   replace(root, h("div", { class: "setup-inner" },
     h("div", { class: "setup-brand" }, h("i"), "Tattle"),
     h("h1", {}, names.length > 1 ? "Add your two API keys to start" : `Add your ${GUIDES[names[0]].title} API key to start`),
-    h("p", { class: "setup-lede" }, "The app uses OpenAI and OpenRouter, which you pay directly, only for what you use. Paste a key from each below. No keys yet? Open the guide under each field."),
+    h("p", { class: "setup-lede" },
+      // why a key at all, when a newer Mac needs none
+      t && !t.apple.available
+        ? "On-device transcription needs macOS 26 or later. On this Mac, Tattle transcribes with OpenAI, which you pay directly, only for what you use. No key yet? Open the guide under the field."
+        : "You chose OpenAI for transcription. OpenAI is paid directly, only for what you use. No key yet? Open the guide under the field."),
     h("section", { class: "setup-panel" }, cards, actions, trust()),
     h("p", { class: "note setup-privacy" },
-      "A show costs about $1.60 an hour ($1.23 for a transcript only), from prepaid credit; each session stops itself at $10. ",
+      "A transcript costs about $1.23 an hour, from prepaid credit; each session stops itself at $10. Fact-checking and labels add up to $0.40 an hour and need an OpenRouter key, which the app asks for when you turn them on. ",
       `Keys are saved in ${status.path}, readable only by your macOS user. Change them later: ${desktop ? "Tattle → Settings… (⌘,)" : "cog menu → API keys"}.`)));
   document.body.append(root);
   fields[0]?.input.focus();
@@ -219,8 +258,14 @@ export function showSetup(status: SetupStatus) {
 
 // ---------- the API keys window ----------
 
-/** One card per key in the API keys window: the key in use, a field to replace it, and the guide folded away. */
-function keyCard(name: KeyName, status: KeyStatus | undefined, submit: () => void): { el: HTMLElement; field: Field | null } {
+/** When each key is needed: neither is required to open the app, except OpenAI's when OpenAI transcribes. */
+const NEEDED: Record<KeyName, string> = {
+  openai: "Needed only for OpenAI transcription.",
+  openrouter: "Needed for fact-checking, labels, and Chat.",
+};
+
+/** One card per key: the key in use, a field to replace it, and the guide folded away (open when `guide` says so). */
+function keyCard(name: KeyName, status: KeyStatus | undefined, submit: () => void, guide = false): { el: HTMLElement; field: Field | null } {
   const g = GUIDES[name];
   const fromEnv = status?.source === "environment";
   const chip = h("span", { class: "key-chip" });
@@ -237,10 +282,47 @@ function keyCard(name: KeyName, status: KeyStatus | undefined, submit: () => voi
   }
   const el = h("section", { class: "key-card" },
     h("div", { class: "key-head" }, h("h2", {}, g.title), h("span", { class: "key-role" }, g.role), chip),
-    h("p", { class: "key-what" }, g.what),
-    h("details", { class: "key-how" }, h("summary", {}, "How to get this key"), steps(name)),
+    h("p", { class: "key-what" }, g.what, h("b", { class: "key-needed" }, ` ${NEEDED[name]}`)),
+    h("details", { class: "key-how", open: guide }, h("summary", {}, "How to get this key"), steps(name)),
     control, msg);
   return { el, field };
+}
+
+/**
+ * A key asked for where it is needed, inside the open window (a popover outside a modal dialog cannot be clicked:
+ * docs/gotchas.md): the heading says why, then the key's card with its guide, Save, and Not now. `onSaved` runs once
+ * the key is checked and saved; `onCancel` on Not now.
+ */
+export function keyPrompt(name: KeyName, heading: string, done: { onSaved: () => void; onCancel?: () => void }): HTMLElement {
+  const status = known?.keys.find((k) => k.name === name);
+  const general = h("p", { class: "key-msg", "aria-live": "polite" });
+  const save = h("button", { class: "btn primary", type: "button" }, "Save");
+  let field: Field | null = null;
+  const submit = async () => {
+    if (!field || save.disabled) return;
+    if (!field.input.value.trim()) { general.className = "key-msg bad"; general.textContent = "Paste the key to save it."; return; }
+    replace(general);
+    save.disabled = true;
+    try {
+      const r = await saveFields([field]);
+      known = r;
+      if (r.saved) done.onSaved();
+    } catch (e) {
+      general.className = "key-msg bad";
+      general.textContent = e instanceof Error ? e.message : String(e);
+    } finally {
+      save.disabled = false;
+    }
+  };
+  const card = keyCard(name, status, () => void submit(), true);
+  field = card.field;
+  save.addEventListener("click", () => void submit());
+  const cancel = done.onCancel ? h("button", { class: "btn", type: "button", onclick: done.onCancel }, "Not now") : null;
+  const el = h("div", { class: "key-prompt", role: "group", "aria-label": heading },
+    h("p", { class: "key-prompt-h" }, heading), card.el,
+    h("div", { class: "row end key-actions" }, general, cancel, field ? save : null));
+  requestAnimationFrame(() => field?.input.focus());
+  return el;
 }
 
 /** The API keys window (cog menu; Settings… in the Mac app): replaces a key; the next call uses it, without a restart. */
@@ -268,6 +350,7 @@ export async function renderKeys(onSaved: (message: string) => void) {
     }
   };
   save.addEventListener("click", () => void submit());
+  known = status;
   const cards = (["openai", "openrouter"] as KeyName[]).map((n) => {
     const c = keyCard(n, status.keys.find((k) => k.name === n), () => void submit());
     if (c.field) fields.push(c.field);
@@ -275,5 +358,83 @@ export async function renderKeys(onSaved: (message: string) => void) {
   });
   // keys set in .env cannot be changed here: nothing to save
   replace(box, cards, h("div", { class: "row end key-actions", hidden: fields.length === 0 }, general, save),
-    h("p", { class: "note" }, `Saved keys are in ${status.path}, readable only by your macOS user.`));
+    h("p", { class: "note" }, `Neither key is needed to open the app. Saved keys are in ${status.path}, readable only by your macOS user.`));
+}
+
+// ---------- the Transcription window ----------
+
+const MODEL_LINE: Record<string, (t: TranscriptionStatus) => string> = {
+  missing: () => "Getting ready…",
+  installing: (t) => `Getting on-device speech recognition ready… ${Math.round((t.apple.fraction ?? 0) * 100)} %`,
+  installed: () => "Ready",
+  error: (t) => t.apple.error ?? "Could not get ready",
+};
+
+/** One line for the settings menu. */
+export function transcriptionSummary(t: TranscriptionStatus | null): string {
+  if (!t) return "";
+  return t.engine === "apple" ? "On this Mac" : "OpenAI";
+}
+
+let onAir = false;
+
+/** Whether a session is on air: the engine cannot change then. */
+export function setOnAir(v: boolean) {
+  if (v === onAir) return;
+  onAir = v;
+  if ($<HTMLDialogElement>("#dlg-transcription")?.open) void renderTranscription(() => {});
+}
+
+/**
+ * The Transcription window (cog menu): Apple Speech on this Mac, or OpenAI. Choosing OpenAI without its key shows the
+ * key's card first. Read-only while a session is on air.
+ */
+export async function renderTranscription(onSaved: (message: string) => void) {
+  const box = $("#transcription");
+  if (!box) return;
+  const t = await refreshTranscription();
+  if (!t) { replace(box, h("p", { class: "empty" }, "This server has no transcription setting: restart it with npm run serve.")); return; }
+  await setupStatus();
+  const msg = h("p", { class: "key-msg", "aria-live": "polite" });
+  const extra = h("div", {});
+  const choose = async (engine: TranscriptionEngine) => {
+    if (onAir || engine === t.engine) return;
+    replace(msg);
+    if (engine === "openai" && !keySet("openai")) {
+      replace(extra, keyPrompt("openai", "Transcribing with OpenAI needs your OpenAI API key.", {
+        onSaved: () => void choose("openai"),
+        onCancel: () => replace(extra),
+      }));
+      return;
+    }
+    try {
+      setTranscription(await api.setTranscription(engine));
+      onSaved(engine === "apple" ? "Transcription: on this Mac" : "Transcription: OpenAI");
+      void renderTranscription(onSaved);
+    } catch (e) {
+      msg.className = "key-msg bad";
+      msg.textContent = e instanceof Error ? e.message : String(e);
+    }
+  };
+  // the model's state sits under its option, not inside it: a button cannot hold another (Try again)
+  const option = (engine: TranscriptionEngine, title: string, text: string, disabled: string | null, status: Node | null) =>
+    h("div", { class: "engine-opt" },
+      h("button", {
+        class: "feat engine-choice", role: "radio", type: "button", "aria-checked": String(t.engine === engine),
+        disabled: onAir || !!disabled, onclick: () => void choose(engine),
+      },
+      h("span", { class: "feat-text" }, h("b", {}, title), h("span", {}, text), disabled ? h("span", { class: "engine-why" }, disabled) : null),
+      h("span", { class: "radio", "aria-hidden": "true" }, h("i"))),
+      status ? h("p", { class: "engine-state" }, status) : null);
+  const model = t.apple.model;
+  const retry = h("button", { class: "linkbtn", type: "button", onclick: () => void api.installModel().then(setTranscription).then(() => renderTranscription(onSaved)).catch(() => {}) }, "Try again");
+  const appleState = t.apple.available ? h("span", {}, MODEL_LINE[model](t), model === "error" ? " " : null, model === "error" ? retry : null) : null;
+  replace(box,
+    onAir ? h("p", { class: "note engine-onair" }, "A session is on air: the engine can be changed when it ends.") : null,
+    h("div", { class: "engine-list", role: "radiogroup", "aria-label": "Transcription" },
+      option("apple", "On this Mac (Apple Speech)", "Free. Audio never leaves your Mac. Less accurate on names and jargon.",
+        t.apple.available ? null : (t.apple.reason ?? "Not available on this Mac"), appleState),
+      option("openai", "OpenAI", "More accurate on names and jargon. About $1.23 an hour of show. Needs an OpenAI key.", null, null)),
+    extra, msg,
+    h("p", { class: "note" }, "The engine is chosen for the next session; a session keeps the one it started with."));
 }

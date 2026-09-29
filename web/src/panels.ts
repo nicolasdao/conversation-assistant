@@ -1,5 +1,6 @@
 import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.js";
 import { openExport, openImport } from "./transfer.js";
+import { keyPrompt, keySet, onTranscription, refreshTranscription, setTranscription, setupStatus, transcriptionState, transcriptionSummary } from "./keys.js";
 import { desktop } from "./desktop.js";
 import { setRoute } from "./router.js";
 import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
@@ -130,7 +131,8 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
   $("#start-replay")?.addEventListener("click", () => {
     const dir = $<HTMLInputElement>("#replay-dir")!.value.trim();
     closePops();
-    void run(() => api.startReplay(dir, replaySpeed, voicesOnCall()));
+    // without an OpenRouter key a replay is transcript-only, as the Start live window's switches would be
+    void run(() => api.startReplay(dir, replaySpeed, voicesOnCall(), withoutKeyOff()));
   });
   $("#stop")?.addEventListener("click", () => run(() => api.stop(), "Stopping: in-flight work will finish"));
   document.querySelectorAll<HTMLButtonElement>("#replay-speed button").forEach((b) => b.addEventListener("click", () => {
@@ -170,46 +172,127 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
 
 // ---------- Start live: choose the features ----------
 
-/** Rough cost per hour of show (README): transcription always, Jev for labels or fact-checking, System 2 for fact-checking. */
+/**
+ * Rough cost per hour of show (README): the transcript (free on this Mac, $1.23 with OpenAI), Jev for labels or
+ * fact-checking, System 2 for fact-checking.
+ */
 const PER_HOUR = { transcript: 1.23, jev: 0.04, factcheck: 0.35 };
 
-const feature = (id: "factcheck" | "labels") => $<HTMLButtonElement>(`#feat-${id}`)!;
-const isOn = (id: "factcheck" | "labels") => feature(id).getAttribute("aria-checked") === "true";
+type Feature = "factcheck" | "labels";
+const FEATURES: Feature[] = ["factcheck", "labels"];
+const feature = (id: Feature) => $<HTMLButtonElement>(`#feat-${id}`)!;
+const isOn = (id: Feature) => feature(id).getAttribute("aria-checked") === "true";
+const OPENROUTER_HEADING = "Please provide your OpenRouter API key to configure fact-checking or labeling.";
+
+/** A replay started without the Start live window runs what the keys allow: without OpenRouter, transcript only. */
+export function withoutKeyOff() {
+  const on = keySet("openrouter");
+  return { factcheck: on, labels: on };
+}
+
+/** Apple's model must be installed before a session can start; the window says how far along it is. */
+function preparing(): boolean {
+  const t = transcriptionState();
+  return t?.engine === "apple" && t.apple.model !== "installed";
+}
 
 function renderStartSummary() {
   const fc = isOn("factcheck"), lb = isOn("labels");
-  const perHour = PER_HOUR.transcript + (fc || lb ? PER_HOUR.jev : 0) + (fc ? PER_HOUR.factcheck : 0);
+  const t = transcriptionState();
+  const apple = t?.engine === "apple";
+  const go = $<HTMLButtonElement>("#start-go");
+  if (go) go.disabled = preparing();
+  if (t && apple && t.apple.model !== "installed") {
+    const failed = t.apple.model === "error";
+    const retry = h("button", { class: "linkbtn", type: "button", onclick: () => void api.installModel().then(setTranscription).catch((e) => toast(e instanceof Error ? e.message : String(e))) }, "Try again");
+    const settings = h("button", { class: "linkbtn", type: "button", onclick: () => { $<HTMLDialogElement>("#dlg-start")!.close(); openSettingsPanel("dlg-transcription"); } }, "Settings → Transcription");
+    replace($("#start-summary"),
+      h("b", {}, failed ? "On-device speech recognition is not ready" : `Getting on-device speech recognition ready… ${Math.round((t.apple.fraction ?? 0) * 100)} %`),
+      h("br", {}), failed ? h("span", {}, t.apple.error ?? "It could not be prepared.", " ", retry, " · ", settings) : "Start is available as soon as it is.");
+    return;
+  }
+  const perHour = (apple ? 0 : PER_HOUR.transcript) + (fc || lb ? PER_HOUR.jev : 0) + (fc ? PER_HOUR.factcheck : 0);
   const what = fc && lb ? "Everything on" : !fc && !lb ? "Transcript only: Jev and System 2 are not called" : fc ? "No labels" : "No fact-checking";
-  replace($("#start-summary"), h("b", {}, what), h("br", {}), `About $${perHour.toFixed(2)} an hour${fc ? " at most" : ""}.`);
+  const cost = apple && !fc && !lb ? "Free: nothing leaves this Mac." : `About $${perHour.toFixed(2)} an hour${fc ? " at most" : ""}.`;
+  replace($("#start-summary"), h("b", {}, what), h("br", {}), apple ? "Transcript: free, on this Mac. " : "", cost);
 }
 
-/** Start live asks first: every feature is on unless the host turns it off, for this session only. */
+/** Asks for the OpenRouter key inside the Start live window; Not now turns off every switch that needs it. */
+function askOpenRouter(then?: () => void) {
+  const box = $("#start-key");
+  if (!box) return;
+  box.hidden = false;
+  replace(box, keyPrompt("openrouter", OPENROUTER_HEADING, {
+    onSaved: () => { box.hidden = true; replace(box); renderStartSummary(); then?.(); },
+    onCancel: () => {
+      for (const id of FEATURES) feature(id).setAttribute("aria-checked", "false");
+      box.hidden = true;
+      replace(box);
+      renderStartSummary();
+    },
+  }));
+}
+
+/**
+ * Start live asks first. The switches start on when the OpenRouter key is set, off when it is not: turning one on
+ * then asks for the key, in this window.
+ */
 function openStartLive() {
   void loadDevices();
   // each show starts at "Any number": who is on the call changes from show to show
   const voices = $<HTMLSelectElement>("#voices");
   if (voices) voices.value = "0";
-  for (const id of ["factcheck", "labels"] as const) feature(id).setAttribute("aria-checked", "true");
+  const box = $("#start-key");
+  if (box) { box.hidden = true; replace(box); }
+  const set = (on: boolean) => { for (const id of FEATURES) feature(id).setAttribute("aria-checked", String(on)); };
+  set(keySet("openrouter"));
   renderStartSummary();
   const d = $<HTMLDialogElement>("#dlg-start")!;
   d.showModal();
   $<HTMLButtonElement>("#start-go")?.focus();
+  // what the server says now (a key saved elsewhere, the model's progress), unless the host already asked for a key
+  void Promise.all([setupStatus(), refreshTranscription()]).then(() => {
+    if (d.open && box?.hidden) set(keySet("openrouter"));
+    renderStartSummary();
+  });
 }
 
 function bindStartLive() {
-  for (const id of ["factcheck", "labels"] as const) {
+  onTranscription(() => { if ($<HTMLDialogElement>("#dlg-start")?.open) renderStartSummary(); });
+  for (const id of FEATURES) {
     feature(id).addEventListener("click", () => {
-      feature(id).setAttribute("aria-checked", String(!isOn(id)));
+      const on = !isOn(id);
+      feature(id).setAttribute("aria-checked", String(on));
       renderStartSummary();
+      if (on && !keySet("openrouter")) askOpenRouter();
     });
   }
-  $("#start-go")?.addEventListener("click", () => {
+  const start = () => {
     const features = { factcheck: isOn("factcheck"), labels: isOn("labels") };
+    if ((features.factcheck || features.labels) && !keySet("openrouter")) return askOpenRouter(start);
+    if (preparing()) return;
     const mic = $<HTMLSelectElement>("#mic")?.value;
     if (mic) try { localStorage.setItem(MIC_KEY, mic); } catch { /* storage may be unavailable */ }
-    $<HTMLDialogElement>("#dlg-start")!.close();
-    void run(() => api.startLive($<HTMLSelectElement>("#mic")?.value || undefined, voicesOnCall(), features));
-  });
+    void (async () => {
+      try {
+        await api.startLive(mic || undefined, voicesOnCall(), features);
+        $<HTMLDialogElement>("#dlg-start")!.close();
+      } catch (e) {
+        // the server knows best which key is missing (one removed from .env, say): ask for it here
+        if (e instanceof ApiError && e.body?.needsKey === "openrouter") { await setupStatus(); return askOpenRouter(start); }
+        if (e instanceof ApiError && e.body?.preparing) { void refreshTranscription(); return; }
+        $<HTMLDialogElement>("#dlg-start")!.close();
+        toast(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  };
+  $("#start-go")?.addEventListener("click", start);
+}
+
+/** Opens a settings window from inside the page (the Transcription window, from Start live). */
+let openSettingsPanel: (dialogId: string) => void = () => {};
+export function setPanelOpener(fn: (dialogId: string) => void) {
+  openSettingsPanel = fn;
 }
 
 function closePops(only?: string) {
@@ -349,6 +432,7 @@ export function renderMenu(st: State) {
   const none = "Start or open a recording";
   replace($("#m-speakers"), st.session ? plural(voices, "voice") : none);
   replace($("#m-labels"), !st.session ? none : featuresOf(st).labels ? st.labels.version || "–" : "Off for this session");
+  replace($("#m-transcription"), transcriptionSummary(transcriptionState()));
 }
 
 // ---------- Insights: Overview (stats), Fact-checker (System 1), Log ----------
@@ -1055,7 +1139,7 @@ function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undef
           const ok = await ask(`Replay “${label}”?`, {
             message: `This runs the audio through the pipeline again at real-time speed and calls the APIs again (about ${usd(r.costUsd || 0.02)}).`, ok: "Replay",
           });
-          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1, voicesOnCall()); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
+          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1, voicesOnCall(), withoutKeyOff()); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
         },
       }, glyph("replay"), "Replay"),
       h("button", {

@@ -4,7 +4,7 @@
 //   /recordings/<id>           that recording, opened read-only
 //   ?t=1:23:45                 the playback position in a recording
 //   ?tab=thinking | jev-log    the right column's tab (fact-check is the default)
-//   ?panel=recordings | insights | speakers | labels | chat | keys     the window that is open
+//   ?panel=recordings | insights | speakers | labels | transcription | chat | keys     the window that is open
 //   ?panel=insights&section=fact-checker | log     the Insights tab (Overview is the default)
 //   ?panel=chat&chat=chat_2    a chat of the session on screen
 //
@@ -20,7 +20,8 @@ export interface Route {
 
 export const TABS: Record<string, string> = { "fact-check": "pane-fc", thinking: "pane-think", "jev-log": "pane-jev" };
 export const PANELS: Record<string, string> = {
-  recordings: "dlg-recordings", insights: "dlg-insights", speakers: "dlg-speakers", labels: "dlg-labels", chat: "dlg-chat", keys: "dlg-keys",
+  recordings: "dlg-recordings", insights: "dlg-insights", speakers: "dlg-speakers", labels: "dlg-labels",
+  transcription: "dlg-transcription", chat: "dlg-chat", keys: "dlg-keys",
 };
 /** The Insights window's tabs, Overview first (the default). */
 export const SECTIONS = ["overview", "fact-checker", "log"] as const;
