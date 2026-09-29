@@ -67,8 +67,9 @@
       <a href="#rundown"><em>01</em><span>Rundown</span></a>
       <a href="#jev"><em>02</em><span>Jev</span></a>
       <a href="#systems"><em>03</em><span>Fast and slow</span></a>
-      <a href="#preshow"><em>04</em><span>Pre-show</span></a>
-      <a href="#credits"><em>05</em><span>Credits</span></a>
+      <a href="#labels"><em>04</em><span>Your labels</span></a>
+      <a href="#preshow"><em>05</em><span>Pre-show</span></a>
+      <a href="#credits"><em>06</em><span>Credits</span></a>
     </nav>
     <a class="bar-dl" data-when="mac" data-download href="https://github.com/nicolasdao/tattle/releases/download/v0.9.0/Tattle-0.9.0-arm64.dmg" tabindex="-1">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
@@ -288,10 +289,66 @@
       <article><p class="teach-k">Criteria</p><p>After false alarms or missed claims, System 2 rewrites System 1's questions. A rewrite goes live only if replaying past lines shows it fixes the errors and keeps at least 90% of the good flags.</p></article>
       <article><p class="teach-k">Attention</p><p>System 2 can add up to three questions that raise the priority of the kinds of claims that turned out to matter. Every five minutes it also audits the lines that weren't flagged, looking for misses.</p></article>
     </div>
-    <p class="sys-foot">On the timeline, <b>you are System 2</b>: labels have no right or wrong answer to learn from, so the label set stays yours to edit, and no LLM changes it. <a href="https://github.com/nicolasdao/tattle/blob/master/docs/system1-system2.md">Read the full design</a></p>
+    <p class="sys-foot">On the timeline, <b>you are System 2</b>: labels have no right or wrong answer to learn from, so the label set is yours. An AI can <a href="#labels">draft one with you</a>, but only you save it, and no LLM changes it on its own. <a href="https://github.com/nicolasdao/tattle/blob/master/docs/system1-system2.md">Read the full design</a></p>
   </section>
 
-  <!-- 4. The cue card: keys, cost, privacy, trust. -->
+  <!-- 4. Label sets: what the timeline asks Jev, made your own, with an AI that interviews you. -->
+  <section class="sect" id="labels" aria-labelledby="labels-title">
+    <div class="sect-head">
+      <span class="tag tag-accent">Labels</span>
+      <div class="strap"><span class="eyebrow">Make the timeline yours</span><h2 class="name" id="labels-title">Your labels</h2></div>
+    </div>
+
+    <p class="sys-intro">The timeline is what Jev is asked about every stretch of your conversation. Those questions are a <b>label set</b>, and it doesn't have to be about AI podcasts. Write one for a sales call, a team meeting, a job interview or a cooking show, pick it when you start, and the timeline, the filters and the stats all follow it.</p>
+
+    <div class="lab-kinds">
+      <article class="lab-kind">
+        <p class="lab-n">Up to <b>2</b></p>
+        <h3>Categories</h3>
+        <p>Jev picks one option for each stretch: the stage of a sales call, the topic, the mood. Each draws a coloured lane, and one can become a big number in the stats, like the share of time spent off topic.</p>
+        <div class="lab-demo lab-lane" aria-hidden="true"><i style="--c:#1fa89a;flex:3">Discovery</i><i style="--c:#3f7df0;flex:2">Demo</i><i style="--c:#d0892a;flex:2">Pricing</i><i style="--c:#6f7a8c;flex:1"></i></div>
+      </article>
+      <article class="lab-kind">
+        <p class="lab-n">Up to <b>2</b></p>
+        <h3>Scores</h3>
+        <p>Graded on five levels you name, from Calm to Very heated, or from Skeptical to Enthusiastic. Each draws a line on the chart and is averaged per speaker.</p>
+        <div class="lab-demo" aria-hidden="true"><svg viewBox="0 0 120 34" preserveAspectRatio="none"><polyline points="0,26 15,18 30,22 45,8 60,14 75,4 90,16 105,10 120,20" fill="none" stroke="var(--heat)" stroke-width="3" vector-effect="non-scaling-stroke"/></svg></div>
+      </article>
+      <article class="lab-kind">
+        <p class="lab-n">Up to <b>8</b></p>
+        <h3>Markers</h3>
+        <p>A yes or no for each stretch: an objection, a decision, a hot take. When Jev is sure enough, the moment gets a pin with its icon, a filter chip, and a list in the stats.</p>
+        <div class="lab-demo lab-pins" aria-hidden="true"><span></span><span></span><span></span></div>
+      </article>
+    </div>
+
+    <h3 class="sys-h">An interview, not a blank page</h3>
+    <p class="sys-sub">Good questions for Jev are narrow and concrete, and that's hard to write from scratch. So <b>Create with AI</b> interviews you instead: it asks one question at a time, with answers you can click, and fills in the draft beside the chat as you go. Leave something out and it proposes it. Ask what a threshold is, or why every category needs an "Other", and it explains, then gets back to its question.</p>
+
+    <div class="lab-chat" aria-label="An example of the interview">
+      <div class="lab-msg ai">
+        <p class="lab-who">AI</p>
+        <p>Got it: weekly sales calls with prospects. You mentioned stages but not which ones, so I've drafted four: Discovery, Demo, Pricing, and Other, which catches everything else.</p>
+        <p class="lab-q">Do these stages match your calls, and would a 0 to 4 score help too, like how interested the prospect sounds?</p>
+        <p class="lab-choices"><span>The stages are right</span><span>Add a Negotiation stage</span><span>No scores</span></p>
+      </div>
+      <div class="lab-msg you"><p class="lab-who">You</p><p>Add Negotiation. And I want to see every objection.</p></div>
+      <div class="lab-todo">
+        <p class="jc-label">Still to settle</p>
+        <p><span class="ok">✓ The conversation</span><span class="ok">✓ Stage and its options</span><span>• Objection: yes and no wording</span><span>• A name</span></p>
+      </div>
+      <p class="jc-note">An example. The app keeps the checklist itself, so nothing required gets skipped, and nothing is saved until you press Save.</p>
+    </div>
+
+    <div class="teach lab-more">
+      <article><p class="teach-k">Try it first</p><p>See what a draft would draw on the first ten minutes of a real recording, next to what that recording showed, before you use it on air. Half a cent or less.</p></article>
+      <article><p class="teach-k">Share it</p><p>Every set is a small file on your Mac. Export it as a <code>.tattle-labels</code> file, send it, and anyone with Tattle can import it. Making and sharing sets needs no account.</p></article>
+      <article><p class="teach-k">Kept with the show</p><p>Each recording keeps a copy of the set it was made with, so editing a set later never changes a past show. Asking a set costs about a cent an hour of Jev.</p></article>
+    </div>
+    <p class="sys-foot">Try it and Create with AI use your OpenRouter key, like fact-checking. <a href="https://github.com/nicolasdao/tattle/blob/master/docs/jev.md#the-timeline-questions-per-segment-label-sets">How label sets work</a></p>
+  </section>
+
+  <!-- 5. The cue card: keys, cost, privacy, trust. -->
   <section class="sect" id="preshow" aria-labelledby="preshow-title">
     <div class="sect-head">
       <span class="tag tag-warn">Pre-show</span>
@@ -305,7 +362,7 @@
     </div>
   </section>
 
-  <!-- 5. The credits: who made it. -->
+  <!-- 6. The credits: who made it. -->
   <section class="sect" id="credits" aria-labelledby="credits-title">
     <div class="sect-head">
       <span class="tag tag-paper">Credits</span>
