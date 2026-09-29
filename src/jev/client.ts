@@ -5,7 +5,7 @@ import type { JevAnswer, JevResponse, JevUsage, QuestionSet } from "./types.ts";
 
 export const DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 
-export type JevPurpose = "utterance" | "segment" | "relabel" | "gate" | "preflight" | "smoke";
+export type JevPurpose = "utterance" | "segment" | "relabel" | "gate" | "preflight" | "smoke" | "try";
 const LIVE: ReadonlySet<JevPurpose> = new Set(["utterance", "segment"]);
 
 /** An HTTP failure carrying what retry classification needs; status null = no response (network error or timeout). */

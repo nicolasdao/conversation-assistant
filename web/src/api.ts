@@ -99,6 +99,24 @@ export interface TranscriptionStatus {
   openai: { keySet: boolean };
 }
 export type Features = { factcheck: boolean; labels: boolean };
+/** What Start live and replays send beyond the features: the label set (null: labels off) and tonight's stories. */
+export interface Labelling { labelSet?: string | null; stories?: string[] }
+
+/** One set in the library (GET /api/label-sets). `broken`: a file that cannot be used, and why. */
+export interface LabelSetEntry {
+  id: string; name: string; description: string; builtIn: boolean; perHourUsd?: number;
+  counts: { categories: number; scores: number; markers: number }; broken?: string;
+}
+/** The library, and the locked boundary question every set shares (shown read-only in the editor). */
+export interface LabelSetList { sets: LabelSetEntry[]; boundary?: { instructions: string; criteria?: { true: string; false: string } } }
+export interface LabelSetCheck { ok: boolean; errors: string[]; tokens: number; perHourUsd: number; overLimit: boolean }
+/** Try on a recording: the draft's labels for the segments of its first minutes, and the recording's own. */
+export interface LabelTry {
+  segments: { id: string; startMs: number; endMs: number }[];
+  labels: any[];
+  recording: { features: Features; set: any | null; labels: any[] };
+  costUsd: number; failed: number; window: { startMs: number; endMs: number } | null;
+}
 export interface KeyCheck { ok: boolean; message: string; warning?: string }
 export interface SaveKeysResult extends SetupStatus { saved: boolean; checks: Partial<Record<KeyName, KeyCheck>> }
 
@@ -149,24 +167,23 @@ export const api = {
   engine: () => call<{ startedAt: string; stale: boolean }>("GET", "/api/engine"),
   stats: () => call<any>("GET", "/api/stats"),
   devices: () => call<{ uid: string; name: string; transport: string; isDefault: boolean }[]>("GET", "/api/devices"),
-  startReplay: (dir: string, speed: 1 | "max", voices?: number, features?: Features) =>
-    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices, features }),
-  startLive: (mic?: string, voices?: number, features?: Features) =>
-    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices, features }),
+  startReplay: (dir: string, speed: 1 | "max", voices?: number, features?: Features, labelling: Labelling = {}) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", dir, speed, voices, features, ...labelling }),
+  startLive: (mic?: string, voices?: number, features?: Features, labelling: Labelling = {}) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "live", ...(mic ? { mic } : {}), voices, features, ...labelling }),
   stop: () => call<{ sessionId: string }>("POST", "/api/session/stop"),
   rename: (id: string, displayName: string) => call("POST", `/api/speakers/${encodeURIComponent(id)}/rename`, { displayName }),
   suggestMerges: (voices?: number) => call<{ suggestions: MergeSuggestion[]; voices: { host: number; remote: number } }>(
     "GET", `/api/speakers/suggestions${voices === undefined ? "" : `?voices=${voices}`}`),
   merge: (fromId: string, intoId: string) => call("POST", "/api/speakers/merge", { fromId, intoId }),
-  putLabels: (set: unknown) => call<{ version: string }>("PUT", "/api/labels", set),
   relabel: () => call<{ segments: number }>("POST", "/api/labels/relabel"),
   putStories: (headlines: string[]) => call<{ version: string }>("PUT", "/api/stories", { headlines }),
   override: (claimId: string, note?: string) => call("POST", `/api/claims/${encodeURIComponent(claimId)}/override`, note ? { note } : {}),
   sessions: (q = "") => call<SessionSummary[]>("GET", `/api/sessions${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   renameSession: (id: string, name: string) => call<SessionSummary>("PATCH", `/api/sessions/${encodeURIComponent(id)}`, { name }),
   openSession: (id: string) => call<{ sessionId: string; events: number }>("POST", `/api/sessions/${encodeURIComponent(id)}/open`),
-  replaySession: (sessionId: string, speed: 1 | "max", voices?: number, features?: Features) =>
-    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed, voices, features }),
+  replaySession: (sessionId: string, speed: 1 | "max", voices?: number, features?: Features, labelling: Labelling = {}) =>
+    call<{ sessionId: string }>("POST", "/api/session/start", { mode: "replay", sessionId, speed, voices, features, ...labelling }),
   pause: () => call<{ paused: boolean }>("POST", "/api/session/pause"),
   resume: () => call<{ paused: boolean }>("POST", "/api/session/resume"),
   deleteSession: (id: string) => call<{ deleted: string }>("DELETE", `/api/sessions/${encodeURIComponent(id)}`),
@@ -184,4 +201,17 @@ export const api = {
   importRecording,
   importCopy: (token: string, name: string) => call<ImportResult>("POST", `/api/sessions/import/${encodeURIComponent(token)}`, { name }),
   rollback: (version: string) => call<{ active: string }>("POST", "/api/s1/rollback", { version }),
+  labelSets: () => call<LabelSetList>("GET", "/api/label-sets"),
+  labelSet: <T = unknown>(id: string) => call<T>("GET", `/api/label-sets/${encodeURIComponent(id)}`),
+  createLabelSet: <T = unknown>(set: unknown) => call<T>("POST", "/api/label-sets", set),
+  updateLabelSet: <T = unknown>(id: string, set: unknown) => call<T>("PUT", `/api/label-sets/${encodeURIComponent(id)}`, set),
+  deleteLabelSet: (id: string) => call<{ deleted: string }>("DELETE", `/api/label-sets/${encodeURIComponent(id)}`),
+  cloneLabelSet: <T = unknown>(id: string) => call<T>("POST", `/api/label-sets/${encodeURIComponent(id)}/clone`),
+  importLabelSet: <T = unknown>(file: unknown) => call<T>("POST", "/api/label-sets/import", file),
+  checkLabelSet: (draft: unknown) => call<LabelSetCheck>("POST", "/api/label-sets/estimate", draft),
+  labelSetExportUrl: (id: string) => `/api/label-sets/${encodeURIComponent(id)}/export`,
+  tryLabelSet: (set: unknown, sessionId: string, minutes = 10) => call<LabelTry>("POST", "/api/label-sets/try", { set, sessionId, minutes }),
+  assistLabels: (conversationId: string, messages: { role: "user" | "assistant"; content: string }[], draft: unknown | null) =>
+    call<{ reply: string; set: any | null; costUsd: number; spentUsd: number; capUsd: number; error?: string }>(
+      "POST", "/api/label-sets/assist", { conversationId, messages, draft }),
 };

@@ -2,6 +2,8 @@ import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync, statSync
 import { join } from "node:path";
 import type { AppEvent } from "./events.ts";
 import { appPaths } from "../paths.ts";
+import { fromLegacy, fromLegacyEvent, isLegacySet } from "../labels/legacy.ts";
+import type { LabelSet } from "../labels/model.ts";
 
 /** Folders written by tools, not recordings: hidden from the library unless asked for. */
 const TOOL_PREFIXES = ["smoke-", "preflight-", "dev-"];
@@ -229,10 +231,27 @@ export class SessionLibrary {
     const dir = this.dirOf(id);
     // A recording's session events name it by its folder. An imported copy (id-2) recorded them under the original's
     // id; left as is, a page showing the original would take the copy's events for its own and never switch.
-    return (readJsonl(join(dir, "events.jsonl")) as AppEvent[]).map((e) =>
-      SESSION_EVENTS.has(e.type) && (e.data as any)?.sessionId !== id
+    // A recording made before label sets has its stats and sections converted, so the page sees only the new format.
+    const legacy = this.legacySet(readJson(join(dir, "session.json")) ?? {});
+    return (readJsonl(join(dir, "events.jsonl")) as AppEvent[]).map((e) => {
+      const own = SESSION_EVENTS.has(e.type) && (e.data as any)?.sessionId !== id
         ? { ...e, data: { ...e.data, sessionId: id, ...((e.data as any).dir !== undefined ? { dir } : {}) } }
-        : e);
+        : e;
+      return legacy ? fromLegacyEvent(own, legacy) : own;
+    });
+  }
+
+  /** The set a recording made before label sets was labelled with, in the new format; null for any other recording. */
+  private legacySet(session: any): LabelSet | null {
+    return isLegacySet(session.labelSet) ? fromLegacy(session.labelSet, session.config?.timeline) : null;
+  }
+
+  /** A recording's label set in the new format (null: made with labels off), and its stories. */
+  private labelsOf(session: any): { set: LabelSet | null; stories: string[]; version: string } | undefined {
+    if (session.labelSet === undefined) return undefined;
+    const set = this.legacySet(session) ?? session.labelSet ?? null;
+    const stories = Array.isArray(session.stories) ? session.stories : session.config?.timeline?.stories ?? [];
+    return { set, stories, version: session.labelSetVersion ?? "" };
   }
 
   /** The recording's speakers as they stand now, including renames and merges made after it was recorded. */
@@ -323,7 +342,7 @@ export class SessionLibrary {
       session: { id, mode: s.mode, status: "archived", dir, startedAt: s.startedAt, streams: s.streams, name: s.name,
         hasAudio: s.hasAudio, appVersion: s.appVersion, imported: s.imported,
         features: { factcheck: session.features?.factcheck !== false, labels: session.features?.labels !== false } },
-      labels: session.labelSet ? { set: session.labelSet, stories: session.config?.timeline?.stories ?? [], version: session.labelSetVersion ?? "" } : undefined,
+      labels: this.labelsOf(session),
       s1: { active: session.s1Version ?? "s1@1", versions: [], memory: [] },
       cost: { ...s.cost, session: s.costUsd, sessionCapUsd: session.config?.budget?.sessionCapUsd ?? 5 },
       archived: true,

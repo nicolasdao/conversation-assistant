@@ -1,0 +1,230 @@
+{
+  "format": "tattle-labels",
+  "version": 1,
+  "id": "ai-podcast",
+  "name": "AI podcast",
+  "description": "The built-in set, made for a podcast about AI: subject and mode lanes, heat and hype, and moments like disagreements, hot takes, predictions, and clips.",
+  "builtIn": true,
+  "prefix": "Judge only segment; previous_segment is context only.",
+  "fadedBelowConfidence": 0.5,
+  "companies": [
+    "OpenAI",
+    "Anthropic",
+    "Google",
+    "Meta",
+    "Nvidia",
+    "TypeSafe",
+    "OpenRouter",
+    "DeepSeek",
+    "Hugging Face"
+  ],
+  "categories": [
+    {
+      "id": "subject",
+      "name": "Subject",
+      "instructions": "What is the current segment mainly about?",
+      "options": [
+        {
+          "id": "ai_models",
+          "name": "AI models",
+          "description": "New AI models, labs, benchmarks, research papers or capabilities",
+          "color": "#3f7df0",
+          "group": "AI"
+        },
+        {
+          "id": "ai_tools",
+          "name": "AI tools",
+          "description": "AI apps, agents, coding assistants or developer tools, and how people build with or use them",
+          "color": "#6fa0ff",
+          "group": "AI"
+        },
+        {
+          "id": "ai_industry",
+          "name": "AI industry",
+          "description": "AI companies, funding, jobs, regulation, safety, ethics or AI's impact on society",
+          "color": "#2a58c9",
+          "group": "AI"
+        },
+        {
+          "id": "tech",
+          "name": "Tech",
+          "description": "Technology not centred on AI, such as hardware, platforms, crypto, gadgets or startups",
+          "color": "#1fa89a"
+        },
+        {
+          "id": "marketing",
+          "name": "Marketing",
+          "description": "Marketing, audiences, content, social media, brands, sales or growth",
+          "color": "#d0892a"
+        },
+        {
+          "id": "personal_life",
+          "name": "Personal life",
+          "description": "The hosts' own lives, such as travel, family, health, food, sport or where they live",
+          "color": "#d9588a"
+        },
+        {
+          "id": "other_topics",
+          "name": "Other topics",
+          "description": "Anything else, such as culture, science, politics, philosophy or random tangents",
+          "color": "#8b6fd6"
+        },
+        {
+          "id": "the_show",
+          "name": "The show",
+          "description": "The podcast itself, such as intros, outros, sponsors, listener comments or housekeeping",
+          "color": "#6f7a8c"
+        }
+      ],
+      "index": {
+        "name": "Off-topic",
+        "description": "time spent on personal life and other topics",
+        "options": [
+          "personal_life",
+          "other_topics"
+        ]
+      }
+    },
+    {
+      "id": "mode",
+      "name": "Mode",
+      "instructions": "What are the speakers mainly doing in the current segment?",
+      "options": [
+        {
+          "id": "news",
+          "name": "News",
+          "description": "Reporting what happened, such as an announcement, release or event",
+          "color": "#3e8ee0"
+        },
+        {
+          "id": "analysis",
+          "name": "Analysis",
+          "description": "Interpreting, giving opinions, or discussing what something means or why it matters",
+          "color": "#9a7fe0"
+        },
+        {
+          "id": "personal_story",
+          "name": "Personal story",
+          "description": "Recounting their own experience, project or anecdote",
+          "color": "#d9679a"
+        },
+        {
+          "id": "explainer",
+          "name": "Explainer",
+          "description": "Explaining how something works or defining a concept",
+          "color": "#2fb39c"
+        },
+        {
+          "id": "banter",
+          "name": "Banter",
+          "description": "Joking, teasing or casual chat with little information",
+          "color": "#d99a2b"
+        },
+        {
+          "id": "transition",
+          "name": "Transition",
+          "description": "Introducing, wrapping up or moving between topics",
+          "color": "#6a7d98"
+        },
+        {
+          "id": "other",
+          "name": "Other",
+          "description": "None of the above",
+          "color": "#4e5b6c"
+        }
+      ]
+    }
+  ],
+  "scores": [
+    {
+      "id": "heat",
+      "name": "Heat",
+      "instructions": "How heated is the exchange in the current segment?",
+      "levels": [
+        "Calm",
+        "Lively",
+        "Animated",
+        "Heated",
+        "Very heated"
+      ]
+    },
+    {
+      "id": "hype",
+      "name": "Hype",
+      "instructions": "How do the speakers in the current segment feel about the subject they are discussing?",
+      "levels": [
+        "Very skeptical",
+        "Skeptical",
+        "Neutral or mixed",
+        "Positive",
+        "Very enthusiastic"
+      ]
+    }
+  ],
+  "markers": [
+    {
+      "id": "disagreement",
+      "name": "Disagreement",
+      "short": "Disagree",
+      "icon": "bolt",
+      "instructions": "In the current segment, a speaker disputes or pushes back on another speaker's view.",
+      "threshold": 0.7,
+      "perSpeaker": true,
+      "list": false
+    },
+    {
+      "id": "hot_take",
+      "name": "Hot take",
+      "short": "Hot take",
+      "icon": "flame",
+      "instructions": "A speaker in the current segment states a bold, surprising or contrarian opinion.",
+      "threshold": 0.7,
+      "perSpeaker": false,
+      "list": false
+    },
+    {
+      "id": "prediction",
+      "name": "Prediction",
+      "short": "Prediction",
+      "icon": "trend",
+      "instructions": "A speaker in the current segment predicts what will happen in the future.",
+      "threshold": 0.7,
+      "perSpeaker": false,
+      "list": true
+    },
+    {
+      "id": "recommendation",
+      "name": "Recommendation",
+      "short": "Recommend",
+      "icon": "star",
+      "instructions": "A speaker in the current segment recommends a specific tool, product, resource or practice.",
+      "threshold": 0.7,
+      "perSpeaker": false,
+      "list": true
+    },
+    {
+      "id": "clip_worthy",
+      "name": "Clip-worthy",
+      "short": "Clip",
+      "icon": "scissors",
+      "instructions": "The segment contains a moment worth clipping for social media: a strong quote, a funny exchange, a surprising claim, or a memorable story.",
+      "criteria": {
+        "true": "A moment in the segment would stand on its own as a short clip: a quotable opinion, a joke that lands, a surprising fact or claim, or a story with a payoff.",
+        "false": "The segment is routine discussion, logistics, or filler, or its best moment only makes sense with what came before."
+      },
+      "threshold": 0.7,
+      "perSpeaker": false,
+      "list": true
+    },
+    {
+      "id": "humour",
+      "name": "Humour",
+      "short": "Humour",
+      "icon": "smile",
+      "instructions": "The current segment contains jokes, teasing or laughter.",
+      "threshold": 0.7,
+      "perSpeaker": false,
+      "list": false
+    }
+  ]
+}

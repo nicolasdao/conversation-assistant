@@ -144,3 +144,30 @@ test("a recording that cannot be read is skipped, and the rest are still listed"
   writeFileSync(join(root, "20260924-110000", "session.json"), JSON.stringify({ id: "20260924-110000", mode: "live", startedAt: "2026-09-24T11:00:00Z" }));
   expect(new SessionLibrary(root).list().map((s) => s.id)).toEqual(["20260924-100000"]);
 });
+
+describe("recordings made before label sets", () => {
+  test("open with their set, stats, and sections in the new format; new recordings are passed through", () => {
+    const root = mkdtempSync(join(tmpdir(), "library-"));
+    const legacy = JSON.parse(readFileSync("tests/fixtures/legacy-session.json", "utf8"));
+    const dir = makeSession(root, "20260925-202620", { startedAt: legacy.startedAt, lines: [["u_1", "Hello."]] });
+    writeFileSync(join(dir, "session.json"), JSON.stringify(legacy));
+    const old = [
+      ev("section.updated", { sections: [{ id: "sec_1", subject: "tech", lane: "tech", segmentIds: ["seg_1"], startMs: 0, endMs: 9000 }] }),
+      ev("stats", { roganIndex: 0.12, labelledMs: 9000, speakers: [{ speakerId: "spk_1", displayName: "Nic", talkMs: 4000, disagreements: 3, hype: 2 }], predictions: [], recommendations: [], clips: [] }),
+    ];
+    writeFileSync(join(dir, "events.jsonl"), readFileSync(join(dir, "events.jsonl"), "utf8") + old.join("\n") + "\n");
+    const lib = new SessionLibrary(root);
+
+    const snap = lib.snapshot("20260925-202620");
+    expect(snap.labels).toMatchObject({ set: { format: "tattle-labels", categories: [{ id: "subject" }, { id: "mode" }] }, stories: [], version: legacy.labelSetVersion });
+    const events = lib.events("20260925-202620");
+    expect(events.find((e) => e.type === "section.updated")!.data).toEqual({ sections: [{ id: "sec_1", category: "subject", option: "tech", lane: "tech", segmentIds: ["seg_1"], startMs: 0, endMs: 9000 }] });
+    expect(events.find((e) => e.type === "stats")!.data).toMatchObject({ version: 2, index: { name: "Off-topic", share: 0.12 }, speakers: [{ markers: { disagreement: 3 }, scores: { hype: 2 } }] });
+
+    // a recording made with labels off since label sets: null, and its events untouched
+    const off = makeSession(root, "20260929-100000", { startedAt: "2026-09-29T10:00:00Z", lines: [["u_1", "Hi."]] });
+    writeFileSync(join(off, "session.json"), JSON.stringify({ id: "20260929-100000", mode: "live", startedAt: "2026-09-29T10:00:00Z", streams: ["host"], features: { factcheck: false, labels: false }, labelSet: null, stories: [], labelSetVersion: "" }));
+    expect(lib.snapshot("20260929-100000").labels).toEqual({ set: null, stories: [], version: "" });
+    expect(lib.snapshot("20260929-100000").session.features).toEqual({ factcheck: false, labels: false });
+  });
+});

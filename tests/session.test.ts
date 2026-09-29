@@ -192,22 +192,37 @@ describe("session (offline, fake services)", () => {
     expect(JSON.parse(readFileSync(join(s.store.dir, "session.json"), "utf8")).features).toEqual({ factcheck: false, labels: false });
     expect(readFileSync(join(s.store.dir, "jev_calls.jsonl"), "utf8")).toBe("");
     expect((s.state() as any).session.features).toEqual({ factcheck: false, labels: false });
+    // labels off: no set is recorded, so the recording shows none
+    expect(JSON.parse(readFileSync(join(s.store.dir, "session.json"), "utf8")).labelSet).toBeNull();
+    expect((s.state() as any).labels.set).toBeNull();
   });
 
-  test("fact-checking off, labels on: the line request asks only the boundary, and segments are labelled", async () => {
+  test("fact-checking off, labels on with a picked set: the line request asks only the boundary, segments get the set's questions", async () => {
     requireAssets();
     const root = mkdtempSync(join(tmpdir(), "sessions-"));
     const { f } = fakeFetch(loadScript());
     const bus = new EventBus();
+    const config = loadConfig();
+    // a set of its own: one category, no scores, one marker
+    const labelSet = {
+      ...structuredClone(config.labels), id: "tiny", name: "Tiny", builtIn: false,
+      categories: [config.labels.categories[1]], scores: [], markers: [config.labels.markers[0]],
+    };
     const s = new Session({
-      mode: "replay", config: loadConfig(), bus, sessionsDir: root, fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI },
+      mode: "replay", config, bus, sessionsDir: root, fetch: f, keys: { openrouter: OPENROUTER, openai: OPENAI },
       sources: [new FileSource(`${FIXTURE_DIR}/host.wav`, "host", "max"), new FileSource(`${FIXTURE_DIR}/remote.wav`, "remote", "max")],
-      features: { factcheck: false },
+      features: { factcheck: false }, labelSet, stories: ["Jev's launch", " "],
     });
     await s.run();
     const rows = readFileSync(join(s.store.dir, "jev_calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     for (const r of rows.filter((x) => x.purpose === "utterance")) expect(r.question_ids).toEqual(["boundary"]);
-    expect(rows.some((r) => r.purpose === "segment")).toBe(true);
+    const segs = rows.filter((r) => r.purpose === "segment");
+    expect(segs.length).toBeGreaterThan(0);
+    for (const r of segs) expect(r.question_ids).toEqual(["mode", "disagreement", "story"]);
+    const saved = JSON.parse(readFileSync(join(s.store.dir, "session.json"), "utf8"));
+    expect(saved.labelSet).toMatchObject({ format: "tattle-labels", id: "tiny", categories: [{ id: "mode" }] });
+    expect(saved.stories).toEqual(["Jev's launch"]);
+    expect(saved.labelSetVersion).toMatch(/^[0-9a-f]{12}$/);
     expect(readFileSync(join(s.store.dir, "s2_calls.jsonl"), "utf8")).toBe("");
     const types = bus.history().map((e) => e.type);
     expect(types).toContain("segment.labels");

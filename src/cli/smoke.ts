@@ -9,7 +9,7 @@ import { Transcriber } from "../transcribe/openai.ts";
 import { JevClient } from "../jev/client.ts";
 import type { JevAnswer, QuestionSet } from "../jev/types.ts";
 import { S2Client } from "../factcheck/s2.ts";
-import { timelineQuestions } from "../pipeline/timeline.ts";
+import { setQuestions } from "../labels/model.ts";
 import { processSecrets } from "../store/events.ts";
 import { SessionStore } from "../store/sessionStore.ts";
 import { loadKeys } from "../keys.ts";
@@ -38,7 +38,7 @@ const state = (i: number) => ({
   current_segment: script.lines.slice(Math.max(0, i - 3), i).map((l) => ({ speaker: l.voice.split(" ")[0], text: l.text, tags: [] })),
   new_utterance: { speaker: script.lines[i].voice.split(" ")[0], text: script.lines[i].text, tags: [] },
 });
-const s1Questions = (): QuestionSet => ({ boundary: cfg.labels.boundary, ...cfg.s1.questions } as QuestionSet);
+const s1Questions = (): QuestionSet => ({ boundary: cfg.timeline.boundary, ...cfg.s1.questions } as QuestionSet);
 
 const results: { n: number; name: string; pass: boolean; detail: string }[] = [];
 async function check(n: number, name: string, fn: () => Promise<string>) {
@@ -87,13 +87,14 @@ await check(2, "per-utterance Jev request (boundary + s1@1)", async () => {
   return `model ${res.model}, claim=${(res.answers.claim as any).noul.toFixed(2)}, cost $${res.usage.cost}`;
 });
 
-await check(3, "segment request with the full label set", async () => {
-  const q = timelineQuestions(cfg.labels, ["OpenRouter lists Jev", "Surfing in Sydney"]);
+await check(3, "segment request with the built-in label set", async () => {
+  const q = setQuestions(cfg.labels, ["OpenRouter lists Jev", "Surfing in Sydney"], cfg.timeline.story);
   const seg = script.lines.slice(0, 5).map((l) => ({ speaker: l.voice.split(" ")[0], text: l.text, tags: [] }));
   const res = await jev.ask({ previous_segment: [], segment: seg }, q, { purpose: "smoke", live: false });
   const missing = Object.keys(q).filter((id) => !typedLike(q[id], res.answers[id]));
   if (missing.length) throw new Error(`missing answers: ${missing.join(", ")}`);
-  return `${Object.keys(q).length} answers, subject=${(res.answers.subject as any).choice}, story=${(res.answers.story as any).choice}`;
+  const first = cfg.labels.categories[0]?.id;
+  return `${Object.keys(q).length} answers${first ? `, ${first}=${(res.answers[first] as any).choice}` : ""}, story=${(res.answers.story as any).choice}`;
 });
 
 async function latencyRun(known: number) {

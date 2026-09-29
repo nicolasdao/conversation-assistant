@@ -1,12 +1,17 @@
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, createReadStream, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { loadConfig, type Config } from "../config.ts";
+import { DEFAULT_LABEL_SET, loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
 import { Session, type Features, type SessionOptions, type TranscriptionEngine } from "../pipeline/session.ts";
 import { listDevices, startNativeCapture } from "../audio/nativeSource.ts";
-import { LabelConflictError } from "../pipeline/timeline.ts";
+import { LabelSetError, LabelSetStore, type LabelSetEntry } from "../labels/store.ts";
+import { checkDraft, checkLabelSet, LABEL_FORMAT, type LabelSet } from "../labels/model.ts";
+import { recordedSegments, tryLabelSet } from "../labels/try.ts";
+import { AssistError, assistSystemPrompt, LabelsAssistant, type AssistMessage } from "../labels/assist.ts";
+import { JevClient } from "../jev/client.ts";
+import { Budget, BudgetExhaustedError, sumDevSpend } from "../budget.ts";
 import { EventBus, processSecrets, type AppEvent } from "../store/events.ts";
 import { resolveRecorded, SessionLibrary } from "../store/library.ts";
 import { Embedder } from "../speakers/registry.ts";
@@ -59,6 +64,38 @@ export class ApiError extends Error {
 /** Fact-checking and labels ask Jev and GPT-6 Luna, through OpenRouter: the only features that need its key. */
 const OPENROUTER_MESSAGE = "Please provide your OpenRouter API key to configure fact-checking or labeling.";
 
+/** The label-set library, as the routes see it (see docs/jev.md § label sets). None of it needs an API key. */
+export interface LabelSetApi {
+  list(): { sets: LabelSetEntry[]; boundary: unknown };
+  get(id: string): LabelSet;
+  create(body: unknown): LabelSet;
+  update(id: string, body: unknown): LabelSet;
+  remove(id: string): { deleted: string };
+  clone(id: string): LabelSet;
+  /** A `<name>.tattle-labels` file: the set as JSON. */
+  exportFile(id: string): { fileName: string; body: string };
+  importFile(body: unknown): LabelSet;
+  /** Validation and the cost estimate of a draft, for the editor's footer. */
+  estimate(body: unknown): ReturnType<typeof checkDraft>;
+  /** Try on a recording: Jev asked the draft about its first minutes. Needs the OpenRouter key; writes nothing there. */
+  tryOn(body: unknown): Promise<unknown>;
+  /** Create with AI: one turn of a conversation with `labelsAssist.model`, which drafts a set. Needs the OpenRouter key. */
+  assist(body: unknown): Promise<unknown>;
+}
+
+/** A draft from the page, as the schema wants it: format and version filled in, an id when it has none, never built-in. */
+function asDraft(body: unknown): Record<string, unknown> {
+  const draft = body && typeof body === "object" && !Array.isArray(body) ? body as Record<string, unknown> : {};
+  const { builtIn: _drop, ...rest } = draft;
+  return { format: LABEL_FORMAT, version: 1, ...rest, id: typeof rest.id === "string" && rest.id ? rest.id : "draft" };
+}
+
+/** A set's export file name: its name, made safe for a file system. */
+export function labelSetFileName(name: string, id: string): string {
+  const base = name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || id;
+  return `${base}.tattle-labels`;
+}
+
 /** The transcription engine setting, as the routes see it (see docs/transcription.md). */
 export interface TranscriptionApi {
   status(): TranscriptionStatus;
@@ -66,10 +103,24 @@ export interface TranscriptionApi {
   install(): TranscriptionStatus;
 }
 
-/** `features`: what runs beyond the transcript, fixed for the session; both on unless set to false. */
+/**
+ * `features`: what runs beyond the transcript, fixed for the session; both on unless set to false. `labelSet`: the id
+ * of the session's label set (the built-in one when absent); `null` turns labels off, as `features.labels: false` does.
+ * `stories`: tonight's headlines, one per entry.
+ */
+interface StartCommon { name?: string; voices?: number; features?: Partial<Features>; labelSet?: string | null; stories?: string[] }
 export type StartRequest =
-  | { mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1"; name?: string; voices?: number; features?: Partial<Features> }
-  | { mode: "live"; mic?: string; name?: string; voices?: number; features?: Partial<Features> };
+  | ({ mode: "replay"; dir?: string; sessionId?: string; speed?: Speed | "1" } & StartCommon)
+  | ({ mode: "live"; mic?: string } & StartCommon);
+
+function parseStories(v: unknown): string[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) throw new ApiError(400, "stories must be an array of strings");
+  const out = v.map((x: string) => x.trim()).filter(Boolean);
+  if (out.length > 254) throw new ApiError(400, "at most 254 stories");
+  if (out.some((x) => x.length > 300)) throw new ApiError(400, "a story is at most 300 characters");
+  return out;
+}
 
 function parseFeatures(f: unknown): Partial<Features> {
   if (f === undefined || f === null) return {};
@@ -93,7 +144,6 @@ export interface EngineApi {
   devices(): Promise<unknown[]>;
   renameSpeaker(id: string, displayName: string): unknown;
   mergeSpeakers(fromId: string, intoId: string): unknown;
-  putLabels(body: unknown): { version: string };
   relabel(): { segments: number };
   putStories(headlines: string[]): { version: string };
   override(claimId: string, note?: string): unknown;
@@ -119,6 +169,8 @@ export interface EngineApi {
   transcription?: TranscriptionApi;
   /** Whether the OpenRouter key is set (the chat checks it before calling OpenRouter). */
   openrouterKeySet?(): boolean;
+  /** Absent: the label-set routes answer 501. */
+  labelSetApi?: LabelSetApi;
 }
 
 /** Replay sources for a fixture or a session folder: host.wav and/or remote.wav. */
@@ -152,6 +204,8 @@ export interface EngineOptions {
   openrouterKey?: string;
   /** The engine setting; without it, sessions transcribe with OpenAI. */
   transcription?: TranscriptionSettings;
+  /** The label-set library; by default the built-in sets and the user's folder (src/paths.ts). */
+  labelSets?: LabelSetStore;
 }
 
 /** The engine: owns one session at a time, its event bus, and the host commands. */
@@ -164,10 +218,12 @@ export class Engine implements EngineApi {
   private archived: string | null = null;
   readonly library: SessionLibrary;
   readonly chat: ChatService;
+  readonly labelSets: LabelSetStore;
   private readonly config: Config;
 
   constructor(private readonly opts: EngineOptions = {}) {
     this.config = opts.config ?? loadConfig();
+    this.labelSets = opts.labelSets ?? new LabelSetStore();
     this.library = new SessionLibrary(opts.sessionsDir);
     this.chat = new ChatService(this.config.app.chat, {
       fetch: (...a) => (opts.fetch ?? fetch)(...a),
@@ -446,10 +502,14 @@ export class Engine implements EngineApi {
   async start(req: StartRequest): Promise<{ sessionId: string }> {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
     const features = parseFeatures(req?.features);
+    const stories = parseStories(req?.stories);
+    // the session's label set, copied now: editing it later changes nothing in this session or its recording
+    const labelSet = this.resolveLabelSet(req?.labelSet, features);
+    features.labels = labelSet !== null;
     // what this session needs before anything starts: the keys its features and engine use, and Apple's model
     const engine = this.engineChoice;
     const realServices = !this.opts.session?.services; // tests inject services, which need no key
-    if (realServices && (features.factcheck !== false || features.labels !== false) && !this.openrouterKeySet()) {
+    if (realServices && (features.factcheck !== false || features.labels) && !this.openrouterKeySet()) {
       throw new ApiError(400, OPENROUTER_MESSAGE, { needsKey: "openrouter" as KeyName });
     }
     if (realServices && engine === "openai" && !this.openaiKeySet()) throw new ApiError(400, "Transcribing with OpenAI needs an OpenAI API key.", { needsKey: "openai" as KeyName });
@@ -486,7 +546,7 @@ export class Engine implements EngineApi {
     this.bus.reset();
     this.session = new Session({
       mode, sources, config: structuredClone(this.config), bus: this.bus, sessionsDir: this.opts.sessionsDir,
-      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features, engine,
+      allowOverDevCap: this.opts.allowOverDevCap, healthDetail: () => this.captureDetail, liveText, features, engine, labelSet, stories,
       // how many people are on the call (the remote stream); 0 means no limit
       ...(Number.isInteger(req.voices) && req.voices! >= 0 ? { voices: { remote: req.voices } } : {}),
       ...this.opts.session,
@@ -500,6 +560,120 @@ export class Engine implements EngineApi {
     // after run() has written session.json, which makes the folder a recording the library can name
     if (typeof req.name === "string" && req.name.trim()) this.library.update(s.id, { name: req.name });
     return { sessionId: s.id };
+  }
+
+  /** The label-set library's routes: plain files, so they work with or without keys, on air or not. */
+  readonly labelSetApi: LabelSetApi = {
+    // the locked boundary question rides along, for the editor to show read-only
+    list: () => ({ sets: this.labelSets.list(), boundary: this.config.timeline.boundary }),
+    get: (id) => this.labelSets.get(id),
+    create: (body) => this.labelSets.create(body),
+    update: (id, body) => this.labelSets.update(id, body),
+    remove: (id) => this.labelSets.remove(id),
+    clone: (id) => this.labelSets.clone(id),
+    exportFile: (id) => {
+      const { builtIn: _drop, ...set } = this.labelSets.get(id);
+      return { fileName: labelSetFileName(set.name, set.id), body: JSON.stringify(set, null, 2) + "\n" };
+    },
+    importFile: (body) => this.labelSets.import(body),
+    estimate: (body) => checkDraft(asDraft(body)),
+    tryOn: (body) => this.tryOn(body),
+    assist: (body) => this.assist(body),
+  };
+
+  /** What each Create with AI conversation has spent, by the id the page gave it (capped at `labelsAssist.capUsd`). */
+  private readonly assistSpent = new Map<string, number>();
+
+  private async assist(body: unknown) {
+    if (!this.openrouterKeySet()) throw new ApiError(400, "Please provide your OpenRouter API key to create labels with AI.", { needsKey: "openrouter" });
+    const b = (body ?? {}) as { conversationId?: unknown; messages?: unknown; draft?: unknown };
+    const conversation = typeof b.conversationId === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(b.conversationId) ? b.conversationId : null;
+    if (!conversation) throw new ApiError(400, "conversationId is required");
+    const messages = Array.isArray(b.messages) ? b.messages : [];
+    if (messages.length === 0 || messages.length > 40
+      || messages.some((m: any) => (m?.role !== "user" && m?.role !== "assistant") || typeof m?.content !== "string" || m.content.length > 8000)) {
+      throw new ApiError(400, "messages must be 1 to 40 { role: user | assistant, content } of at most 8,000 characters");
+    }
+    const cfg = this.config.app;
+    const cap = cfg.labelsAssist.capUsd;
+    const spent = this.assistSpent.get(conversation) ?? 0;
+    if (spent >= cap) throw new ApiError(409, `This conversation reached its $${cap} cap: start a new one.`);
+    const draft = b.draft && typeof b.draft === "object" ? (() => { const { builtIn: _b, ...d } = asDraft(b.draft); return d; })() : null;
+    const log = join(this.library.root, "label-assist.jsonl");
+    const budget = new Budget({
+      sessionCapUsd: cap - spent, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: !this.opts.allowOverDevCap, devSpentUsd: sumDevSpend(this.library.root),
+    });
+    const assistant = new LabelsAssistant(cfg.labelsAssist, {
+      fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
+      apiKey: (this.opts.openrouterKey ?? this.opts.session?.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "").trim(),
+      budget, log: (r) => appendFileSync(log, JSON.stringify(r) + "\n"),
+    });
+    try {
+      const r = await assistant.turn(assistSystemPrompt(this.config.labels), messages as AssistMessage[], draft);
+      const total = spent + r.costUsd;
+      this.assistSpent.set(conversation, total);
+      return { ...r, spentUsd: total, capUsd: cap };
+    } catch (e) {
+      this.assistSpent.set(conversation, spent + budget.totals().session);
+      if (e instanceof AssistError) throw new ApiError(e.status, e.message);
+      if (e instanceof BudgetExhaustedError) throw new ApiError(409, e.cap === "session" ? `This conversation reached its $${cap} cap: start a new one.` : e.message);
+      throw new ApiError(400, e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Try on a recording (`POST /api/label-sets/try { set, sessionId, minutes }`): asks Jev the draft's questions about
+   * the segments that start in the recording's first minutes (at most 40), 4 at a time, with the background retry
+   * rules. Its calls are logged to `label-tries.jsonl` beside the recordings (so the development total counts them),
+   * never into the recording's folder.
+   */
+  private async tryOn(body: unknown) {
+    if (!this.openrouterKeySet()) throw new ApiError(400, "Please provide your OpenRouter API key to try a label set on a recording.", { needsKey: "openrouter" });
+    if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is on air: try a label set after it ends");
+    const b = (body ?? {}) as { set?: unknown; sessionId?: unknown; minutes?: unknown };
+    const checked = checkLabelSet(asDraft(b.set));
+    if (!checked.ok) throw new ApiError(400, `The draft is not valid yet:\n${checked.errors.join("\n")}`);
+    if (typeof b.sessionId !== "string" || !b.sessionId) throw new ApiError(400, "sessionId is required");
+    const id = b.sessionId;
+    const minutes = typeof b.minutes === "number" && b.minutes > 0 ? Math.min(30, b.minutes) : 10;
+    this.libraryCall(() => this.library.dirOf(id));
+    const names = new Map(this.library.transcript(id).map((l) => [l.id, l.speaker]));
+    const { segments, own } = recordedSegments(this.library.events(id), (uid, sid) => names.get(uid) ?? sid, minutes);
+    const snap = this.library.snapshot(id);
+    const recording = { features: snap.session.features, set: snap.labels?.set ?? null, labels: [...own.values()] };
+    const window = segments.length ? { startMs: segments[0].startMs, endMs: segments.at(-1)!.endMs } : null;
+    const bounds = segments.map((s) => ({ id: s.id, startMs: s.startMs, endMs: s.endMs }));
+    if (segments.length === 0) return { segments: [], labels: [], recording, costUsd: 0, failed: 0, window };
+    const cfg = this.config.app;
+    const log = join(this.library.root, "label-tries.jsonl");
+    const budget = new Budget({
+      sessionCapUsd: cfg.budget.sessionCapUsd, devCapUsd: cfg.budget.devCapUsd, enforceDevCap: !this.opts.allowOverDevCap,
+      devSpentUsd: sumDevSpend(this.library.root),
+    });
+    const jev = new JevClient(cfg.jev, {
+      fetch: (...a) => (this.opts.session?.fetch ?? this.opts.fetch ?? fetch)(...a),
+      apiKey: (this.opts.openrouterKey ?? this.opts.session?.keys?.openrouter ?? process.env.OPENROUTER_API_KEY ?? "").trim(),
+      budget, log: (r) => appendFileSync(log, JSON.stringify({ ...r, session_id: id }) + "\n"),
+    });
+    try {
+      const r = await tryLabelSet(checked.set, segments, { ask: (s, q, m) => jev.ask(s, q, m), concurrency: cfg.jev.segmentConcurrency, story: this.config.timeline.story });
+      return { segments: bounds, labels: r.labels, recording, costUsd: r.costUsd, failed: r.failed, window };
+    } catch (e) {
+      if (e instanceof BudgetExhaustedError) throw new ApiError(409, e.message);
+      throw e;
+    }
+  }
+
+  /** The set a start request names: null for labels off, the built-in one when it names none. */
+  private resolveLabelSet(id: unknown, features: Partial<Features>): LabelSet | null {
+    if (id === null || features.labels === false) return null;
+    if (id !== undefined && typeof id !== "string") throw new ApiError(400, "labelSet must be a label set id, or null for labels off");
+    try {
+      return this.labelSets.get(id ?? DEFAULT_LABEL_SET);
+    } catch (e) {
+      if (e instanceof LabelSetError) throw new ApiError(400, e.status === 404 ? `There is no label set ${id}: pick another in Start live.` : e.message);
+      throw e;
+    }
   }
 
   /** Tells a live session where the call plays (the helper's `remote.outputKind`), which drives its echo gate. */
@@ -567,16 +741,6 @@ export class Engine implements EngineApi {
       throw new ApiError(409, feature === "labels" ? "labels are off for this session" : "fact-checking is off for this session");
     }
     return s;
-  }
-
-  putLabels(body: unknown) {
-    const s = this.needFeature("labels");
-    try {
-      return { version: s.timeline.replaceLabels(body) };
-    } catch (e) {
-      if (e instanceof LabelConflictError) throw new ApiError(409, e.message);
-      throw new ApiError(400, e instanceof Error ? e.message : String(e));
-    }
   }
 
   relabel() {
@@ -801,7 +965,6 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
       }
       let mm = path.match(/^\/api\/speakers\/([^/]+)\/rename$/);
       if (m === "POST" && mm) return send(res, 200, engine.renameSpeaker(decodeURIComponent(mm[1]), (await readJson(req)).displayName));
-      if (m === "PUT" && path === "/api/labels") return send(res, 200, engine.putLabels(await readJson(req)));
       if (m === "POST" && path === "/api/labels/relabel") return send(res, 202, engine.relabel());
       if (m === "PUT" && path === "/api/stories") return send(res, 200, engine.putStories((await readJson(req)).headlines));
       mm = path.match(/^\/api\/claims\/([^/]+)\/override$/);
@@ -865,10 +1028,40 @@ export function createApiServer(engine: EngineApi, opts: { webRoot?: string; set
         }
       }
       if (m === "POST" && path === "/api/s1/rollback") return send(res, 200, engine.rollback((await readJson(req)).version));
+      if (path === "/api/label-sets" || path.startsWith("/api/label-sets/")) {
+        const ls = engine.labelSetApi;
+        if (!ls) throw new ApiError(501, "label sets are not available");
+        if (m === "GET" && path === "/api/label-sets") return send(res, 200, ls.list());
+        if (m === "POST" && path === "/api/label-sets") return send(res, 201, ls.create(await readJson(req)));
+        if (m === "POST" && path === "/api/label-sets/import") return send(res, 201, ls.importFile(await readJson(req)));
+        if (m === "POST" && path === "/api/label-sets/estimate") return send(res, 200, ls.estimate(await readJson(req)));
+        if (m === "POST" && path === "/api/label-sets/try") return send(res, 200, await ls.tryOn(await readJson(req)));
+        if (m === "POST" && path === "/api/label-sets/assist") return send(res, 200, await ls.assist(await readJson(req)));
+        let lm = path.match(/^\/api\/label-sets\/([^/]+)$/);
+        if (lm) {
+          const id = decodeURIComponent(lm[1]);
+          if (m === "GET") return send(res, 200, ls.get(id));
+          if (m === "PUT") return send(res, 200, ls.update(id, await readJson(req)));
+          if (m === "DELETE") return send(res, 200, ls.remove(id));
+        }
+        lm = path.match(/^\/api\/label-sets\/([^/]+)\/clone$/);
+        if (m === "POST" && lm) return send(res, 201, ls.clone(decodeURIComponent(lm[1])));
+        lm = path.match(/^\/api\/label-sets\/([^/]+)\/export$/);
+        if (m === "GET" && lm) {
+          const f = ls.exportFile(decodeURIComponent(lm[1]));
+          const ascii = f.fileName.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
+          // octet-stream, like a recording's export: a browser saves it as is (docs/gotchas.md § Export and import)
+          res.writeHead(200, {
+            "Content-Type": "application/octet-stream", "Content-Length": Buffer.byteLength(f.body), "Cache-Control": "no-store",
+            "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.fileName)}`,
+          });
+          return res.end(f.body);
+        }
+      }
       if (m === "GET" && serveStatic(webRoot, path, res)) return;
       return send(res, 404, { error: "not found" });
     } catch (e) {
-      const status = e instanceof ApiError || e instanceof ChatError || e instanceof KeyError ? e.status : 400;
+      const status = e instanceof ApiError || e instanceof ChatError || e instanceof KeyError || e instanceof LabelSetError ? e.status : 400;
       return send(res, status, { error: e instanceof Error ? e.message : String(e), ...(e instanceof ApiError ? e.extra : {}) });
     }
   });

@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { appPaths } from "./paths.ts";
-import { ChoiceQuestion, JevQuestion, NoulQuestion, QuestionId, ScoreQuestion } from "./jev/types.ts";
+import { ChoiceQuestion, NoulQuestion, ScoreQuestion } from "./jev/types.ts";
+import { LabelSetSchema, type LabelSet } from "./labels/model.ts";
+
+export type { LabelSet };
 
 const positive = z.number().positive();
 const nonNegative = z.number().min(0);
@@ -66,10 +69,6 @@ export const AppConfigSchema = z.object({
   }).strict().refine((s) => s.minSegmentMs <= s.maxSegmentMs, {
     message: "segmentation.minSegmentMs must not exceed segmentation.maxSegmentMs",
   }),
-  timeline: z.object({
-    noulMarkerThreshold: probability, clipWorthyMin: nonNegative, fadedBelowConfidence: probability,
-    companies: z.array(z.string().min(1)), stories: z.array(z.string().min(1)),
-  }).strict(),
   s2: z.object({
     model: z.string().min(1),
     provider: z.object({
@@ -89,6 +88,15 @@ export const AppConfigSchema = z.object({
     auditIntervalMs: int, auditMinUtterances: int, auditSample: int,
     rewriteOnFalseAlarms: int, rewriteOnMisses: int, rewriteCooldownMs: nonNegative, replayMaxItems: int,
   }).strict(),
+  // Create with AI: an LLM drafts a label set for the host to review and save (src/labels/assist.ts). One fixed model, no picker.
+  labelsAssist: z.object({
+    model: z.string().min(1),
+    effort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]),
+    provider: z.object({}).passthrough(),
+    timeoutMs: int, maxAttempts: int,
+    /** The most one Create with AI conversation may spend. */
+    capUsd: positive,
+  }).strict(),
   // The chat window: questions about the transcript, to any of `models` through OpenRouter (see docs/chat.md)
   chat: z.object({
     defaultModel: z.string().min(1),
@@ -100,15 +108,19 @@ export const AppConfigSchema = z.object({
 }).strict();
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 
-/** The timeline label set (§4.9). `boundary` is asked per utterance; `questions` per closed segment. */
-export const LabelSetSchema = z.object({
-  prefix: z.string(),
+/**
+ * The timeline's locked questions, the same for every label set: `boundary`, asked per utterance, decides where segments
+ * end and is calibrated (`npm run calibrate:boundary`); `story` is the wording of the question generated from tonight's
+ * stories. The labels themselves are label sets (config/labels/, and the user's own; see src/labels/).
+ */
+export const TimelineConfigSchema = z.object({
   boundary: NoulQuestion,
-  questions: z.record(QuestionId, JevQuestion).refine((q) => Object.keys(q).length > 0, "at least one question")
-    .refine((q) => !("story" in q), "`story` is generated from timeline.stories; do not define it"),
   story: z.object({ instructions: z.string().min(1), none: z.string().min(1) }).strict(),
 }).strict();
-export type LabelSet = z.infer<typeof LabelSetSchema>;
+export type TimelineConfig = z.infer<typeof TimelineConfigSchema>;
+
+/** The built-in set a session uses when none is named. */
+export const DEFAULT_LABEL_SET = "ai-podcast";
 
 export const CLAIM_TYPE_KEYS = [
   "number_or_price", "date_or_release", "quote_or_attribution", "capability_or_benchmark", "event", "prediction", "none",
@@ -152,7 +164,8 @@ export const S1SetSchema = z.object({
 }).strict();
 export type S1Set = z.infer<typeof S1SetSchema>;
 
-export interface Config { app: AppConfig; labels: LabelSet; s1: S1Set }
+/** `labels`: the default built-in label set (config/labels/ai-podcast.json). */
+export interface Config { app: AppConfig; timeline: TimelineConfig; labels: LabelSet; s1: S1Set }
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -168,11 +181,11 @@ export function loadConfig(dir = appPaths().config): Config {
   const f = (name: string) => join(dir, name);
   return {
     app: parse(AppConfigSchema, readJson(f("app.json")), f("app.json")),
-    labels: parse(LabelSetSchema, readJson(f("labels.default.json")), f("labels.default.json")),
+    timeline: parse(TimelineConfigSchema, readJson(f("timeline.json")), f("timeline.json")),
+    labels: parse(LabelSetSchema, readJson(f(`labels/${DEFAULT_LABEL_SET}.json`)), f(`labels/${DEFAULT_LABEL_SET}.json`)),
     s1: parse(S1SetSchema, readJson(f("factcheck.s1.default.json")), f("factcheck.s1.default.json")),
   };
 }
 
 export const parseAppConfig = (v: unknown) => parse(AppConfigSchema, v, "app config");
-export const parseLabelSet = (v: unknown) => parse(LabelSetSchema, v, "label set");
 export const parseS1Set = (v: unknown) => parse(S1SetSchema, v, "System 1 set");

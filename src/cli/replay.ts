@@ -43,6 +43,7 @@ if (engine === "apple") {
     console.log("");
   }
 }
+const cfg = loadConfig();
 const speed = values.speed === "1" ? 1 : "max";
 const sources: AudioSource[] = [];
 if (values.host) sources.push(new FileSource(values.host, "host", speed));
@@ -54,7 +55,11 @@ if (!values.quiet) {
     const d = e.data as any;
     if (e.type === "utterance") console.log(`[${(d.startMs / 1000).toFixed(1)}s] ${d.speakerName}: ${d.text}`);
     else if (e.type === "segment.closed") console.log(`  ── ${d.id} closed (${((d.endMs - d.startMs) / 1000).toFixed(1)} s${d.forced ? ", forced" : ""})`);
-    else if (e.type === "segment.labels") console.log(`  ── ${d.segmentId} labels: subject=${d.choices?.subject?.choice ?? "?"} mode=${d.choices?.mode?.choice ?? "?"} markers=[${d.markers.join(", ")}]`);
+    else if (e.type === "segment.labels") {
+      // the built-in set's categories, then its markers
+      const cats = cfg.labels.categories.map((c) => `${c.id}=${d.choices?.[c.id]?.choice ?? "?"}`).join(" ");
+      console.log(`  ── ${d.segmentId} labels: ${cats} markers=[${d.markers.join(", ")}]`);
+    }
     else if (e.type === "claim.flagged") console.log(`  ⚑ ${d.claimId} flagged (priority ${d.priority.toFixed(2)}): ${d.text}`);
     else if (e.type === "claim.verdict") console.log(`  ✓ ${d.claimId} ${d.verdict.verdict}: ${d.verdict.restated_claim} ${d.verdict.correction ? `— ${d.verdict.correction}` : ""} (${d.verdict.sources.length} sources, ${d.latencyMs} ms)`);
     else if (e.type === "claim.repeat" || e.type === "claim.duplicate") console.log(`  ↺ ${e.type} of ${d.claimId} by ${d.utteranceId}`);
@@ -66,7 +71,7 @@ if (!values.quiet) {
 }
 
 const session = new Session({
-  mode: "replay", sources, config: loadConfig(), bus, allowOverDevCap: values["allow-over-dev-cap"], exportBoundary: values.export,
+  mode: "replay", sources, config: cfg, bus, allowOverDevCap: values["allow-over-dev-cap"], exportBoundary: values.export,
   engine, features: { factcheck: values.factcheck, labels: values.labels },
 });
 console.log(`transcription: ${engine === "apple" ? "on this Mac (Apple Speech)" : "OpenAI"}; fact-checking ${values.factcheck ? "on" : "off"}, labels ${values.labels ? "on" : "off"}`);

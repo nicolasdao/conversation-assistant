@@ -13,12 +13,37 @@
   <!-- Drawn glyphs for markers and controls: no emoji. -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
-      <symbol id="g-disagreement" viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.2h4.1L6.3 15l6.2-8.4H8.4z" fill="currentColor"/></symbol>
-      <symbol id="g-humour" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 9.3c1.6 2.2 4.4 2.2 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="5.9" cy="6.2" r="1" fill="currentColor"/><circle cx="10.1" cy="6.2" r="1" fill="currentColor"/></symbol>
-      <symbol id="g-hot_take" viewBox="0 0 16 16"><path d="M8.2 1c.4 2.6 3.9 4.2 3.9 8.1a4.1 4.1 0 0 1-8.2 0c0-2 1.1-3.2 2-4.1.2 1.3.9 2.2 1.8 2.5C7.4 5.3 7.1 3.1 8.2 1z" fill="currentColor"/></symbol>
-      <symbol id="g-prediction" viewBox="0 0 16 16"><path d="M1.5 12.5 6 8l3 3 5.2-6.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 4.3h4.6v4.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-      <symbol id="g-recommendation" viewBox="0 0 16 16"><path d="M8 1.3l2 4.4 4.7.4-3.6 3.1 1.1 4.7L8 11.4l-4.2 2.5 1.1-4.7L1.3 6.1 6 5.7z" fill="currentColor"/></symbol>
-      <symbol id="g-clip_worthy" viewBox="0 0 16 16"><circle cx="4" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.4 10.5 12.5 1.5M10.6 10.5 3.5 1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 16 16"><path d="M9.6 1 3.5 9.2h4.1L6.3 15l6.2-8.4H8.4z" fill="currentColor"/></symbol>
+      <symbol id="i-smile" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 9.3c1.6 2.2 4.4 2.2 6 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="5.9" cy="6.2" r="1" fill="currentColor"/><circle cx="10.1" cy="6.2" r="1" fill="currentColor"/></symbol>
+      <symbol id="i-flame" viewBox="0 0 16 16"><path d="M8.2 1c.4 2.6 3.9 4.2 3.9 8.1a4.1 4.1 0 0 1-8.2 0c0-2 1.1-3.2 2-4.1.2 1.3.9 2.2 1.8 2.5C7.4 5.3 7.1 3.1 8.2 1z" fill="currentColor"/></symbol>
+      <symbol id="i-trend" viewBox="0 0 16 16"><path d="M1.5 12.5 6 8l3 3 5.2-6.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 4.3h4.6v4.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-star" viewBox="0 0 16 16"><path d="M8 1.3l2 4.4 4.7.4-3.6 3.1 1.1 4.7L8 11.4l-4.2 2.5 1.1-4.7L1.3 6.1 6 5.7z" fill="currentColor"/></symbol>
+      <symbol id="i-scissors" viewBox="0 0 16 16"><circle cx="4" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12.2" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.4 10.5 12.5 1.5M10.6 10.5 3.5 1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <!-- the marker icon library (web/src/icons.ts): 16 × 16, currentColor, drawn to match the six above -->
+      <symbol id="i-question" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6 6.3a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3v.3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.8" r="1" fill="currentColor"/></symbol>
+      <symbol id="i-lightbulb" viewBox="0 0 16 16"><path d="M8 1.3a4.6 4.6 0 0 0-2.7 8.3c.4.3.7.8.7 1.3v.9h4v-.9c0-.5.3-1 .7-1.3A4.6 4.6 0 0 0 8 1.3z" fill="currentColor"/><path d="M6 13.6h4M6.8 15h2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="i-check" viewBox="0 0 16 16"><path d="M2.5 8.5 6.3 12.3 13.5 3.8" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-cross" viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+      <symbol id="i-warning" viewBox="0 0 16 16"><path d="M8 2 14.6 13.6H1.4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 6.3v3.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.6" r="1" fill="currentColor"/></symbol>
+      <symbol id="i-money" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 5.7c-.4-.6-1.1-.9-2-.9-1.2 0-2 .6-2 1.5 0 2 4.1 1.1 4.1 3.3 0 .9-.9 1.6-2.1 1.6-.9 0-1.7-.4-2.1-1M8 3.6v1.2M8 11.2v1.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 4.4V8l2.6 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="4.5" y="8.5" width="2.6" height="2.6" fill="currentColor"/></symbol>
+      <symbol id="i-target" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 16 16"><path d="M3.5 15V1.8h9l-2 3.3 2 3.3h-9" fill="currentColor"/></symbol>
+      <symbol id="i-quote" viewBox="0 0 16 16"><path d="M2 9.5C2 6.5 3.5 4.3 6.3 3.5l.5 1.2C5.3 5.4 4.6 6.4 4.5 7.5H7V13H2zM9 9.5c0-3 1.5-5.2 4.3-6l.5 1.2c-1.5.7-2.2 1.7-2.3 2.8H14V13H9z" fill="currentColor"/></symbol>
+      <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 14.2S1.5 10.2 1.5 5.7A3.3 3.3 0 0 1 8 4.3a3.3 3.3 0 0 1 6.5 1.4c0 4.5-6.5 8.5-6.5 8.5z" fill="currentColor"/></symbol>
+      <symbol id="i-thumbs-up" viewBox="0 0 16 16"><path d="M1.5 7h2.8v7H1.5zM5.5 7l2.7-5.2c1 0 1.8.8 1.6 1.9L9.4 6h3.8c.9 0 1.5.8 1.3 1.6l-1.2 5.2c-.2.7-.8 1.2-1.5 1.2H5.5z" fill="currentColor"/></symbol>
+      <symbol id="i-thumbs-down" viewBox="0 0 16 16"><path d="M14.5 9h-2.8V2h2.8zM10.5 9l-2.7 5.2c-1 0-1.8-.8-1.6-1.9L6.6 10H2.8c-.9 0-1.5-.8-1.3-1.6l1.2-5.2C2.9 2.5 3.5 2 4.2 2h6.3z" fill="currentColor"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1.3 2.5 3.3v4.4c0 3.3 2.3 5.9 5.5 7 3.2-1.1 5.5-3.7 5.5-7V3.3z" fill="currentColor"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7.5" rx="1" fill="currentColor"/><path d="M5.2 7V5a2.8 2.8 0 0 1 5.6 0v2" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+      <symbol id="i-link" viewBox="0 0 16 16"><path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.4-2.4a2.6 2.6 0 0 0-3.7-3.7l-1 1M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.1 9.2a2.6 2.6 0 0 0 3.7 3.7l1-1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 16 16"><path d="M1.8 14.6h12.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="2.8" y="8" width="2.6" height="5.2" fill="currentColor"/><rect x="6.7" y="4.6" width="2.6" height="8.6" fill="currentColor"/><rect x="10.6" y="2" width="2.6" height="11.2" fill="currentColor"/></symbol>
+      <symbol id="i-people" viewBox="0 0 16 16"><circle cx="5.6" cy="5" r="2.4" fill="currentColor"/><path d="M1 14.2c0-2.8 2-4.8 4.6-4.8s4.6 2 4.6 4.8z" fill="currentColor"/><circle cx="11.3" cy="5.6" r="2" fill="currentColor"/><path d="M11 9.6c2.3 0 4 1.8 4 4.6h-3.6c0-1.8-.5-3.3-1.5-4.4z" fill="currentColor"/></symbol>
+      <symbol id="i-handshake" viewBox="0 0 16 16"><path d="M1 6.2 4 4l3 1.4L9.6 4 15 6.2M4 4v6.2l3.6 3 1.4-.9 1.2.8 1.3-1 1.3.4L15 10.8V6.2M7 5.4 5.3 7.2c.6.8 1.6.9 2.4.3l1.9-1.3 3 3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-book" viewBox="0 0 16 16"><path d="M8 3.6C6.5 2.4 4.3 2 1.5 2.3v10.5c2.8-.3 5 .1 6.5 1.3 1.5-1.2 3.7-1.6 6.5-1.3V2.3C11.7 2 9.5 2.4 8 3.6zM8 3.6v10.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+      <symbol id="i-megaphone" viewBox="0 0 16 16"><path d="M1.8 6h2.6l8-3.6v11.2l-8-3.6H1.8z" fill="currentColor"/><path d="M5 10.4 6 14.3h2L7 10.8M14.2 6.2v3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 16 16"><path d="M8 15.2s5-5 5-8.7a5 5 0 0 0-10 0c0 3.7 5 8.7 5 8.7zm0-6.8a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8z" fill-rule="evenodd" fill="currentColor"/></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 16 16"><path d="M7 1c.5 3.4 1.7 4.6 5 5.1-3.3.5-4.5 1.7-5 5.1-.5-3.4-1.7-4.6-5-5.1 3.3-.5 4.5-1.7 5-5.1zM12.6 9.8c.2 1.5.8 2 2.2 2.2-1.4.2-2 .7-2.2 2.2-.2-1.5-.8-2-2.2-2.2 1.4-.2 2-.7 2.2-2.2z" fill="currentColor"/></symbol>
       <symbol id="g-flag" viewBox="0 0 16 16"><path d="M3.5 15V1.8h9l-2 3.3 2 3.3h-9" fill="currentColor"/></symbol>
       <symbol id="g-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="3.6" stroke-dasharray="3.4 2.25"/><circle cx="12" cy="12" r="5.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.1" fill="currentColor"/></symbol>
       <symbol id="g-replay" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 0 1.6-3.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M2.6 1.8v3.4H6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -154,14 +179,8 @@
       </div>
     </div>
     <div class="tl-body">
-      <div class="tl-labels" aria-hidden="true">
-        <span></span>
-        <span class="tl-lbl">Subject</span>
-        <span class="tl-lbl">Mode</span>
-        <span class="tl-lbl tl-lbl-chart">Heat · Hype<i class="scale top">4</i><i class="scale bottom">0</i></span>
-        <span class="tl-lbl">Markers</span>
-        <span></span>
-      </div>
+      <!-- the lanes' names, from the session's label set (web/src/timeline.ts) -->
+      <div id="tl-labels" class="tl-labels" aria-hidden="true"></div>
       <div id="tl-scroll" class="tl-scroll">
         <div id="timeline" class="tl-track"></div>
         <div id="tl-hover" class="tl-hover" hidden><span></span></div>
@@ -178,9 +197,25 @@
     <div class="dlg-head"><h2 id="h-sp">Speakers</h2><span class="sub">Rename a voice, or merge two that are the same person</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="speakers" class="dlg-body"></div>
   </dialog>
+  <!-- the label-set library (web/src/labels.ts): works without a session and without any key -->
   <dialog id="dlg-labels" aria-labelledby="h-lb">
-    <div class="dlg-head"><h2 id="h-lb">Labels</h2><span class="sub">Changes apply from the next segment</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="dlg-head"><h2 id="h-lb">Labels</h2><span class="sub">What the timeline asks Jev: pick a set in Start live</span><button class="x" data-close aria-label="Close">×</button></div>
     <div id="labels" class="dlg-body"></div>
+  </dialog>
+  <!-- Create with AI: a chat with GPT-6 Luna beside the editor; the host reviews, edits, and saves -->
+  <dialog id="dlg-labels-ai" class="labelsai-dlg" aria-labelledby="h-lai">
+    <div class="dlg-head"><h2 id="h-lai">Create with AI</h2><span class="sub">GPT-6 Luna drafts a label set; you review, edit, and save it</span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="labels-ai-body" class="lai-body"></div>
+  </dialog>
+  <!-- Try on a recording: a draft's labels for a recording's first minutes, over the editor -->
+  <dialog id="dlg-labeltry" class="labeltry-dlg" aria-labelledby="h-ltry">
+    <div class="dlg-head"><h2 id="h-ltry">Try on a recording</h2><span id="ltry-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="labeltry-body" class="dlg-body"></div>
+  </dialog>
+  <!-- one label set in the editor, over the library -->
+  <dialog id="dlg-labelset" class="labelset-dlg" aria-labelledby="h-lset">
+    <div class="dlg-head"><h2 id="h-lset">Label set</h2><span id="h-lset-sub" class="sub"></span><button class="x" data-close aria-label="Close">×</button></div>
+    <div id="labelset-body" class="lset-body"></div>
   </dialog>
   <!-- Insights: what the session on screen produced, how the fact-checker did, and what went wrong, in three tabs -->
   <dialog id="dlg-insights" class="insights-dlg" aria-labelledby="h-ins">
@@ -232,10 +267,14 @@
         <span class="feat-text"><b>Fact-check</b><span>System 1 (Jev) flags checkable claims on every line; System 2 (GPT-6 Luna) researches them with sources.</span></span>
         <span class="toggle" aria-hidden="true"><i></i></span>
       </button>
-      <button id="feat-labels" class="feat" role="switch" aria-checked="true">
-        <span class="feat-text"><b>Labels</b><span>Jev labels each part of the timeline: subject, mode, heat and hype, and moments like hot takes, predictions, and clip-worthy segments.</span></span>
-        <span class="toggle" aria-hidden="true"><i></i></span>
-      </button>
+      <div id="feat-labels" class="feat start-labels">
+        <span class="feat-text"><b>Labels</b><span>Jev labels each part of the timeline with the questions of a label set (cog → Labels to make your own).</span></span>
+        <label class="sr" for="start-labelset">Label set</label>
+        <select id="start-labelset" class="select"><option value="off">Off</option></select>
+      </div>
+      <label id="start-stories-box" class="fieldlabel start-stories">Tonight's stories (optional)
+        <textarea id="start-stories" class="input" rows="2" placeholder="One headline per line: Jev says which one each part of the show is about"></textarea>
+      </label>
       <!-- the OpenRouter key, asked for here when a switch needs it: inside the dialog, which is modal (docs/gotchas.md) -->
       <div id="start-key" hidden></div>
       <p id="start-summary" class="start-summary"></p>

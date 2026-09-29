@@ -1,0 +1,14 @@
+{
+  "boundary": {
+    "type": "noul",
+    "instructions": "The new_utterance moves on to a different point or subject than current_segment, rather than continuing, elaborating, answering, or reacting to it.",
+    "criteria": {
+      "true": "It starts a new topic, a new story, or a clearly different point.",
+      "false": "It continues, adds detail to, answers, jokes about, or reacts to the preceding discussion."
+    }
+  },
+  "story": {
+    "instructions": "Which of tonight's stories is the current segment about?",
+    "none": "None of these stories."
+  }
+}

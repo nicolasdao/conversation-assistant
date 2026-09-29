@@ -27,6 +27,11 @@ export interface AppPaths {
   licenses: string;
   /** The engine's TypeScript sources, watched for the restart banner; null where there are none (the Mac app). */
   src: string | null;
+  /**
+   * The user's own label sets, one JSON file each: Application Support/Tattle/labels, shared by development and the
+   * Mac app (`TATTLE_LABEL_SETS` overrides it; the tests point it at a temporary folder). See src/labels/store.ts.
+   */
+  labelSets: string;
 }
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,6 +47,7 @@ const DEFAULTS: AppPaths = {
   notices: join(ROOT, "THIRD_PARTY_NOTICES.md"),
   licenses: join(ROOT, "licenses"),
   src: join(ROOT, "src"),
+  labelSets: process.env.TATTLE_LABEL_SETS || join(appSupportDir(), "labels"),
 };
 
 let current: AppPaths = { ...DEFAULTS };

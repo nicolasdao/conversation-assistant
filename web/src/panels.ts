@@ -1,14 +1,19 @@
-import { api, ApiError, type MergeSuggestion, type SessionSummary } from "./api.js";
+import { api, ApiError, type Features, type Labelling, type LabelSetEntry, type MergeSuggestion, type SessionSummary } from "./api.js";
 import { openExport, openImport } from "./transfer.js";
 import { keyPrompt, keySet, onTranscription, refreshTranscription, setTranscription, setupStatus, transcriptionState, transcriptionSummary } from "./keys.js";
 import { desktop } from "./desktop.js";
 import { setRoute } from "./router.js";
-import { $, clock, glyph, h, pretty, replace, usd } from "./dom.js";
-import { MARKERS, SUBJECT_COLORS } from "./timeline.js";
-import { featuresOf, resolveSpeaker, s1Counters, speakerName, type MissingLine, type Utterance, type Claim, type LabelQuestion, type LabelSet, type Segment, type State, type Stream } from "./state.js";
+import { $, clock, glyph, h, icon, pluralOf, pretty, replace, usd } from "./dom.js";
+import { optionColor, optionName } from "./timeline.js";
+import { featuresOf, labelSetOf, resolveSpeaker, s1Counters, speakerName, type MissingLine, type Utterance, type Claim, type LabelSet, type Segment, type State, type Stats, type Stream } from "./state.js";
 
-export interface Filters { markers: Set<string>; speaker: string; subject: string }
-export const filters: Filters = { markers: new Set(), speaker: "", subject: "" };
+/**
+ * The transcript's filters. `categories`: per category id, an option id or `group:<name>` (every option of that group,
+ * like the built-in set's "AI").
+ */
+export interface Filters { markers: Set<string>; speaker: string; categories: Record<string, string> }
+export const filters: Filters = { markers: new Set(), speaker: "", categories: {} };
+const categoryFiltered = () => Object.values(filters.categories).some(Boolean);
 
 export function toast(message: string, kind: "error" | "ok" = "error") {
   const box = $("#toasts");
@@ -132,7 +137,7 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
     const dir = $<HTMLInputElement>("#replay-dir")!.value.trim();
     closePops();
     // without an OpenRouter key a replay is transcript-only, as the Start live window's switches would be
-    void run(() => api.startReplay(dir, replaySpeed, voicesOnCall(), withoutKeyOff()));
+    void run(async () => { const c = await replayChoices(); await api.startReplay(dir, replaySpeed, voicesOnCall(), c.features, c.labelling); });
   });
   $("#stop")?.addEventListener("click", () => run(() => api.stop(), "Stopping: in-flight work will finish"));
   document.querySelectorAll<HTMLButtonElement>("#replay-speed button").forEach((b) => b.addEventListener("click", () => {
@@ -170,24 +175,49 @@ export function bindControls(onOpen: (dialogId: string) => void, viewGone: () =>
   });
 }
 
-// ---------- Start live: choose the features ----------
+// ---------- Start live: choose the features and the label set ----------
 
 /**
- * Rough cost per hour of show (README): the transcript (free on this Mac, $1.23 with OpenAI), Jev for labels or
- * fact-checking, System 2 for fact-checking.
+ * Rough cost per hour of show (README): the transcript (free on this Mac, $1.23 with OpenAI), Jev's line checks
+ * (whenever fact-checking or labels are on), the label set's own estimate, and System 2 for fact-checking.
  */
-const PER_HOUR = { transcript: 1.23, jev: 0.04, factcheck: 0.35 };
+const PER_HOUR = { transcript: 1.23, lines: 0.028, labels: 0.012, factcheck: 0.35 };
 
-type Feature = "factcheck" | "labels";
-const FEATURES: Feature[] = ["factcheck", "labels"];
-const feature = (id: Feature) => $<HTMLButtonElement>(`#feat-${id}`)!;
-const isOn = (id: Feature) => feature(id).getAttribute("aria-checked") === "true";
+const factcheckSwitch = () => $<HTMLButtonElement>("#feat-factcheck")!;
+const factcheckOn = () => factcheckSwitch().getAttribute("aria-checked") === "true";
+const labelPick = () => $<HTMLSelectElement>("#start-labelset");
+const labelsOn = () => (labelPick()?.value ?? "off") !== "off";
 const OPENROUTER_HEADING = "Please provide your OpenRouter API key to configure fact-checking or labeling.";
+/** The label set picked last time, remembered in the browser like the microphone. */
+const LABELS_KEY = "pa.labelSet";
+const DEFAULT_SET = "ai-podcast";
+let startSets: LabelSetEntry[] = [];
+/** True while code, not the host, sets the picker (its change event must not ask for a key). */
+let settingPick = false;
+function setPick(value: string) {
+  const pick = labelPick();
+  if (!pick) return;
+  settingPick = true;
+  pick.value = value;
+  pick.dispatchEvent(new Event("change")); // the bespoke select shows the new value
+  settingPick = false;
+}
 
-/** A replay started without the Start live window runs what the keys allow: without OpenRouter, transcript only. */
-export function withoutKeyOff() {
-  const on = keySet("openrouter");
-  return { factcheck: on, labels: on };
+function rememberedSet(sets: LabelSetEntry[]): string {
+  let want = DEFAULT_SET;
+  try { want = localStorage.getItem(LABELS_KEY) ?? want; } catch { /* storage may be unavailable */ }
+  // a set deleted since falls back to the built-in one
+  return sets.some((x) => x.id === want && !x.broken) ? want : sets.find((x) => x.builtIn)?.id ?? DEFAULT_SET;
+}
+
+/**
+ * What a replay started without the Start live window runs: what the keys allow. Without OpenRouter, transcript only;
+ * with it, fact-checking and the label set picked last time.
+ */
+export async function replayChoices(): Promise<{ features: Features; labelling: Labelling }> {
+  if (!keySet("openrouter")) return { features: { factcheck: false, labels: false }, labelling: { labelSet: null } };
+  const sets = (await api.labelSets().catch(() => null))?.sets ?? [];
+  return { features: { factcheck: true, labels: true }, labelling: sets.length ? { labelSet: rememberedSet(sets) } : {} };
 }
 
 /** Apple's model must be installed before a session can start; the window says how far along it is. */
@@ -197,7 +227,9 @@ function preparing(): boolean {
 }
 
 function renderStartSummary() {
-  const fc = isOn("factcheck"), lb = isOn("labels");
+  const fc = factcheckOn(), lb = labelsOn();
+  const box = $("#start-stories-box");
+  if (box) box.hidden = !lb; // stories only feed the labels' story question
   const t = transcriptionState();
   const apple = t?.engine === "apple";
   const go = $<HTMLButtonElement>("#start-go");
@@ -211,13 +243,15 @@ function renderStartSummary() {
       h("br", {}), failed ? h("span", {}, t.apple.error ?? "It could not be prepared.", " ", retry, " · ", settings) : "Start is available as soon as it is.");
     return;
   }
-  const perHour = (apple ? 0 : PER_HOUR.transcript) + (fc || lb ? PER_HOUR.jev : 0) + (fc ? PER_HOUR.factcheck : 0);
-  const what = fc && lb ? "Everything on" : !fc && !lb ? "Transcript only: Jev and System 2 are not called" : fc ? "No labels" : "No fact-checking";
+  const set = startSets.find((x) => x.id === labelPick()?.value);
+  const perHour = (apple ? 0 : PER_HOUR.transcript) + (fc || lb ? PER_HOUR.lines : 0) + (lb ? set?.perHourUsd ?? PER_HOUR.labels : 0) + (fc ? PER_HOUR.factcheck : 0);
+  const named = lb && set ? ` · labels: ${set.name}` : "";
+  const what = fc && lb ? `Everything on${named}` : !fc && !lb ? "Transcript only: Jev and System 2 are not called" : fc ? "No labels" : `No fact-checking${named}`;
   const cost = apple && !fc && !lb ? "Free: nothing leaves this Mac." : `About $${perHour.toFixed(2)} an hour${fc ? " at most" : ""}.`;
   replace($("#start-summary"), h("b", {}, what), h("br", {}), apple ? "Transcript: free, on this Mac. " : "", cost);
 }
 
-/** Asks for the OpenRouter key inside the Start live window; Not now turns off every switch that needs it. */
+/** Asks for the OpenRouter key inside the Start live window; Not now turns off everything that needs it. */
 function askOpenRouter(then?: () => void) {
   const box = $("#start-key");
   if (!box) return;
@@ -225,7 +259,8 @@ function askOpenRouter(then?: () => void) {
   replace(box, keyPrompt("openrouter", OPENROUTER_HEADING, {
     onSaved: () => { box.hidden = true; replace(box); renderStartSummary(); then?.(); },
     onCancel: () => {
-      for (const id of FEATURES) feature(id).setAttribute("aria-checked", "false");
+      factcheckSwitch().setAttribute("aria-checked", "false");
+      setPick("off");
       box.hidden = true;
       replace(box);
       renderStartSummary();
@@ -233,9 +268,18 @@ function askOpenRouter(then?: () => void) {
   }));
 }
 
+/** The Labels picker: every usable set by name, then Off; the remembered set when the key is set, Off when it is not. */
+async function fillLabelPicker(on: boolean) {
+  const pick = labelPick();
+  if (!pick) return;
+  startSets = (await api.labelSets().catch(() => null))?.sets.filter((x) => !x.broken) ?? [];
+  replace(pick, startSets.map((x) => h("option", { value: x.id }, x.name)), h("option", { value: "off" }, "Off"));
+  setPick(on && startSets.length ? rememberedSet(startSets) : "off");
+}
+
 /**
- * Start live asks first. The switches start on when the OpenRouter key is set, off when it is not: turning one on
- * then asks for the key, in this window.
+ * Start live asks first. Fact-checking and the label set start on when the OpenRouter key is set, off when it is not:
+ * turning one on then asks for the key, in this window.
  */
 function openStartLive() {
   void loadDevices();
@@ -244,38 +288,51 @@ function openStartLive() {
   if (voices) voices.value = "0";
   const box = $("#start-key");
   if (box) { box.hidden = true; replace(box); }
-  const set = (on: boolean) => { for (const id of FEATURES) feature(id).setAttribute("aria-checked", String(on)); };
-  set(keySet("openrouter"));
-  renderStartSummary();
+  const on = keySet("openrouter");
+  factcheckSwitch().setAttribute("aria-checked", String(on));
   const d = $<HTMLDialogElement>("#dlg-start")!;
+  void fillLabelPicker(on).then(renderStartSummary);
+  renderStartSummary();
   d.showModal();
   $<HTMLButtonElement>("#start-go")?.focus();
   // what the server says now (a key saved elsewhere, the model's progress), unless the host already asked for a key
-  void Promise.all([setupStatus(), refreshTranscription()]).then(() => {
-    if (d.open && box?.hidden) set(keySet("openrouter"));
+  void Promise.all([setupStatus(), refreshTranscription()]).then(async () => {
+    if (d.open && box?.hidden && keySet("openrouter") !== on) {
+      factcheckSwitch().setAttribute("aria-checked", String(keySet("openrouter")));
+      await fillLabelPicker(keySet("openrouter"));
+    }
     renderStartSummary();
   });
 }
 
 function bindStartLive() {
   onTranscription(() => { if ($<HTMLDialogElement>("#dlg-start")?.open) renderStartSummary(); });
-  for (const id of FEATURES) {
-    feature(id).addEventListener("click", () => {
-      const on = !isOn(id);
-      feature(id).setAttribute("aria-checked", String(on));
-      renderStartSummary();
-      if (on && !keySet("openrouter")) askOpenRouter();
-    });
-  }
+  factcheckSwitch().addEventListener("click", () => {
+    const on = !factcheckOn();
+    factcheckSwitch().setAttribute("aria-checked", String(on));
+    renderStartSummary();
+    if (on && !keySet("openrouter")) askOpenRouter();
+  });
+  labelPick()?.addEventListener("change", () => {
+    renderStartSummary();
+    // a set picked by the host asks for the key when it is missing
+    if (!settingPick && labelsOn() && !keySet("openrouter") && $("#start-key")?.hidden) askOpenRouter();
+  });
   const start = () => {
-    const features = { factcheck: isOn("factcheck"), labels: isOn("labels") };
-    if ((features.factcheck || features.labels) && !keySet("openrouter")) return askOpenRouter(start);
+    const lb = labelsOn();
+    const features = { factcheck: factcheckOn(), labels: lb };
+    if ((features.factcheck || lb) && !keySet("openrouter")) return askOpenRouter(start);
     if (preparing()) return;
     const mic = $<HTMLSelectElement>("#mic")?.value;
-    if (mic) try { localStorage.setItem(MIC_KEY, mic); } catch { /* storage may be unavailable */ }
+    const labelSet = lb ? labelPick()!.value : null;
+    const stories = lb ? ($<HTMLTextAreaElement>("#start-stories")?.value ?? "").split("\n").map((x) => x.trim()).filter(Boolean) : [];
+    try {
+      if (mic) localStorage.setItem(MIC_KEY, mic);
+      if (labelSet) localStorage.setItem(LABELS_KEY, labelSet);
+    } catch { /* storage may be unavailable */ }
     void (async () => {
       try {
-        await api.startLive(mic || undefined, voicesOnCall(), features);
+        await api.startLive(mic || undefined, voicesOnCall(), features, { labelSet, stories });
         $<HTMLDialogElement>("#dlg-start")!.close();
       } catch (e) {
         // the server knows best which key is missing (one removed from .env, say): ask for it here
@@ -413,7 +470,7 @@ export function renderClock(ms: number) {
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Windows that act on the session on screen (live or a recording), so they are greyed out while there is none. */
-export const SESSION_WINDOWS = new Set(["dlg-speakers", "dlg-labels"]);
+export const SESSION_WINDOWS = new Set(["dlg-speakers"]);
 
 /**
  * One-line summaries under each settings menu item. Insights' says what it would be opened for: how off-topic the
@@ -424,14 +481,13 @@ export function renderMenu(st: State) {
   replace($("#m-recordings"), "Open, rename, replay");
   const parts: Node[] = [];
   const sep = () => (parts.length ? [document.createTextNode(" · ")] : []);
-  if (st.stats) parts.push(document.createTextNode(`Off-topic ${Math.round((st.stats.roganIndex ?? 0) * 100)}%`));
+  if (st.stats?.index) parts.push(document.createTextNode(`${st.stats.index.name} ${Math.round(st.stats.index.share * 100)}%`));
   if (st.session && featuresOf(st).factcheck) parts.push(...sep(), document.createTextNode(plural(s1Counters(st).flags, "flag")));
   if (st.errors.length) parts.push(...sep(), h("em", { class: "error-text" }, plural(st.errors.length, "error")));
   replace($("#m-insights"), ...(parts.length ? parts : ["Stats, fact-checker, log"]));
   for (const id of SESSION_WINDOWS) $<HTMLButtonElement>(`#cog-menu [data-open="${id}"]`)!.disabled = !st.session;
   const none = "Start or open a recording";
   replace($("#m-speakers"), st.session ? plural(voices, "voice") : none);
-  replace($("#m-labels"), !st.session ? none : featuresOf(st).labels ? st.labels.version || "–" : "Off for this session");
   replace($("#m-transcription"), transcriptionSummary(transcriptionState()));
 }
 
@@ -513,39 +569,78 @@ export function segmentOf(st: State): Map<string, Segment> {
   return m;
 }
 
+/** Every option a category filter's value stands for: one option, or all of a group's. */
+function filterOptions(set: LabelSet, catId: string, value: string): Set<string> {
+  const cat = set.categories.find((c) => c.id === catId);
+  if (!cat) return new Set();
+  if (value.startsWith("group:")) return new Set(cat.options.filter((o) => o.group === value.slice(6)).map((o) => o.id));
+  return new Set([value]);
+}
+
+let filterSet: LabelSet | null = null;
+
 export function segmentMatches(g: Segment): boolean {
   const l = g.labels;
   if (filters.markers.size > 0 && !(l?.markers ?? []).some((m) => filters.markers.has(m))) return false;
-  if (filters.subject) {
-    const subj = l?.choices.subject?.choice;
-    if (filters.subject === "ai" ? !subj?.startsWith("ai_") : subj !== filters.subject) return false;
+  for (const [catId, value] of Object.entries(filters.categories)) {
+    if (!value || !filterSet) continue;
+    const picked = l?.choices[catId]?.choice;
+    if (!picked || !filterOptions(filterSet, catId, value).has(picked)) return false;
   }
   if (filters.speaker) return false; // speaker filtering is per utterance; segments dim only on label filters
   return true;
 }
 
+/**
+ * The filters under the transcript: a chip for every marker of the set, in a row that scrolls sideways on one line,
+ * then, pinned on the right and always visible, the speaker and one dropdown per category.
+ */
 export function renderFilters(st: State, onChange: () => void) {
-  // without labels there are no markers or subjects to filter by; a filter left from another session would hide every line
-  const labels = featuresOf(st).labels;
-  if (!labels) { filters.markers.clear(); filters.subject = ""; }
-  const chips = !labels ? [] : Object.entries(MARKERS).filter(([k]) => k !== "humour").map(([k, m]) =>
+  // without labels there are no markers or categories to filter by; a filter left from another session or set would hide every line
+  const set = labelSetOf(st);
+  if (set?.id !== filterSet?.id || !set) {
+    filters.markers.clear();
+    filters.categories = {};
+  }
+  filterSet = set;
+  const chips = (set?.markers ?? []).map((m) =>
     h("button", {
-      class: "chip", "aria-pressed": String(filters.markers.has(k)),
-      onclick: () => { filters.markers.has(k) ? filters.markers.delete(k) : filters.markers.add(k); onChange(); },
-    }, glyph(k), m.label));
+      class: "chip", "aria-pressed": String(filters.markers.has(m.id)), title: m.name,
+      onclick: () => { filters.markers.has(m.id) ? filters.markers.delete(m.id) : filters.markers.add(m.id); onChange(); },
+    }, icon(m.icon), m.name));
   const speakers = [...st.speakers.values()].filter((s) => !s.mergedInto);
+  const categorySelect = (cat: LabelSet["categories"][number]) => {
+    const value = filters.categories[cat.id] ?? "";
+    const groups = [...new Set(cat.options.map((o) => o.group).filter((g): g is string => !!g))];
+    return h("select", {
+      class: "select", "aria-label": `${cat.name} filter`,
+      onchange: (e: Event) => { filters.categories[cat.id] = (e.target as HTMLSelectElement).value; onChange(); },
+    },
+      h("option", { value: "" }, `All ${pluralOf(cat.name.toLowerCase())}`),
+      groups.map((g) => h("option", { value: `group:${g}`, selected: value === `group:${g}` }, `${g} (all)`)),
+      cat.options.map((o) => h("option", { value: o.id, selected: value === o.id }, o.name)));
+  };
+  const any = filters.markers.size || filters.speaker || categoryFiltered();
+  // the row is redrawn as speakers and stats arrive: keep where it was scrolled to
+  const scrolled = $("#filters .chip-row")?.scrollLeft ?? 0;
+  const row = h("div", {
+    class: "chip-row", role: "group", "aria-label": "Markers",
+    // a mouse wheel scrolls the row sideways
+    onwheel: ((e: WheelEvent) => {
+      const el = e.currentTarget as HTMLElement;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && el.scrollWidth > el.clientWidth) { e.preventDefault(); el.scrollLeft += e.deltaY; }
+    }) as EventListener,
+  }, chips);
   replace($("#filters"),
-    chips,
-    h("select", { class: "select", "aria-label": "Speaker filter", onchange: (e: Event) => { filters.speaker = (e.target as HTMLSelectElement).value; onChange(); } },
-      h("option", { value: "" }, "All speakers"),
-      speakers.map((s) => h("option", { value: s.id, selected: filters.speaker === s.id }, s.displayName))),
-    !labels ? null : h("select", { class: "select", "aria-label": "Subject filter", onchange: (e: Event) => { filters.subject = (e.target as HTMLSelectElement).value; onChange(); } },
-      h("option", { value: "" }, "All subjects"),
-      h("option", { value: "ai", selected: filters.subject === "ai" }, "AI (all)"),
-      Object.keys(SUBJECT_COLORS).map((k) => h("option", { value: k, selected: filters.subject === k }, pretty(k)))),
-    filters.markers.size || filters.speaker || filters.subject
-      ? h("button", { class: "linkbtn", onclick: () => { filters.markers.clear(); filters.speaker = ""; filters.subject = ""; onChange(); } }, "Clear")
-      : null);
+    row,
+    h("div", { class: "chip-pins" },
+      h("select", { class: "select", "aria-label": "Speaker filter", onchange: (e: Event) => { filters.speaker = (e.target as HTMLSelectElement).value; onChange(); } },
+        h("option", { value: "" }, "All speakers"),
+        speakers.map((s) => h("option", { value: s.id, selected: filters.speaker === s.id }, s.displayName))),
+      (set?.categories ?? []).map(categorySelect),
+      any ? h("button", { class: "linkbtn", onclick: () => { filters.markers.clear(); filters.speaker = ""; filters.categories = {}; onChange(); } }, "Clear") : null));
+  row.scrollLeft = scrolled;
+  row.classList.toggle("overflows", row.scrollWidth > row.clientWidth + 1); // the fading edge says there is more
 }
 
 // ---------- transcript ----------
@@ -621,7 +716,9 @@ export function renderTranscript(st: State) {
   const recording = st.session?.status === "archived";
   const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   const bySeg = segmentOf(st);
-  const labelFilter = filters.markers.size > 0 || !!filters.subject;
+  const labelFilter = filters.markers.size > 0 || categoryFiltered();
+  const set = labelSetOf(st);
+  const markerDefs = new Map((set?.markers ?? []).map((m) => [m.id, m]));
   // lines not transcribed (yet) keep their place, so a network drop does not look like a dead microphone
   const missing = [...st.missing.values()].filter((m) => !st.utterances.has(m.id))
     .map((m): Utterance & { missing?: MissingLine["status"] } => ({ ...m, text: "", tags: [], missing: m.status }));
@@ -637,13 +734,17 @@ export function renderTranscript(st: State) {
     if (filters.speaker && sp?.id !== filters.speaker) continue;
     if (seg && seg.id !== lastSeg) {
       const l = seg.labels;
-      const subj = l?.choices.subject;
-      const md = l?.choices.mode;
+      // a tag per category (the first in its option's colour, the others grey), then the markers' icons
       rows.push(h("div", { class: "segdiv", id: `seg-${seg.id}` },
         h("span", { class: "t" }, clock(seg.startMs)),
-        subj ? h("span", { class: `subj${subj.faded ? " faded" : ""}`, style: `background:${SUBJECT_COLORS[subj.choice] ?? "#6a7d98"}` }, pretty(subj.choice)) : null,
-        md ? h("span", { class: `mode${md.faded ? " faded" : ""}` }, pretty(md.choice)) : null,
-        (l?.markers ?? []).map((m) => MARKERS[m] ? h("span", { class: "mk", title: MARKERS[m].label }, glyph(m)) : null),
+        (set?.categories ?? []).map((cat, i) => {
+          const c = l?.choices[cat.id];
+          if (!c) return null;
+          return i === 0
+            ? h("span", { class: `subj${c.faded ? " faded" : ""}`, style: `background:${optionColor(cat, c.choice)}` }, optionName(cat, c.choice))
+            : h("span", { class: `mode${c.faded ? " faded" : ""}` }, optionName(cat, c.choice));
+        }),
+        (l?.markers ?? []).map((m) => { const d = markerDefs.get(m); return d ? h("span", { class: "mk", title: d.name }, icon(d.icon)) : null; }),
         l?.mentions.length ? h("span", { class: "ment" }, l.mentions.join(", ")) : null));
       lastSeg = seg.id;
       lastSpeaker = undefined;
@@ -927,105 +1028,6 @@ export async function renderS1(st: State) {
       h("button", { class: "btn", onclick: () => run(() => api.rollback(sel.value), `Rolled back to ${sel.value}`) }, "Roll back")));
 }
 
-// ---------- label editor ----------
-
-let editorVersion = "";
-let editorTouched = false;
-
-function criteriaText(q: LabelQuestion): string {
-  if (q.type === "choice") return Object.entries(q.criteria ?? {}).map(([k, v]) => `${k}: ${v}`).join("\n");
-  if (q.type === "score") return (q.criteria ?? []).join("\n");
-  return q.criteria ? `true: ${q.criteria.true}\nfalse: ${q.criteria.false}` : "";
-}
-
-function parseCriteria(type: string, text: string): unknown {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  if (type === "score") return lines;
-  const pairs = lines.map((l) => {
-    const i = l.indexOf(":");
-    return i < 0 ? [l, ""] : [l.slice(0, i).trim(), l.slice(i + 1).trim()];
-  });
-  if (type === "choice") return Object.fromEntries(pairs);
-  if (lines.length === 0) return undefined;
-  const o = Object.fromEntries(pairs);
-  return { true: o.true ?? "", false: o.false ?? "" };
-}
-
-function questionRow(id: string, q: LabelQuestion): HTMLElement {
-  const type = h("select", { class: "select q-type", "aria-label": "Question type" }, ["noul", "choice", "score"].map((t) => h("option", { value: t, selected: q.type === t }, t)));
-  const hint = h("span", { class: "hint" });
-  const setHint = () => {
-    hint.textContent = type.value === "choice" ? "One option per line: key: description (include none or other…)"
-      : type.value === "score" ? "One level per line, lowest first (2–10)" : "Optional: true: … and false: … lines";
-  };
-  setHint();
-  type.addEventListener("change", setHint);
-  const row = h("div", { class: "q" },
-    h("div", { class: "row" },
-      h("input", { class: "input q-id", value: id, "aria-label": "Question id (snake_case)" }), type,
-      h("button", { class: "linkbtn danger", onclick: () => { row.remove(); editorTouched = true; } }, "Remove")),
-    h("textarea", { class: "input q-instructions", rows: 2, "aria-label": "Instructions" }, q.instructions),
-    h("textarea", { class: "input q-criteria", rows: q.type === "noul" ? 2 : 4, "aria-label": "Criteria" }, criteriaText(q)),
-    hint);
-  row.addEventListener("input", () => { editorTouched = true; });
-  return row;
-}
-
-function readEditor(base: LabelSet): LabelSet {
-  const questions: Record<string, LabelQuestion> = {};
-  document.querySelectorAll<HTMLElement>("#label-questions .q").forEach((row) => {
-    const id = (row.querySelector(".q-id") as HTMLInputElement).value.trim();
-    const type = (row.querySelector(".q-type") as HTMLSelectElement).value as LabelQuestion["type"];
-    const instructions = (row.querySelector(".q-instructions") as HTMLTextAreaElement).value.trim();
-    const criteria = parseCriteria(type, (row.querySelector(".q-criteria") as HTMLTextAreaElement).value);
-    questions[id] = criteria === undefined ? { type, instructions } : { type, instructions, criteria };
-  });
-  const prefix = ($<HTMLInputElement>("#label-prefix")?.value ?? base.prefix).trim();
-  return { ...base, prefix, questions };
-}
-
-export function renderLabels(st: State, force = false) {
-  if (st.session && !featuresOf(st).labels) {
-    editorVersion = "";
-    return replace($("#labels"), h("div", { class: "empty" }, "Labels are off for this session: its timeline shows segments and time only."));
-  }
-  const set = st.labels.set;
-  if (!set) return replace($("#labels"), h("div", { class: "empty" }, "The label set loads with a session."));
-  if (!force && (editorTouched || editorVersion === st.labels.version)) return;
-  editorVersion = st.labels.version;
-  editorTouched = false;
-  replace($("#h-lb")?.nextElementSibling ?? null, `Version ${st.labels.version} · changes apply from the next segment`);
-  const stories = h("textarea", { id: "stories", class: "input", rows: 3, placeholder: "Tonight's stories, one headline per line" }, st.labels.stories.join("\n"));
-  replace($("#labels"),
-    h("label", { class: "fieldlabel" }, "Tonight's stories, one headline per line", stories),
-    h("div", { class: "row" }, h("button", {
-      class: "btn",
-      onclick: () => run(async () => {
-        const headlines = stories.value.split("\n").map((x) => x.trim()).filter(Boolean);
-        const r = await api.putStories(headlines);
-        st.labels.stories = headlines;
-        st.labels.version = r.version;
-      }, "Stories saved: they apply from the next segment"),
-    }, "Save stories")),
-    h("label", { class: "fieldlabel" }, "Prefix", h("input", { id: "label-prefix", class: "input", value: set.prefix })),
-    h("div", { id: "label-questions", style: "display:grid;gap:12px" }, Object.entries(set.questions).map(([id, q]) => questionRow(id, q))),
-    h("div", { class: "row" },
-      h("button", { class: "btn", onclick: () => { $("#label-questions")!.append(questionRow("new_question", { type: "noul", instructions: "A speaker in the current segment …" })); editorTouched = true; } }, "Add question"),
-      h("button", {
-        class: "btn primary", onclick: () => run(async () => {
-          const next = readEditor(set);
-          const r = await api.putLabels(next);
-          st.labels.set = next;
-          st.labels.version = r.version;
-          editorTouched = false;
-          editorVersion = "";
-          renderLabels(st, true);
-        }, "Label set applied from the next segment"),
-      }, "Apply"),
-      h("button", { class: "btn", onclick: () => run(async () => { const r = await api.relabel(); toast(`Relabelling ${r.segments} segments in the background`, "ok"); }) }, "Relabel closed segments")),
-    h("p", { class: "note" }, "The boundary question is calibrated and cannot change live."));
-}
-
 // ---------- accounting and stats ----------
 
 export function renderCost(st: State) {
@@ -1053,22 +1055,48 @@ export function renderCost(st: State) {
       st.budgetExhausted ? h("p", { class: "error-text" }, `Budget exhausted: ${st.budgetExhausted}`) : null));
 }
 
+/**
+ * Insights → Overview, in the shape of the session's set: its index as the big number, each category's split, talk time
+ * with each per-speaker marker's count and each score's average, and one list per listed marker (each entry jumps).
+ */
 export function renderStats(st: State) {
   const s = st.stats;
   if (!s) return replace($("#stats"), h("div", { class: "empty" }, "Stats arrive every minute and at the end of the show."));
-  const list = (k: "predictions" | "recommendations" | "clips") => h("div", {},
-    h("h3", {}, pretty(k)),
-    (s[k] ?? []).length
-      ? h("ul", {}, s[k].map((x: any) => h("li", {}, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); jumpToSegment(x.segmentId); } }, x.text || x.segmentId))))
-      : h("p", { class: "note" }, "None yet"));
+  const set = labelSetOf(st);
+  const markerDefs = new Map((set?.markers ?? []).map((m) => [m.id, m]));
+  const scoreDefs = new Map((set?.scores ?? []).map((x) => [x.id, x]));
+  const perSpeaker = Object.keys(s.speakers[0]?.markers ?? {}).filter((id) => markerDefs.has(id));
+  const scoreIds = Object.keys(s.speakers[0]?.scores ?? {}).filter((id) => scoreDefs.has(id));
+  const split = (c: Stats["categories"][number]) => {
+    const cat = set?.categories.find((x) => x.id === c.id);
+    if (!cat || !c.split.length) return null;
+    const parts = [...c.split].sort((a, b) => b.share - a.share);
+    return h("div", { class: "split-stat" },
+      h("h3", {}, c.name),
+      h("div", { class: "split-bar", role: "img", "aria-label": parts.map((p) => `${optionName(cat, p.option)} ${Math.round(p.share * 100)}%`).join(", ") },
+        parts.map((p) => h("span", { style: `width:${(p.share * 100).toFixed(2)}%;background:${optionColor(cat, p.option)}`, title: `${optionName(cat, p.option)}: ${Math.round(p.share * 100)}% · ${clock(p.ms)}` }))),
+      h("div", { class: "split-keys" }, parts.map((p) => h("span", {}, h("i", { style: `background:${optionColor(cat, p.option)}` }), `${optionName(cat, p.option)} ${Math.round(p.share * 100)}%`))));
+  };
+  const list = (l: Stats["lists"][number]) => {
+    const def = markerDefs.get(l.markerId);
+    if (!def) return null;
+    return h("div", {},
+      h("h3", {}, def.name),
+      l.items.length
+        ? h("ul", {}, l.items.map((x) => h("li", {}, h("a", { href: "#", onclick: (e: Event) => { e.preventDefault(); jumpToSegment(x.segmentId); } }, x.text || x.segmentId))))
+        : h("p", { class: "note" }, "None yet"));
+  };
   replace($("#stats"),
-    h("div", { class: "big" }, h("span", { class: "n" }, `${Math.round((s.roganIndex ?? 0) * 100)}%`), h("span", { class: "k" }, "Off-topic index: time spent on personal life and other topics")),
+    s.index ? h("div", { class: "big" }, h("span", { class: "n" }, `${Math.round(s.index.share * 100)}%`), h("span", { class: "k" }, `${s.index.name} index: ${s.index.description}`)) : null,
+    s.categories.map(split),
     h("table", { class: "data" },
-      h("thead", {}, h("tr", {}, h("th", {}, "Speaker"), h("th", {}, "Talk"), h("th", {}, "Disagreements"), h("th", {}, "Hype"))),
-      h("tbody", {}, (s.speakers ?? []).map((sp: any) => h("tr", {},
-        h("td", {}, speakerName(st, sp.speakerId)), h("td", {}, clock(sp.talkMs)), h("td", {}, String(sp.disagreements)),
-        h("td", {}, sp.hype === null ? "–" : `${sp.hype.toFixed(1)} / 4`))))),
-    h("div", { class: "lists" }, list("predictions"), list("recommendations"), list("clips")));
+      h("thead", {}, h("tr", {}, h("th", {}, "Speaker"), h("th", {}, "Talk"),
+        perSpeaker.map((id) => h("th", {}, pluralOf(markerDefs.get(id)!.name))), scoreIds.map((id) => h("th", {}, scoreDefs.get(id)!.name)))),
+      h("tbody", {}, s.speakers.map((sp) => h("tr", {},
+        h("td", {}, speakerName(st, sp.speakerId)), h("td", {}, clock(sp.talkMs)),
+        perSpeaker.map((id) => h("td", {}, String(sp.markers[id] ?? 0))),
+        scoreIds.map((id) => h("td", {}, sp.scores[id] == null ? "–" : `${sp.scores[id]!.toFixed(1)} / 4`)))))),
+    s.lists.length ? h("div", { class: "lists" }, s.lists.map(list)) : null);
 }
 
 export function renderErrors(st: State) {
@@ -1139,7 +1167,11 @@ function recordingRow(st: State, r: SessionSummary, next: SessionSummary | undef
           const ok = await ask(`Replay “${label}”?`, {
             message: `This runs the audio through the pipeline again at real-time speed and calls the APIs again (about ${usd(r.costUsd || 0.02)}).`, ok: "Replay",
           });
-          if (ok !== null) void run(async () => { await api.replaySession(r.id, 1, voicesOnCall(), withoutKeyOff()); $<HTMLDialogElement>("#dlg-recordings")?.close(); });
+          if (ok !== null) void run(async () => {
+            const c = await replayChoices();
+            await api.replaySession(r.id, 1, voicesOnCall(), c.features, c.labelling);
+            $<HTMLDialogElement>("#dlg-recordings")?.close();
+          });
         },
       }, glyph("replay"), "Replay"),
       h("button", {

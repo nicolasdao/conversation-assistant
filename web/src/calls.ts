@@ -4,7 +4,7 @@
 //   - "Jev log": every call to Jev in plain words (what it was asked, what it answered, what the app did next), with
 //     the exact HTTP request and response a click away.
 import { $, clock, h, pretty, replace } from "./dom.js";
-import { featuresOf, type CallRow, type Claim, type State, type SystemId } from "./state.js";
+import { featuresOf, type CallRow, type Claim, type LabelSet, type State, type SystemId } from "./state.js";
 
 const JEV_URL = "https://openrouter.ai/api/alpha/decisions";
 const S2_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -39,29 +39,38 @@ function toggle(key: string) {
 /** What each kind of Jev call is for, in words the audience knows. */
 const PURPOSE: Record<string, { label: string; about: string }> = {
   utterance: { label: "Line check", about: "Every line said is checked: is it a new topic, and is it a public fact worth fact-checking?" },
-  segment: { label: "Topic labels", about: "Each closed stretch of conversation is labelled for the timeline: subject, mode, heat, hype, and moments." },
+  segment: { label: "Topic labels", about: "Each closed stretch of conversation is labelled for the timeline, with the questions of the session's label set." },
   gate: { label: "Rewrite test", about: "System 2 proposed new questions; Jev re-answers earlier lines with them to test the rewrite before it is used." },
-  relabel: { label: "Relabel", about: "A closed stretch is labelled again with the host's edited questions." },
+  relabel: { label: "Relabel", about: "A closed stretch is labelled again with the session's label set." },
   research: { label: "Research", about: "System 2 searches the web and writes a verdict with sources." },
   audit: { label: "Audit", about: "System 2 looks over lines System 1 did not flag, for claims it missed." },
   rewrite: { label: "Rewrite", about: "System 2 rewrites System 1's questions to fix false alarms and misses." },
 };
 const purposeOf = (p: string) => PURPOSE[p] ?? { label: pretty(p), about: "" };
 
-/** Plain-language names for the questions the audience sees most. */
+/** Plain-language names for the fact-checker's questions; the timeline's come from the session's label set. */
 const QUESTION: Record<string, string> = {
   boundary: "New topic?", claim: "Checkable claim?", public: "About the public world?", claim_type: "Kind of claim",
-  hedged: "Speaker unsure?", worth: "Worth checking?", subject: "Subject", mode: "Mode", heat: "Heat", hype: "Hype",
-  disagreement: "Disagreement?", humour: "Humour?", hot_take: "Hot take?", prediction: "Prediction?", recommendation: "Recommendation?",
-  clip_worthy: "Clip-worthy?",
+  hedged: "Speaker unsure?", worth: "Worth checking?", story: "Story",
 };
-const questionName = (id: string) => QUESTION[id] ?? (id.startsWith("known_") ? `Repeat of claim ${id.slice(6)}?` : `${pretty(id)}?`);
 
-/** One answer as words: "No (2% yes)", "event (39%)", "0.6 of 4". */
-function answerText(a: any): string {
+/** A question's name: the set's name for its labels (markers asked as a question), else the fact-checker's. */
+function questionName(id: string, set: LabelSet | null): string {
+  const cat = set?.categories.find((c) => c.id === id) ?? set?.scores.find((x) => x.id === id);
+  if (cat) return cat.name;
+  const m = set?.markers.find((x) => x.id === id);
+  if (m) return `${m.name}?`;
+  return QUESTION[id] ?? (id.startsWith("known_") ? `Repeat of claim ${id.slice(6)}?` : `${pretty(id)}?`);
+}
+
+/** One answer as words: "No (2% yes)", "event (39%)", "0.6 of 4". A category's option goes by its name in the set. */
+function answerText(a: any, id = "", set: LabelSet | null = null): string {
   if (!a) return "–";
   if (a.type === "noul") return a.noul >= 0.5 ? `Yes (${pct(a.noul)})` : `No (${pct(a.noul)} yes)`;
-  if (a.type === "choice") return `${pretty(a.choice)} (${pct(a.confidence ?? a.probabilities?.[a.choice] ?? 0)} sure)`;
+  if (a.type === "choice") {
+    const name = set?.categories.find((c) => c.id === id)?.options.find((o) => o.id === a.choice)?.name ?? pretty(a.choice);
+    return `${name} (${pct(a.confidence ?? a.probabilities?.[a.choice] ?? 0)} sure)`;
+  }
   if (a.type === "score") {
     const max = Math.max(1, Object.keys(a.probabilities ?? a.legend ?? {}).length - 1);
     return `${a.score.toFixed(1)} of ${max}`;
@@ -69,9 +78,9 @@ function answerText(a: any): string {
   return JSON.stringify(a);
 }
 
-function answer(id: string, a: any, strong = false): HTMLElement {
+function answer(id: string, a: any, set: LabelSet | null, strong = false): HTMLElement {
   const yes = a?.type === "noul" && a.noul >= 0.5;
-  return h("span", { class: `qa${yes ? " yes" : ""}${strong ? " key" : ""}` }, h("span", { class: "qa-q" }, questionName(id)), h("b", {}, answerText(a)));
+  return h("span", { class: `qa${yes ? " yes" : ""}${strong ? " key" : ""}` }, h("span", { class: "qa-q" }, questionName(id, set)), h("b", {}, answerText(a, id, set)));
 }
 
 /** The claim a line produced, if any. */
@@ -119,14 +128,15 @@ function shown(r: CallRow): string {
   return "";
 }
 
-/** The answers worth showing collapsed: the decisive ones for a line check, the labels for a topic. */
-function keyAnswers(r: CallRow): [string, any][] {
+/** The answers worth showing collapsed: the decisive ones for a line check; for a topic, its categories and scores, then the markers it hit. */
+function keyAnswers(r: CallRow, set: LabelSet | null): [string, any][] {
   const a = Object.entries(r.answers ?? {});
   if (r.purpose === "utterance" || r.purpose === "gate") {
     const order = ["claim", "public", "worth", "boundary"];
     return order.filter((id) => r.answers?.[id]).map((id) => [id, r.answers![id]]);
   }
-  return a.filter(([id]) => ["subject", "mode", "heat", "hype"].includes(id))
+  const summary = [...(set?.categories ?? []), ...(set?.scores ?? [])].map((x) => x.id);
+  return summary.filter((id) => r.answers?.[id]).map((id): [string, any] => [id, r.answers![id]])
     .concat(a.filter(([, v]: [string, any]) => v?.type === "noul" && v.noul >= 0.5));
 }
 
@@ -141,6 +151,7 @@ function http(method: string, url: string, request: unknown, status: string, res
 }
 
 function jevRow(st: State, r: CallRow): HTMLElement {
+  const set = st.labels.set;
   const key = keyOf(r);
   const open = expanded.has(key);
   const p = purposeOf(r.purpose);
@@ -151,15 +162,15 @@ function jevRow(st: State, r: CallRow): HTMLElement {
     h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key), title: p.about },
       h("span", { class: "t" }, when(st, r)),
       h("span", { class: "purpose" }, p.label),
-      h("span", { class: "subject" }, shown(r)),
+      h("span", { class: "what" }, shown(r)),
       h("span", { class: "lat" }, seconds(r.latency_ms)),
       h("span", { class: "cost" }, money(r.cost_usd))),
-    h("div", { class: "qa-row" }, r.ok ? keyAnswers(r).map(([id, a]) => answer(id, a, true)) : h("span", { class: "error-text" }, r.error ?? "The call failed.")),
+    h("div", { class: "qa-row" }, r.ok ? keyAnswers(r, set).map(([id, a]) => answer(id, a, set, true)) : h("span", { class: "error-text" }, r.error ?? "The call failed.")),
     outcome(st, r),
     open ? h("div", { class: "call-detail" },
       h("p", { class: "note" }, p.about),
       h("h4", {}, `Every answer · ${Object.keys(r.answers ?? {}).length} questions asked at once`),
-      h("div", { class: "qa-row all" }, Object.entries(r.answers ?? {}).filter(([id]) => !id.startsWith("known_")).map(([id, a]) => answer(id, a))),
+      h("div", { class: "qa-row all" }, Object.entries(r.answers ?? {}).filter(([id]) => !id.startsWith("known_")).map(([id, a]) => answer(id, a, set))),
       memory(r),
       h("h4", {}, "The HTTP request and response"),
       http("POST", JEV_URL, { model: r.model_returned ?? "typesafe/jev-1.13", state: r.state, questions },
@@ -181,7 +192,7 @@ function s2Row(st: State, r: CallRow): HTMLElement {
     h("button", { class: "call-head", "aria-expanded": String(open), onclick: () => toggle(key), title: p.about },
       h("span", { class: "t" }, when(st, r)),
       h("span", { class: "purpose" }, p.label),
-      h("span", { class: "subject" }, claim ? `“${claim.text}”` : p.about),
+      h("span", { class: "what" }, claim ? `“${claim.text}”` : p.about),
       h("span", { class: "lat" }, seconds(r.latency_ms)),
       h("span", { class: "cost" }, money(r.cost_usd))),
     verdict ? h("span", { class: "next go" }, `→ Verdict: ${verdict}`) : null,

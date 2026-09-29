@@ -2,10 +2,11 @@
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import {
-  bindControls, bindInsights, bindSessionName, bindSplit, checkEngine, jumpToSegment, setPanelOpener, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth, renderLabels,
+  bindControls, bindInsights, bindSessionName, bindSplit, checkEngine, jumpToSegment, setPanelOpener, setTimeClick, toast, loadDevices, renderClaims, renderClock, renderCost, renderErrors, renderFilters, renderHealth,
   renderMenu, renderRecordings, renderS1, renderSession, renderSpeakers, renderStats, renderTranscript, segmentMatches, SESSION_WINDOWS, showInsights,
 } from "./panels.js";
 import { bindTimeline, renderLegend, renderTimeline } from "./timeline.js";
+import { importLabelFile, loadLabelSets, renderLabelLibrary } from "./labels.js";
 import { renderThinking } from "./calls.js";
 import { bindChat, chatOpened, openChat, renderChat } from "./chat.js";
 import { bindBespoke } from "./ui.js";
@@ -14,7 +15,7 @@ import { bindTransfer, renderTransferButtons } from "./transfer.js";
 import { refreshTranscription, renderKeys, renderTranscription, setOnAir, setTranscription, setupStatus } from "./keys.js";
 import { bindPlayer, refreshFollow, seek, setPositionListener, syncPlayer } from "./player.js";
 import { panelName, PANELS, readRoute, setRoute, tabName, TABS, type Route } from "./router.js";
-import { addCall, applyEvent, emptyState, fromSnapshot, type CallRow, type Dirty, type State } from "./state.js";
+import { addCall, applyEvent, emptyState, fromSnapshot, labelSetOf, type CallRow, type Dirty, type State } from "./state.js";
 
 let st: State = emptyState();
 const dirty: Dirty = new Set();
@@ -44,10 +45,10 @@ function schedule() {
     if (all || dirty.has("health")) { renderHealth(st); renderClock(nowMs()); }
     if (all || dirty.has("transcript") || dirty.has("speakers")) { renderTranscript(st); refreshFollow(); }
     if (all || dirty.has("timeline") || dirty.has("transcript")) drawTimeline();
-    if (all || dirty.has("speakers") || dirty.has("stats")) { renderSpeakers(st); renderFilters(st, onFilter); }
+    if (all || dirty.has("speakers") || dirty.has("stats") || dirty.has("labels")) { renderSpeakers(st); renderFilters(st, onFilter); }
     if (all || dirty.has("claims")) renderClaims(st);
     if (all || dirty.has("s1") || dirty.has("stats")) void renderS1(st); // the fact-checker tab shows the stats' totals too
-    if (all || dirty.has("labels")) renderLabels(st);
+    if (all || dirty.has("labels")) renderLegend($("#legend"), labelSetOf(st));
     if (all || dirty.has("cost")) renderCost(st);
     if (all || dirty.has("stats")) renderStats(st);
     if (all || dirty.has("errors")) renderErrors(st);
@@ -74,7 +75,7 @@ const isOpen = (id: string) => !!$<HTMLDialogElement>(`#${id}`)?.open;
 function onOpen(id: string) {
   setRoute({ panel: panelName(id) });
   if (id === "dlg-recordings") void renderRecordings(st);
-  if (id === "dlg-labels") renderLabels(st);
+  if (id === "dlg-labels") void renderLabelLibrary();
   if (id === "dlg-insights") showInsights(readRoute().section ?? "overview");
   if (id === "dlg-chat") chatOpened();
   if (id === "dlg-keys") void renderKeys((m) => toast(m, "ok"));
@@ -263,7 +264,8 @@ setPositionListener((ms) => { if (st.session?.status === "archived") setRoute({ 
 for (const id of Object.values(PANELS)) $<HTMLDialogElement>(`#${id}`)?.addEventListener("close", () => { if (readRoute().panel === panelName(id)) setRoute({ panel: null }); });
 window.addEventListener("popstate", () => void applyRoute(readRoute(), "history"));
 bindBespoke();
-bindTransfer(() => st);
+bindTransfer(() => st, (f) => void importLabelFile(f));
+void loadLabelSets(); // the cog menu's summary
 bindChat({ onTime: jumpToTime });
 bindInsights();
 desktop?.onCommand(openPanel);
@@ -272,7 +274,6 @@ bindTabs();
 void checkEngine();
 setInterval(() => void checkEngine(), 15_000);
 bindTimeline(() => { dirty.add("timeline"); schedule(); });
-renderLegend($("#legend"));
 void loadDevices();
 void setupStatus(); // which keys are set, for the prompts
 void refreshTranscription().then(() => schedule());

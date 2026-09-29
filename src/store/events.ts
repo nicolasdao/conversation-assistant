@@ -24,7 +24,7 @@ export const EVENT_SCHEMAS = {
   "speaker.merged": obj({ fromId: str, intoId: str, displayName: str }),
   "segment.closed": obj({ id: str, startMs: num, endMs: num, forced: z.boolean(), final: z.boolean(), utteranceIds: z.array(str) }),
   "segment.labels": obj({ segmentId: str, labelSetVersion: str, unlabeled: z.boolean(), markers: z.array(str) }),
-  "section.updated": obj({ sections: z.array(obj({ id: str, subject: str, segmentIds: z.array(str) })) }),
+  "section.updated": obj({ sections: z.array(obj({ id: str, category: str, option: str, segmentIds: z.array(str) })) }),
   "claim.flagged": obj({ claimId: str, utteranceId: str, text: str, priority: num, s1Version: str }),
   "claim.duplicate": obj({ claimId: str, utteranceId: str }),
   "claim.repeat": obj({ claimId: str, utteranceId: str, verdict: obj({ verdict: str }) }),

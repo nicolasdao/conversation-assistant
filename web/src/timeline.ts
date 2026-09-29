@@ -1,33 +1,59 @@
-// The timeline as a results strip: section brackets, a subject lane (AI subjects as shades of one colour), a mode lane,
-// heat and hype lines (inline SVG), and marker pins. Low-confidence labels are faded. Clicking a segment or marker
-// jumps to the transcript. Positions are percentages of the session length inside a track that is `zoom` times the
-// visible width, so zooming only widens the track and the strip scrolls sideways. The strip can be made taller by
+// The timeline as a results strip, drawn from the session's label set: section brackets from its first category, one
+// lane per category (options in their colours), one chart line per score (0–4), and marker pins with each marker's
+// icon. Without a set (labels off), one lane of plain segments. Low-confidence labels are faded. Clicking a segment or
+// marker jumps to the transcript. Positions are percentages of the session length inside a track that is `zoom` times
+// the visible width, so zooming only widens the track and the strip scrolls sideways. The strip can be made taller by
 // dragging its top edge, and a dotted line follows the pointer with the exact time.
-import { clock, glyph, h, pretty, replace, s } from "./dom.js";
-import { featuresOf, type Segment, type State } from "./state.js";
+import { clock, h, icon, replace, s } from "./dom.js";
+import { labelSetOf, type LabelCategory, type LabelOption, type LabelSet, type Labels, type Segment, type State } from "./state.js";
 
-export const SUBJECT_COLORS: Record<string, string> = {
-  ai_models: "#3f7df0", ai_tools: "#6fa0ff", ai_industry: "#2a58c9",
-  tech: "#1fa89a", marketing: "#d0892a", personal_life: "#d9588a", other_topics: "#8b6fd6", the_show: "#6f7a8c",
-};
-export const MODE_COLORS: Record<string, string> = {
-  news: "#3e8ee0", analysis: "#9a7fe0", personal_story: "#d9679a", explainer: "#2fb39c", banter: "#d99a2b", transition: "#6a7d98", other: "#4e5b6c",
-};
-/** Marker ids map to drawn glyphs (`#g-<id>` in index.html). */
-export const MARKERS: Record<string, { label: string; short: string }> = {
-  disagreement: { label: "Disagreement", short: "Disagree" },
-  hot_take: { label: "Hot take", short: "Hot take" },
-  prediction: { label: "Prediction", short: "Prediction" },
-  recommendation: { label: "Recommendation", short: "Recommend" },
-  clip_worthy: { label: "Clip-worthy", short: "Clip" },
-  humour: { label: "Humour", short: "Humour" },
-};
+/** Scores take their colour from their slot (CSS classes): the first is drawn in --heat, the second in --hype. */
+export const SCORE_SLOTS = ["score-1", "score-2"] as const;
+const LANE_FALLBACK = ["#6a7d98", "#4e5b6c"];
 
-export function renderLegend(el: HTMLElement | null) {
+export function optionOf(cat: LabelCategory | undefined, id: string | undefined): LabelOption | undefined {
+  return cat && id ? cat.options.find((o) => o.id === id) : undefined;
+}
+
+/** An option's name, or its id made readable when the set does not know it. */
+export const optionName = (cat: LabelCategory | undefined, id: string) => optionOf(cat, id)?.name ?? id.replace(/_/g, " ");
+
+export function optionColor(cat: LabelCategory | undefined, id: string, lane = 0): string {
+  return optionOf(cat, id)?.color ?? LANE_FALLBACK[lane] ?? LANE_FALLBACK[0];
+}
+
+/** The legend above the strip: each score's line, then each marker's icon. It scrolls sideways when it does not fit. */
+export function renderLegend(el: HTMLElement | null, set: LabelSet | null) {
+  if (!set) return replace(el);
   replace(el,
-    h("span", {}, h("span", { class: "ln heat" }), "Heat"),
-    h("span", {}, h("span", { class: "ln hype" }), "Hype"),
-    Object.entries(MARKERS).map(([k, m]) => h("span", { class: "mk" }, glyph(k), m.short)));
+    set.scores.map((sc, i) => h("span", {}, h("span", { class: `ln ${SCORE_SLOTS[i]}` }), sc.name)),
+    set.markers.map((m) => h("span", { class: "mk", title: m.name }, icon(m.icon), m.short)));
+}
+
+/** The lanes' row heights, shared by the label column and the track, and their labels. */
+function lanes(set: LabelSet | null): { rows: string[]; labels: HTMLElement[] } {
+  const rows: string[] = ["4px"];
+  const labels: HTMLElement[] = [h("span", {})];
+  const cats = set?.categories ?? [];
+  if (cats.length === 0) {
+    rows.push("34px");
+    labels.push(h("span", { class: "tl-lbl" }, "Segments"));
+  }
+  cats.forEach((c, i) => {
+    rows.push(i === 0 ? "34px" : "22px");
+    labels.push(h("span", { class: "tl-lbl" }, c.name));
+  });
+  if (set?.scores.length) {
+    rows.push("var(--tl-chart)");
+    labels.push(h("span", { class: "tl-lbl tl-lbl-chart" }, set.scores.map((x) => x.name).join(" · "), h("i", { class: "scale top" }, "4"), h("i", { class: "scale bottom" }, "0")));
+  }
+  if (set?.markers.length) {
+    rows.push("28px");
+    labels.push(h("span", { class: "tl-lbl" }, "Markers"));
+  }
+  rows.push("18px");
+  labels.push(h("span", {}));
+  return { rows, labels };
 }
 
 const pct = (n: number) => `${Math.max(0, Math.min(100, n)).toFixed(4)}%`;
@@ -208,7 +234,8 @@ export function renderTimeline(
   box: HTMLElement, st: State, opts: { matches: (seg: Segment) => boolean; onJump: (segmentId: string) => void; nowMs: number },
 ) {
   const segs = [...st.segments.values()].sort((a, b) => a.startMs - b.startMs);
-  const labelsOn = featuresOf(st).labels;
+  const set = labelSetOf(st);
+  const labelsOn = !!set;
   const lastUtt = Math.max(0, ...[...st.utterances.values()].map((u) => u.endMs));
   const endMs = Math.max(60_000, opts.nowMs, lastUtt, ...segs.map((g) => g.endMs));
   const x = (ms: number) => (ms / endMs) * 100;
@@ -220,60 +247,85 @@ export function renderTimeline(
   box.style.width = `${zoom * 100}%`;
   const trackPx = (sc?.clientWidth ?? 1000) * zoom;
 
+  // the rows follow the set: its categories, a chart if it has scores, pins if it has markers
+  const layout = lanes(set);
+  const rows = layout.rows.join(" ");
+  box.style.gridTemplateRows = rows;
+  const labelCol = document.getElementById("tl-labels");
+  if (labelCol && labelCol.dataset.rows !== `${rows}|${set?.id ?? ""}|${labelsOn}`) {
+    labelCol.dataset.rows = `${rows}|${set?.id ?? ""}|${labelsOn}`;
+    labelCol.style.gridTemplateRows = rows;
+    replace(labelCol, layout.labels);
+  }
+
+  const cats = set?.categories ?? [];
+  const scores = set?.scores ?? [];
+  const markerDefs = new Map((set?.markers ?? []).map((m) => [m.id, m]));
   const sections = h("div", { class: "lane sections" });
-  const subject = h("div", { class: "lane subject" });
-  const mode = h("div", { class: "lane mode" });
-  const chart = h("div", { class: "lane chart" }, [25, 50, 75].map((t) => h("span", { class: "gridline", style: `top:${t}%` })));
-  const markers = h("div", { class: "lane markers" });
+  // without categories, one lane of plain segments to find your way around
+  const catLanes = (cats.length ? cats : [null]).map((_, i) => h("div", { class: `lane cat cat-${i + 1}` }));
+  const chart = scores.length ? h("div", { class: "lane chart" }, [25, 50, 75].map((t) => h("span", { class: "gridline", style: `top:${t}%` }))) : null;
+  const markers = markerDefs.size ? h("div", { class: "lane markers" }) : null;
   const axis = h("div", { class: "lane axis" });
 
   for (const sec of st.sections) {
+    const cat = cats.find((c) => c.id === sec.category);
+    if (!cat) continue;
     sections.append(h("span", {
-      class: "sect", style: `left:${pct(x(sec.startMs))};width:${pct(x(sec.endMs) - x(sec.startMs))};background:${SUBJECT_COLORS[sec.subject] ?? "#6a7d98"}`,
-      title: `Section: ${pretty(sec.subject)}, ${clock(sec.startMs)}–${clock(sec.endMs)}`,
+      class: "sect", style: `left:${pct(x(sec.startMs))};width:${pct(x(sec.endMs) - x(sec.startMs))};background:${optionColor(cat, sec.option)}`,
+      title: `Section: ${optionName(cat, sec.option)}, ${clock(sec.startMs)}–${clock(sec.endMs)}`,
     }));
   }
 
   // a 2 px gap between neighbouring segments, as in a results strip
   const gap = (2 / trackPx) * 100;
-  const heat: [number, number][] = [];
-  const hype: [number, number][] = [];
+  const points: [number, number][][] = scores.map(() => []);
   for (const g of segs) {
     const left = x(g.startMs);
     const width = Math.max(0.3 / zoom, x(g.endMs) - left - gap);
     const geo = `left:${pct(left)};width:${pct(width)}`;
     const dim = !opts.matches(g);
     const l = g.labels;
-    const subj = l?.choices.subject;
-    const md = l?.choices.mode;
     // jump the transcript there; in a recording, playback moves there too
     const jump = () => { opts.onJump(g.id); onSeek?.(g.startMs); };
     const span = `${clock(g.startMs)}–${clock(g.endMs)}`;
     const plain = !labelsOn; // labels off: a segment is only a stretch of time to jump to
-    const tip = plain ? span : l && !l.unlabeled
-      ? `${span} · ${pretty(subj?.choice ?? "?")} (${Math.round((subj?.confidence ?? 0) * 100)}%) · ${pretty(md?.choice ?? "?")}${l.story ? ` · story: ${l.story}` : ""}${l.mentions.length ? ` · mentions: ${l.mentions.join(", ")}` : ""}`
-      : `${span} · ${l?.unlabeled ? "unlabeled" : "labelling…"}`;
+    const labelled = !!l && !l.unlabeled;
     const state = `${dim ? " dim" : ""}${l?.unlabeled ? " unlabeled" : ""}`;
-    subject.append(h("button", {
-      class: `blk${subj?.faded ? " faded" : ""}${state}`, style: `${geo}${subj ? `;background:${SUBJECT_COLORS[subj.choice] ?? "#6a7d98"}` : ""}`,
-      title: `${tip} · click to jump`, onclick: jump,
-    }, h("span", { class: "blk-t" }, subj ? pretty(subj.choice) : plain ? "" : l?.unlabeled ? "unlabeled" : "")));
-    mode.append(h("button", {
-      class: `blk${md?.faded ? " faded" : ""}${state}`, style: `${geo}${md ? `;background:${MODE_COLORS[md.choice] ?? "#4e5b6c"}` : ""}`,
-      title: `${span}${plain ? "" : ` · ${md ? `${pretty(md.choice)}${md.faded ? " (low confidence)" : ""}` : "no mode yet"}`}`, onclick: jump, tabindex: -1,
-    }, h("span", { class: "blk-t" }, md ? pretty(md.choice) : "")));
+    if (!cats.length) {
+      catLanes[0].append(h("button", { class: `blk${state}`, style: geo, title: `${span}${plain ? "" : l?.unlabeled ? " · unlabeled" : ""} · click to jump`, onclick: jump }));
+    }
+    cats.forEach((cat, i) => {
+      const c = l?.choices[cat.id];
+      let tip: string;
+      if (i === 0) {
+        const rest = cats.slice(1).map((o) => (l?.choices[o.id] ? ` · ${optionName(o, l.choices[o.id].choice)}` : "")).join("");
+        tip = labelled
+          ? `${span} · ${c ? `${optionName(cat, c.choice)} (${Math.round(c.confidence * 100)}%)` : "?"}${rest}${l!.story ? ` · story: ${l!.story}` : ""}${l!.mentions.length ? ` · mentions: ${l!.mentions.join(", ")}` : ""}`
+          : `${span} · ${l?.unlabeled ? "unlabeled" : "labelling…"}`;
+      } else {
+        tip = `${span} · ${c ? `${optionName(cat, c.choice)}${c.faded ? " (low confidence)" : ""}` : `no ${cat.name.toLowerCase()} yet`}`;
+      }
+      catLanes[i].append(h("button", {
+        class: `blk${c?.faded ? " faded" : ""}${state}`, style: `${geo}${c ? `;background:${optionColor(cat, c.choice, i)}` : ""}`,
+        title: i === 0 ? `${tip} · click to jump` : tip, onclick: jump, ...(i > 0 ? { tabindex: -1 } : {}),
+      }, h("span", { class: "blk-t" }, c ? optionName(cat, c.choice) : i === 0 && l?.unlabeled ? "unlabeled" : "")));
+    });
 
     const mid = x((g.startMs + g.endMs) / 2);
-    if (typeof l?.scores.heat === "number") heat.push([mid, l.scores.heat]);
-    if (typeof l?.scores.hype === "number") hype.push([mid, l.scores.hype]);
+    scores.forEach((sc2, i) => {
+      const v = l?.scores[sc2.id];
+      if (typeof v === "number") points[i].push([mid, v]);
+    });
 
-    const marks = (l?.markers ?? []).filter((m) => MARKERS[m]);
+    const marks = (l?.markers ?? []).filter((m) => markerDefs.has(m));
     marks.forEach((m, i) => {
+      const def = markerDefs.get(m)!;
       const offset = (i - (marks.length - 1) / 2) * 28;
-      markers.append(h("button", {
+      markers?.append(h("button", {
         class: `pin${dim ? " dim" : ""}`, style: `left:calc(${pct(mid)} + ${offset}px)`,
-        title: `${MARKERS[m].label} · ${clock(g.startMs)}: click to jump`, "aria-label": `${MARKERS[m].label} at ${clock(g.startMs)}`, onclick: jump,
-      }, glyph(m)));
+        title: `${def.name} · ${clock(g.startMs)}: click to jump`, "aria-label": `${def.name} at ${clock(g.startMs)}`, onclick: jump,
+      }, icon(def.icon)));
     });
   }
 
@@ -285,8 +337,9 @@ export function renderTimeline(
     const end = Math.max(...open.map((u) => u.endMs), st.session?.status === "running" ? opts.nowMs : 0);
     const geo = `left:${pct(x(start))};width:${pct(Math.max(0.4 / zoom, x(end) - x(start)))}`;
     const wide = ((end - start) / endMs) * trackPx > 90;
-    subject.append(h("span", { class: "blk open", style: geo, title: labelsOn ? "Segment in progress: labelled when it closes" : "Segment in progress" }, wide ? "In progress" : ""));
-    mode.append(h("span", { class: "blk open", style: geo }));
+    catLanes.forEach((lane, i) => lane.append(i === 0
+      ? h("span", { class: "blk open", style: geo, title: labelsOn ? "Segment in progress: labelled when it closes" : "Segment in progress" }, wide ? "In progress" : "")
+      : h("span", { class: "blk open", style: geo })));
   }
 
   // paused stretches, hatched across the lanes
@@ -294,16 +347,18 @@ export function renderTimeline(
     const end = p.endMs ?? opts.nowMs;
     const geo = `left:${pct(x(p.startMs))};width:${pct(Math.max(0.2 / zoom, x(end) - x(p.startMs)))}`;
     const tip = `Paused ${clock(p.startMs)}–${p.endMs === null ? "now" : clock(end)}: nothing was heard or transcribed`;
-    for (const lane of [subject, mode, chart]) lane.append(h("span", { class: "pause-band", style: geo, title: tip }));
+    for (const lane of [...catLanes, chart]) lane?.append(h("span", { class: "pause-band", style: geo, title: tip }));
   }
 
-  // heat and hype on a 0–4 scale
+  // each score on the shared 0–4 scale, coloured by its slot
   const yOf = (v: number) => (1 - v / 4) * 100;
   const line = (pts: [number, number][], cls: string) =>
     pts.length ? s("polyline", { class: cls, points: pts.map(([px, v]) => `${px},${yOf(v)}`).join(" ") }) : null;
-  chart.append(s("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" }, line(heat, "heat"), line(hype, "hype")));
-  for (const [cls, pts] of [["heat", heat], ["hype", hype]] as const) {
-    for (const [px, v] of pts) chart.append(h("span", { class: `dot ${cls}`, style: `left:${pct(px)};top:${pct(yOf(v))}`, title: `${cls === "heat" ? "Heat" : "Hype"} ${v.toFixed(1)}` }));
+  if (chart) {
+    chart.append(s("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" }, scores.map((_, i) => line(points[i], SCORE_SLOTS[i]))));
+    scores.forEach((sc2, i) => {
+      for (const [px, v] of points[i]) chart.append(h("span", { class: `dot ${SCORE_SLOTS[i]}`, style: `left:${pct(px)};top:${pct(yOf(v))}`, title: `${sc2.name} ${v.toFixed(1)}` }));
+    });
   }
 
   // axis: ticks at least ~80 px apart at the current zoom, and the now line
@@ -315,13 +370,65 @@ export function renderTimeline(
   }
   if (opts.nowMs > 0) {
     const nx = pct(x(opts.nowMs));
-    for (const lane of [subject, mode, chart, markers]) lane.append(h("span", { class: "nowline", style: `left:${nx}` }));
+    for (const lane of [...catLanes, chart, markers]) lane?.append(h("span", { class: "nowline", style: `left:${nx}` }));
     axis.append(h("span", { class: "nowtag", style: `left:calc(${nx} + 1px)` }, `${st.session?.status === "running" ? "Now" : "End"} ${clock(opts.nowMs)}`));
   }
 
-  replace(box, sections, subject, mode, chart, markers, axis);
+  replace(box, sections, catLanes, chart, markers, axis);
   if (playhead !== null) setPlayhead(playhead);
   if (following && sc) sc.scrollLeft = sc.scrollWidth;
   showZoom();
   showHover();
+}
+
+// ---------- a still preview of a stretch (Try on a recording) ----------
+
+/**
+ * A timeline for a stretch of a recording, drawn with a given set, without zoom, playhead, or clicks: the same lanes,
+ * colours, chart, and pins as the strip below the transcript. Used to compare a draft set with a recording's own labels.
+ */
+export function renderPreview(
+  set: LabelSet | null, segments: { id: string; startMs: number; endMs: number }[], labels: Map<string, Labels>, window: { startMs: number; endMs: number },
+): HTMLElement {
+  const span = Math.max(1, window.endMs - window.startMs);
+  const x = (ms: number) => ((ms - window.startMs) / span) * 100;
+  const layout = lanes(set);
+  const rows = layout.rows.join(" ");
+  const cats = set?.categories ?? [];
+  const scores = set?.scores ?? [];
+  const markerDefs = new Map((set?.markers ?? []).map((m) => [m.id, m]));
+  const catLanes = (cats.length ? cats : [null]).map((_, i) => h("div", { class: `lane cat cat-${i + 1}` }));
+  const chart = scores.length ? h("div", { class: "lane chart" }, [25, 50, 75].map((t) => h("span", { class: "gridline", style: `top:${t}%` }))) : null;
+  const markers = markerDefs.size ? h("div", { class: "lane markers" }) : null;
+  const points: [number, number][][] = scores.map(() => []);
+  for (const g of segments) {
+    const l = labels.get(g.id);
+    const geo = `left:${pct(x(g.startMs))};width:${pct(Math.max(0.3, x(g.endMs) - x(g.startMs) - 0.25))}`;
+    const tip = `${clock(g.startMs)}–${clock(g.endMs)}`;
+    if (!cats.length) catLanes[0].append(h("span", { class: `blk${l?.unlabeled ? " unlabeled" : ""}`, style: geo, title: tip }));
+    cats.forEach((cat, i) => {
+      const c = l?.choices[cat.id];
+      catLanes[i].append(h("span", {
+        class: `blk${c?.faded ? " faded" : ""}${l?.unlabeled ? " unlabeled" : ""}`, style: `${geo}${c ? `;background:${optionColor(cat, c.choice, i)}` : ""}`,
+        title: `${tip}${c ? ` · ${optionName(cat, c.choice)} (${Math.round(c.confidence * 100)}%)` : l?.unlabeled ? " · no answer" : ""}`,
+      }, h("span", { class: "blk-t" }, c ? optionName(cat, c.choice) : "")));
+    });
+    const mid = x((g.startMs + g.endMs) / 2);
+    scores.forEach((sc, i) => { const v = l?.scores[sc.id]; if (typeof v === "number") points[i].push([mid, v]); });
+    const marks = (l?.markers ?? []).filter((m) => markerDefs.has(m));
+    marks.forEach((m, i) => {
+      const def = markerDefs.get(m)!;
+      markers?.append(h("span", { class: "pin", style: `left:calc(${pct(mid)} + ${(i - (marks.length - 1) / 2) * 28}px)`, title: `${def.name} · ${tip}` }, icon(def.icon)));
+    });
+  }
+  const yOf = (v: number) => (1 - v / 4) * 100;
+  if (chart) {
+    chart.append(s("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" },
+      points.map((pts, i) => (pts.length ? s("polyline", { class: SCORE_SLOTS[i], points: pts.map(([px, v]) => `${px},${yOf(v)}`).join(" ") }) : null))));
+    scores.forEach((sc, i) => { for (const [px, v] of points[i]) chart.append(h("span", { class: `dot ${SCORE_SLOTS[i]}`, style: `left:${pct(px)};top:${pct(yOf(v))}`, title: `${sc.name} ${v.toFixed(1)}` })); });
+  }
+  const axis = h("div", { class: "lane axis" }, [0, 0.25, 0.5, 0.75].map((f) => h("span", { class: `tick${f === 0 ? " first" : ""}`, style: `left:${pct(f * 100)}` }, clock(window.startMs + f * span))));
+  return h("div", { class: "tl-body preview" },
+    h("div", { class: "tl-labels", style: `grid-template-rows:${rows}` }, layout.labels),
+    h("div", { class: "tl-track", style: `grid-template-rows:${rows}` }, h("div", { class: "lane sections" }), catLanes, chart, markers, axis));
 }

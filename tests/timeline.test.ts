@@ -2,12 +2,12 @@ import { describe, expect, test } from "vitest";
 import { loadConfig } from "../src/config.ts";
 import type { JevAnswer, QuestionSet } from "../src/jev/types.ts";
 import type { JevCallMeta } from "../src/jev/client.ts";
+import { labelSetVersion, setQuestions, type LabelSet } from "../src/labels/model.ts";
 import type { PipelineUtterance, Segment } from "../src/pipeline/segmenter.ts";
-import {
-  deriveLabels, LabelConflictError, labelSetVersion, mentionsOf, sectionsOf, segmentState, Timeline, timelineQuestions, type SegmentLabels,
-} from "../src/pipeline/timeline.ts";
+import { deriveLabels, mentionsOf, sectionsOf, segmentState, Timeline, type SegmentLabels } from "../src/pipeline/timeline.ts";
 
 const cfg = loadConfig();
+const set = cfg.labels;
 const clone = <T>(v: T): T => structuredClone(v);
 
 const u = (id: string, speakerId: string, text: string, tags: string[] = []): PipelineUtterance => ({
@@ -17,32 +17,34 @@ const seg = (id: string, startMs: number, endMs: number, utts: PipelineUtterance
 
 const choiceA = (c: string, confidence = 0.9): JevAnswer => ({ type: "choice", choice: c, confidence, probabilities: {} });
 const labelsFor = (segmentId: string, subject: string, confidence = 0.9): SegmentLabels =>
-  deriveLabels(seg(segmentId, 0, 1, []), { subject: choiceA(subject, confidence) }, cfg.app.timeline, "v", []);
+  deriveLabels(seg(segmentId, 0, 1, []), { subject: choiceA(subject, confidence) }, set, "v", []);
 
 describe("timeline", () => {
-  test("questions get the prefix; boundary never does; story is generated", () => {
-    const q = timelineQuestions(cfg.labels, []);
-    expect(Object.keys(q)).toEqual(Object.keys(cfg.labels.questions));
+  test("questions get the prefix; boundary is not one of them; story is generated", () => {
+    const q = setQuestions(set, [], cfg.timeline.story);
+    expect(Object.keys(q)).toEqual(["subject", "mode", "heat", "hype", "disagreement", "hot_take", "prediction", "recommendation", "clip_worthy", "humour"]);
     expect(q.subject.instructions).toBe("Judge only segment; previous_segment is context only. What is the current segment mainly about?");
     expect("boundary" in q).toBe(false);
-    const withStories = timelineQuestions(cfg.labels, ["OpenAI ships GPT-6 Sol", "Nvidia earnings"]);
+    const withStories = setQuestions(set, ["OpenAI ships GPT-6 Sol", "Nvidia earnings"], cfg.timeline.story);
     expect(withStories.story).toEqual({
       type: "choice",
       instructions: "Judge only segment; previous_segment is context only. Which of tonight's stories is the current segment about?",
       criteria: { s1: "OpenAI ships GPT-6 Sol", s2: "Nvidia earnings", none: "None of these stories." },
     });
-    expect(cfg.labels.boundary.instructions.startsWith("Judge only")).toBe(false);
+    expect(cfg.timeline.boundary.instructions.startsWith("Judge only")).toBe(false);
   });
 
-  test("label-set version: 12 hex, key-order independent, changes with stories", () => {
-    const v = labelSetVersion(cfg.labels, []);
+  test("label-set version: 12 hex, independent of display fields, changes with the questions and the stories", () => {
+    const v = labelSetVersion(set, [], cfg.timeline.story);
     expect(v).toMatch(/^[0-9a-f]{12}$/);
-    const reordered = { ...cfg.labels, questions: Object.fromEntries(Object.entries(cfg.labels.questions).reverse()) };
-    expect(labelSetVersion(reordered, [])).toBe(v);
-    expect(labelSetVersion(cfg.labels, ["x"])).not.toBe(v);
-    const changedBoundary = clone(cfg.labels);
-    changedBoundary.boundary.instructions = "different";
-    expect(labelSetVersion(changedBoundary, [])).toBe(v); // boundary is not part of the label-set version
+    const renamed = clone(set);
+    renamed.name = "Renamed";
+    renamed.categories[0].options[0].color = "#000000";
+    expect(labelSetVersion(renamed, [], cfg.timeline.story)).toBe(v);
+    expect(labelSetVersion(set, ["x"], cfg.timeline.story)).not.toBe(v);
+    const reworded = clone(set);
+    reworded.markers[0].instructions = "different";
+    expect(labelSetVersion(reworded, [], cfg.timeline.story)).not.toBe(v);
   });
 
   test("state building: previous_segment and segment with names, text, tags only", () => {
@@ -56,34 +58,40 @@ describe("timeline", () => {
     expect(segmentState(null, a, (id) => names[id]).previous_segment).toEqual([]);
   });
 
-  test("markers and faded rules", () => {
+  test("markers at each marker's own threshold, faded choices, and the lane from the option's group", () => {
     const s = seg("seg_1", 0, 20_000, [u("u_1", "spk_1", "OpenAI and nvidia, not openairline or Metadata")]);
+    const own = clone(set);
+    own.markers.find((m) => m.id === "humour")!.threshold = 0.6;
     const l = deriveLabels(s, {
       subject: choiceA("ai_models", 0.49),
       mode: choiceA("news", 0.5),
       disagreement: { type: "noul", noul: 0.7 },
       humour: { type: "noul", noul: 0.69 },
-      clip_worthy: { type: "score", score: 3, confidence: 1, probabilities: {} },
+      clip_worthy: { type: "noul", noul: 0.71 },
+      hot_take: { type: "noul", noul: 0.69 },
       heat: { type: "score", score: 4, confidence: 1, probabilities: {} },
-    }, cfg.app.timeline, "v", []);
+      unknown_question: { type: "noul", noul: 1 },
+    }, own, "v", []);
     expect(l.choices.subject).toEqual({ choice: "ai_models", confidence: 0.49, faded: true });
     expect(l.choices.mode.faded).toBe(false);
-    expect(l.markers).toEqual(["disagreement", "clip_worthy"]);
-    expect(l.lane).toBe("ai");
+    expect(l.markers).toEqual(["disagreement", "clip_worthy", "humour"]); // the set's order; humour at its own 0.6
+    expect(l.nouls.hot_take).toBe(0.69);
+    expect("unknown_question" in l.nouls).toBe(false);
+    expect(l.lane).toBe("AI");
     expect(l.scores.heat).toBe(4);
+    expect(l.mentions).toEqual(["OpenAI", "Nvidia"]);
     expect(l.unlabeled).toBe(false);
-    const low = deriveLabels(s, { clip_worthy: { type: "score", score: 2.99, confidence: 1, probabilities: {} } }, cfg.app.timeline, "v", []);
-    expect(low.markers).toEqual([]);
-    expect(deriveLabels(s, null, cfg.app.timeline, "v", []).unlabeled).toBe(true);
+    expect(deriveLabels(s, { subject: choiceA("tech") }, set, "v", []).lane).toBe("tech");
+    expect(deriveLabels(s, null, set, "v", []).unlabeled).toBe(true);
   });
 
   test("mentions are case-insensitive whole words", () => {
-    expect(mentionsOf("openai, NVIDIA and Hugging Face; not OpenAIs or Metaverse", cfg.app.timeline.companies)).toEqual(["OpenAI", "Nvidia", "Hugging Face"]);
-    expect(mentionsOf("OpenAIs and Metaverse", cfg.app.timeline.companies)).toEqual([]);
-    expect(mentionsOf("Meta. OpenAI!", cfg.app.timeline.companies)).toEqual(["OpenAI", "Meta"]);
+    expect(mentionsOf("openai, NVIDIA and Hugging Face; not OpenAIs or Metaverse", set.companies)).toEqual(["OpenAI", "Nvidia", "Hugging Face"]);
+    expect(mentionsOf("OpenAIs and Metaverse", set.companies)).toEqual([]);
+    expect(mentionsOf("Meta. OpenAI!", set.companies)).toEqual(["OpenAI", "Meta"]);
   });
 
-  test("sections merge consecutive same-subject segments, ignoring faded ones", () => {
+  test("sections merge consecutive same-option segments of the first category, ignoring faded ones", () => {
     const segs = ["seg_1", "seg_2", "seg_3", "seg_4", "seg_5"].map((id, i) => seg(id, i * 10, i * 10 + 10, []));
     const labels = new Map([
       ["seg_1", labelsFor("seg_1", "ai_models")],
@@ -92,15 +100,18 @@ describe("timeline", () => {
       ["seg_4", labelsFor("seg_4", "ai_models")],
       ["seg_5", labelsFor("seg_5", "personal_life")],
     ]);
-    const s = sectionsOf(segs, labels);
-    expect(s.map((x) => [x.subject, x.segmentIds])).toEqual([["ai_models", ["seg_1", "seg_2", "seg_4"]], ["personal_life", ["seg_5"]]]);
-    expect(s[0]).toMatchObject({ lane: "ai", startMs: 0, endMs: 40 });
+    const s = sectionsOf(segs, labels, set);
+    expect(s.map((x) => [x.option, x.segmentIds])).toEqual([["ai_models", ["seg_1", "seg_2", "seg_4"]], ["personal_life", ["seg_5"]]]);
+    expect(s[0]).toMatchObject({ category: "subject", lane: "AI", startMs: 0, endMs: 40 });
+    expect(sectionsOf(segs, labels, null)).toEqual([]);
+    const noCategory: LabelSet = { ...clone(set), categories: [] };
+    expect(sectionsOf(segs, labels, noCategory)).toEqual([]);
   });
 
-  function timeline(answer: (q: QuestionSet, m: JevCallMeta) => Record<string, JevAnswer> | "fail") {
+  function timeline(answer: (q: QuestionSet, m: JevCallMeta) => Record<string, JevAnswer> | "fail", labels: LabelSet | null = set, stories: string[] = []) {
     const events: { type: string; data: any }[] = [];
     const asked: { q: QuestionSet; m: JevCallMeta; state: any }[] = [];
-    const t = new Timeline(cfg.app, cfg.labels, {
+    const t = new Timeline(cfg.app, cfg.timeline, labels, stories, {
       async ask(state, q, m) {
         asked.push({ q, m, state });
         const a = answer(q, m);
@@ -115,29 +126,24 @@ describe("timeline", () => {
     return { t, events, asked };
   }
 
-  test("config replacement: validated, active from the next segment; a boundary change is a conflict", async () => {
-    const { t, asked } = timeline(() => ({ subject: choiceA("tech") }));
+  test("each closed segment is asked the session's set, with the previous segment as context", async () => {
+    const { t, asked } = timeline(() => ({ subject: choiceA("tech") }), set, ["Surf report"]);
     t.onSegmentClosed(seg("seg_1", 0, 1, [u("u_1", "spk_1", "a")]));
-    await t.idle();
-    const next = clone(cfg.labels) as any;
-    delete next.questions.heat;
-    next.questions.jargon = { type: "noul", instructions: "Uses jargon." };
-    const v = t.replaceLabels(next);
-    expect(v).not.toBe(labelSetVersion(cfg.labels, []));
     t.onSegmentClosed(seg("seg_2", 1, 2, [u("u_2", "spk_1", "b")]));
     await t.idle();
-    expect(Object.keys(asked[0].q)).toContain("heat");
-    expect(Object.keys(asked[1].q)).toContain("jargon");
-    expect(Object.keys(asked[1].q)).not.toContain("heat");
-    expect(asked[1].m).toMatchObject({ purpose: "segment", segment_id: "seg_2", question_set_version: v });
+    expect(Object.keys(asked[0].q)).toContain("story");
+    expect(asked[1].m).toMatchObject({ purpose: "segment", segment_id: "seg_2", question_set_version: t.version });
     expect(asked[1].state.previous_segment).toEqual([{ speaker: "spk_1", text: "a", tags: [] }]);
+  });
 
-    const badBoundary = clone(next);
-    badBoundary.boundary.instructions = "something else";
-    expect(() => t.replaceLabels(badBoundary)).toThrow(LabelConflictError);
-    const invalid = clone(next);
-    invalid.questions.subject.criteria = { a: "only one" };
-    expect(() => t.replaceLabels(invalid)).toThrow();
+  test("without a set, segments are kept but never labelled", async () => {
+    const { t, asked } = timeline(() => ({}), null);
+    t.onSegmentClosed(seg("seg_1", 0, 1, [u("u_1", "spk_1", "a")]));
+    await t.idle();
+    expect(t.segments.length).toBe(1);
+    expect(asked.length).toBe(0);
+    expect(t.version).toBe("");
+    expect(t.relabel()).toBe(0);
   });
 
   test("a failed request marks the segment unlabeled; relabel asks again in the background", async () => {

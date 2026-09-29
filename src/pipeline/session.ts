@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import type { Config } from "../config.ts";
+import type { Config, LabelSet } from "../config.ts";
 import { Budget, sumDevSpend } from "../budget.ts";
 import { mergeSources, type AudioSource, type StreamName } from "../audio/source.ts";
 import { EchoGate, type OutputKind } from "../audio/echoGate.ts";
@@ -86,8 +86,12 @@ export interface SessionOptions {
   appleSpawn?: SpawnHelper;
   /** Overrides `speakers.voicesPerStream`, e.g. how many people are on the call tonight. */
   voices?: VoiceLimits;
-  /** Both on unless set to false. */
+  /** Both on unless set to false; labels are off without a label set too. */
   features?: Partial<Features>;
+  /** The session's label set, fixed for its run; `null` turns labels off; absent, the built-in default (`config.labels`). */
+  labelSet?: LabelSet | null;
+  /** Tonight's stories: the `story` question, and a hint to OpenAI's transcription. */
+  stories?: string[];
   /** How often failed lines are retried while the session runs (tests set it). */
   retryEveryMs?: number;
 }
@@ -201,8 +205,7 @@ export class Session {
     const speakerName = (id: string) => this.speakers.displayName(id);
 
     const features = this.features;
-    this.timeline = new Timeline(cfg.app, cfg.labels, {
-      labels: features.labels,
+    this.timeline = new Timeline(cfg.app, cfg.timeline, features.labels ? this.labelSet : null, opts.stories ?? [], {
       ask: (s, q, m) => this.services.ask(s, q, m),
       speakerName,
       emit: (t, d) => this.emit(t as EventType, d),
@@ -222,7 +225,8 @@ export class Session {
 
     this.segmenter = new Segmenter(cfg.app.segmentation, {
       ask: (s, q, m) => this.services.ask(s, q, m),
-      boundary: () => this.timeline.labelSetActive.boundary,
+      // locked, the same for every label set: asked with fact-checking on even when labels are off
+      boundary: () => cfg.timeline.boundary,
       factcheck: features.factcheck ? this.factcheck : NO_FACTCHECK,
       jev: features.factcheck || features.labels,
       speakerName,
@@ -263,7 +267,12 @@ export class Session {
   }
 
   get features(): Features {
-    return { factcheck: this.opts.features?.factcheck !== false, labels: this.opts.features?.labels !== false };
+    return { factcheck: this.opts.features?.factcheck !== false, labels: this.opts.features?.labels !== false && this.labelSet !== null };
+  }
+
+  /** The set the session was started with (null: labels off). */
+  private get labelSet(): LabelSet | null {
+    return this.opts.labelSet === undefined ? this.opts.config.labels : this.opts.labelSet;
   }
 
   private realServices(log: (file: JsonlFile, row: unknown, live?: Record<string, unknown>) => void): Services {
@@ -311,7 +320,7 @@ export class Session {
       id: this.id, app: appInfo(), mode: this.opts.mode, startedAt: this.startedAt.toISOString(),
       streams: this.opts.sources.map((s) => s.stream),
       config: cfg.app, voices: this.voices, features: this.features, transcription: this.transcription,
-      labelSet: cfg.labels, labelSetVersion: this.timeline.version,
+      labelSet: this.timeline.set, stories: this.timeline.storiesActive, labelSetVersion: this.timeline.version,
       s1Version: this.factcheck.active.id, s1: cfg.s1,
     });
     this.emit("session.started", {
@@ -513,7 +522,7 @@ export class Session {
     return computeStats({
       segments: this.timeline.segments, labels: this.timeline.labels,
       resolveSpeaker: (id) => this.speakers.resolve(id), speakerName: (id) => this.speakers.displayName(id),
-      factcheck: this.factcheck.stats(), cost: this.budget.totals(), timeline: this.opts.config.app.timeline,
+      factcheck: this.factcheck.stats(), cost: this.budget.totals(), set: this.timeline.set,
     });
   }
 
@@ -634,7 +643,7 @@ export class Session {
       })),
       openSegment: this.segmenter.openSegment ? { id: this.segmenter.openSegment.id, utteranceIds: this.segmenter.openSegment.utterances.map((u) => u.id) } : null,
       sections: this.timeline.sections(),
-      labels: { set: this.timeline.labelSetActive, stories: this.timeline.storiesActive, version: this.timeline.version },
+      labels: { set: this.timeline.set, stories: this.timeline.storiesActive, version: this.timeline.version },
       claims: [...this.factcheck.claims.values()],
       s1: {
         active: this.factcheck.active.id,

@@ -23,6 +23,18 @@ export function glyph(id: string, cls = "g"): SVGSVGElement {
   return s("svg", { class: cls, "aria-hidden": "true" }, s("use", { href: `#g-${id}` }));
 }
 
+/** A marker icon from the library in index.html (`#i-<name>`, the names in icons.ts). */
+export function icon(name: string, cls = "g"): SVGSVGElement {
+  return s("svg", { class: cls, "aria-hidden": "true" }, s("use", { href: `#i-${name}` }));
+}
+
+/** "Disagreement" → "Disagreements", "Category" → "Categories": English plurals for label names. */
+export function pluralOf(word: string): string {
+  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh)$/i.test(word)) return `${word}es`;
+  return `${word}s`;
+}
+
 function setAttrs(el: Element, attrs: Attrs) {
   for (const [k, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;

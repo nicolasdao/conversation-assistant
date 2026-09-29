@@ -16,7 +16,8 @@ export interface Labels {
   nouls: Record<string, number>; scores: Record<string, number>; markers: string[]; mentions: string[]; lane: string | null; story: string | null;
 }
 export interface Segment { id: string; startMs: number; endMs: number; forced: boolean; final: boolean; utteranceIds: string[]; labels: Labels | null }
-export interface Section { id: string; subject: string; lane: string; segmentIds: string[]; startMs: number; endMs: number }
+/** A run of consecutive segments with the same option of the set's first category (the section brackets). */
+export interface Section { id: string; category: string; option: string; lane: string; segmentIds: string[]; startMs: number; endMs: number }
 export interface Verdict {
   restated_claim: string; verdict: string; correction: string; confidence: string; false_alarm_reason: string;
   sources: { url: string; title: string }[]; downgraded: boolean;
@@ -36,8 +37,33 @@ export interface Health {
 export interface S1Version { id: string; parent: string | null; status: string; kind: string; rationale: string; gate: any; errors: string[] | null }
 export interface S1Outcome { active: string; candidate: string | null; outcome: string; rationale: string; gate: any; errors: string[] | null; at: string }
 export interface Cost { transcription: number; jev: number; s2: number; chat?: number; session: number; sessionCapUsd: number }
-export interface LabelQuestion { type: "noul" | "choice" | "score"; instructions: string; criteria?: any }
-export interface LabelSet { prefix: string; boundary: LabelQuestion; questions: Record<string, LabelQuestion>; story: { instructions: string; none: string } }
+/** A label set, as the engine defines it (src/labels/model.ts): up to 2 categories, 2 scores, 8 markers. */
+export interface LabelOption { id: string; name: string; description: string; color: string; group?: string }
+export interface LabelCategory {
+  id: string; name: string; instructions: string; options: LabelOption[];
+  index?: { name: string; description: string; options: string[] };
+}
+export interface LabelScore { id: string; name: string; instructions: string; levels: string[] }
+export interface LabelMarker {
+  id: string; name: string; short: string; icon: string; instructions: string; criteria?: { true: string; false: string };
+  threshold: number; perSpeaker: boolean; list: boolean;
+}
+export interface LabelSet {
+  format: "tattle-labels"; version: 1; id: string; name: string; description: string; builtIn?: boolean;
+  prefix: string; fadedBelowConfidence: number; companies: string[];
+  categories: LabelCategory[]; scores: LabelScore[]; markers: LabelMarker[];
+}
+/** Stats in the shape of the session's set (src/pipeline/stats.ts); older recordings arrive converted. */
+export interface Stats {
+  version: 2;
+  index: { name: string; description: string; share: number } | null;
+  roganIndex: number;
+  labelledMs: number;
+  categories: { id: string; name: string; split: { option: string; ms: number; share: number }[] }[];
+  speakers: { speakerId: string; displayName: string; talkMs: number; markers: Record<string, number>; scores: Record<string, number | null> }[];
+  lists: { markerId: string; items: { segmentId: string; text: string }[] }[];
+  factcheck?: any; cost?: any;
+}
 export interface LivePartial { stream: Stream; itemId: string; text: string; utteranceId: string | null; final: boolean; receivedAt: number }
 export interface ErrorItem { component: string; message: string; at: string }
 
@@ -92,7 +118,7 @@ export interface State {
   s1: { active: string; versions: S1Version[]; memorySize: number; last: S1Outcome | null; misses: number; audits: number; auditsSeen: Set<string> };
   labels: { set: LabelSet | null; stories: string[]; version: string };
   cost: Cost;
-  stats: any | null;
+  stats: Stats | null;
   errors: ErrorItem[];
   budgetExhausted: string | null;
   calls: Calls;
@@ -129,6 +155,11 @@ export function emptyState(): State {
 /** The session on screen's features; sessions and recordings from before features existed ran with both on. */
 export function featuresOf(s: State): Features {
   return { factcheck: s.session?.features?.factcheck !== false, labels: s.session?.features?.labels !== false };
+}
+
+/** The label set the screen shows: the session's, or null when it runs (or ran) with labels off, or there is none. */
+export function labelSetOf(s: State): LabelSet | null {
+  return s.session && featuresOf(s).labels ? s.labels.set : null;
 }
 
 /** Follows merges to the surviving speaker. */

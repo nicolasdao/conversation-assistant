@@ -148,6 +148,21 @@ describe("the transcription routes, and what Start and Chat refuse", () => {
     expect(prep).toMatchObject({ status: 409, json: { preparing: true } });
   });
 
+  test("a picked label set needs the OpenRouter key; labels Off with fact-checking off does not", async () => {
+    const start = (body: Record<string, unknown>) => call("POST", "/api/session/start", { mode: "replay", dir: "fixtures/conversation", ...body });
+    expect(await start({ labelSet: "ai-podcast", features: { factcheck: false } })).toMatchObject({ status: 400, json: { needsKey: "openrouter" } });
+    // no labelSet named: the built-in one, so the key is needed too
+    expect(await start({ features: { factcheck: false } })).toMatchObject({ status: 400, json: { needsKey: "openrouter" } });
+    // past the key check: stopped only because Apple's model is not ready in this test
+    expect(await start({ labelSet: null, features: { factcheck: false } })).toMatchObject({ status: 409, json: { preparing: true } });
+    expect(await start({ labelSet: "ai-podcast", features: { factcheck: false, labels: false } })).toMatchObject({ status: 409, json: { preparing: true } });
+    const unknown = await start({ labelSet: "no-such-set", features: { factcheck: false } });
+    expect(unknown.status).toBe(400);
+    expect(unknown.json.error).toMatch(/no label set no-such-set/);
+    expect((await start({ labelSet: 42 })).status).toBe(400);
+    expect((await start({ labelSet: null, features: { factcheck: false }, stories: "x" })).status).toBe(400);
+  });
+
   test("choosing OpenAI needs its key; Start with OpenAI and no key names it", async () => {
     expect(await call("PUT", "/api/transcription", { engine: "whisper" })).toMatchObject({ status: 400 });
     expect(await call("PUT", "/api/transcription", { engine: "openai" })).toMatchObject({ status: 400, json: { needsKey: "openai" } });

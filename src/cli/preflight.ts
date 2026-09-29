@@ -122,7 +122,7 @@ if (cfg) {
     const jev = new JevClient(c.app.jev, { fetch, apiKey: openrouter, budget, log: (r) => store.append("jev_calls", r) });
     const res = await jev.ask(
       { current_segment: [], new_utterance: { speaker: "Nic", text: "OpenRouter listed Jev on September eighteenth.", tags: [] } },
-      { boundary: c.labels.boundary, ...c.s1.questions } as never, { purpose: "preflight" });
+      { boundary: c.timeline.boundary, ...c.s1.questions } as never, { purpose: "preflight" });
     if (!res.model.startsWith("typesafe/jev-1.13")) throw new Error(`unexpected model ${res.model}`);
     return `${res.model}, claim ${(res.answers.claim as { noul: number }).noul.toFixed(2)}`;
   });

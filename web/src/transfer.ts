@@ -239,7 +239,8 @@ function showResult(r: ImportResult) {
 
 // ---------- header buttons, and dropping a file anywhere ----------
 
-export function bindTransfer(state: () => State) {
+/** `onLabels`: a dropped `.tattle-labels` file is a label set, not a recording (web/src/labels.ts). */
+export function bindTransfer(state: () => State, onLabels?: (file: File) => void) {
   getState = state;
   $("#export-btn")?.addEventListener("click", () => { const id = getState().session?.id; if (id) void openExport(id); });
   $("#import-btn")?.addEventListener("click", () => openImport());
@@ -255,7 +256,8 @@ export function bindTransfer(state: () => State) {
     depth = 0;
     overlay.hidden = true;
     const f = e.dataTransfer?.files?.[0];
-    if (f) openImport(f);
+    if (f && onLabels && f.name.toLowerCase().endsWith(".tattle-labels")) onLabels(f);
+    else if (f) openImport(f);
   });
 }
 

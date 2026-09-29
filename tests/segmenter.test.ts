@@ -34,7 +34,7 @@ function harness(boundaries: Record<string, number | "fail">, opts: { streams?: 
       if (b === "fail") throw new Error("timeout");
       return { answers: { boundary: { type: "noul", noul: b ?? 0 }, claim: { type: "noul", noul: 0.1 } }, id: "x", model: "m", provider: "p", usage: { input_tokens: 1, output_tokens: 0, cost: 0 } };
     },
-    boundary: () => cfg.labels.boundary,
+    boundary: () => cfg.timeline.boundary,
     factcheck: { questions: () => ({ questions: cfg.s1.questions, version: "s1@1" }), onAnswers: (u) => factAnswers.push(u.id) },
     speakerName: (id) => ({ spk_1: "Nic", spk_2: "Speaker 2" } as Record<string, string>)[id] ?? id,
     streams: () => streams,
