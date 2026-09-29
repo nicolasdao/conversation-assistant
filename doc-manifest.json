@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 243,
+      "line_count": 250,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -64,7 +64,7 @@
     },
     {
       "dangling": false,
-      "description": "The end-to-end architecture — native capture, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.",
+      "description": "The end-to-end architecture — native capture and the on-device transcription helper, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.",
       "has_frontmatter": true,
       "headings": [
         "Architecture",
@@ -78,7 +78,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 227,
+      "line_count": 228,
       "links_to": [
         "docs/chat.md",
         "docs/desktop.md",
@@ -133,11 +133,12 @@
         "API",
         "The page — `web/src/chat.ts`, `web/src/markdown.ts`"
       ],
-      "line_count": 153,
+      "line_count": 155,
       "links_to": [
         "docs/architecture.md",
         "docs/mission.md",
-        "docs/recordings.md"
+        "docs/recordings.md",
+        "docs/setup.md"
       ],
       "over_size": false,
       "parse_error": null,
@@ -186,14 +187,15 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 240,
+      "line_count": 242,
       "links_to": [
         "README.md",
         "docs/architecture.md",
         "docs/gotchas.md",
         "docs/mission.md",
         "docs/recordings.md",
-        "docs/setup.md"
+        "docs/setup.md",
+        "docs/transcription.md"
       ],
       "over_size": false,
       "parse_error": null,
@@ -236,11 +238,12 @@
     },
     {
       "dangling": false,
-      "description": "Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.",
+      "description": "Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.",
       "has_frontmatter": true,
       "headings": [
         "Gotchas",
         "Capture (macOS)",
+        "Apple Speech",
         "sherpa-onnx",
         "OpenAI",
         "OpenRouter and GPT-6 Luna",
@@ -252,11 +255,12 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 95,
+      "line_count": 110,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
         "docs/recordings.md",
+        "docs/transcription.md",
         "docs/website.md"
       ],
       "over_size": false,
@@ -266,6 +270,7 @@
         "native/capture/**",
         "src/audio/nativeSource.ts",
         "src/transcribe/**",
+        "native/transcribe/**",
         "src/factcheck/s1.ts",
         "src/factcheck/s2.ts",
         "scripts/make-fixtures.ts",
@@ -279,6 +284,8 @@
       "tags": [
         "gotchas",
         "macos",
+        "apple-speech",
+        "speechanalyzer",
         "openai",
         "openrouter",
         "jev",
@@ -475,17 +482,18 @@
     },
     {
       "dangling": false,
-      "description": "The two API keys (OpenAI and OpenRouter) — the first-run setup screen that replaces the app until both are set, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.",
+      "description": "The two API keys (OpenAI and OpenRouter), both optional — which one the transcription engine requires, the first-run setup screen (OpenAI only, on Macs that transcribe with OpenAI), the prompts that ask for the OpenRouter key when fact-checking, labels, or Chat need it, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.",
       "has_frontmatter": true,
       "headings": [
         "Setup and API keys",
         "First run: the setup screen",
+        "Asking for a key where it is needed",
         "Where keys are stored",
         "Checking a key before saving",
         "Routes and the gate",
         "Command-line tools"
       ],
-      "line_count": 94,
+      "line_count": 108,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",
@@ -503,7 +511,8 @@
         "web/src/keys.ts",
         "web/src/main.ts",
         "src/cli/smoke.ts",
-        "src/cli/replay.ts"
+        "src/cli/replay.ts",
+        "src/cli/preflight.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -513,7 +522,9 @@
         "credentials",
         "security",
         "openai",
-        "openrouter"
+        "openrouter",
+        "first-run",
+        "key-prompt"
       ],
       "toc": {
         "linked": false,
@@ -617,36 +628,48 @@
     },
     {
       "dangling": false,
-      "description": "How speech becomes text, in two layers — final per-utterance transcripts from gpt-transcribe, and streaming display text from gpt-live-transcribe — with their triggers, costs, and configuration.",
+      "description": "How speech becomes text, with two engines — Apple Speech on this Mac (the default on macOS 26+, free, nothing leaves the Mac), with one clip per utterance and live text from stream analyzers, or OpenAI's gpt-transcribe and gpt-live-transcribe — how the engine is chosen and saved, the tattle-transcribe helper, costs, and configuration.",
       "has_frontmatter": true,
       "headings": [
         "Transcription",
-        "Utterances: what triggers a transcript",
-        "Final layer — `src/transcribe/openai.ts`",
-        "Live layer — `src/transcribe/live.ts`",
-        "Cost",
+        "Choosing the engine — `src/settings.ts`",
+        "Apple Speech — `native/transcribe/`, `src/transcribe/apple.ts`",
+        "OpenAI — `src/transcribe/openai.ts`, `src/transcribe/live.ts`",
+        "Final layer",
+        "Live layer",
+        "Both engines",
         "Configuration (`config/app.json` → `transcription`)"
       ],
-      "line_count": 75,
+      "line_count": 146,
       "links_to": [
+        "docs/architecture.md",
         "docs/gotchas.md",
         "docs/recordings.md",
+        "docs/setup.md",
         "docs/speakers.md"
       ],
       "over_size": false,
       "parse_error": null,
       "path": "docs/transcription.md",
       "source": [
+        "src/transcribe/apple.ts",
         "src/transcribe/openai.ts",
         "src/transcribe/live.ts",
+        "src/settings.ts",
         "src/audio/vad.ts",
+        "native/transcribe/**",
+        "scripts/transcribe-test.sh",
         "config/app.json"
       ],
       "source_unresolved": [],
       "tags": [
         "transcription",
+        "apple-speech",
+        "speechanalyzer",
         "openai",
         "realtime",
+        "engine",
+        "settings",
         "latency",
         "cost"
       ],

@@ -24,10 +24,10 @@ Every session — live or replay — is kept as one folder of plain files. There
 | File | Holds |
 | --- | --- |
 | `host.wav`, `remote.wav` | The streams as received, 16 kHz mono PCM16 — enough to replay the session exactly. Their headers get the final sizes as soon as the input ends, before the rest of the session's ending (see [Architecture](architecture.md#the-session-pipeline--srcpipelinesessionts)), so the audio is complete even if the app quits while fact-checks drain |
-| `session.json` | Mode, start time, `app` (the name and version that recorded it; absent before 0.3.0), streams, config snapshot, `features` (fact-check and labels on or off; see [Architecture](architecture.md#features-transcript-only-sessions)), label set, System 1 set |
+| `session.json` | Mode, start time, `app` (the name and version that recorded it; absent before 0.3.0), streams, config snapshot, `features` (fact-check and labels on or off; see [Architecture](architecture.md#features-transcript-only-sessions)), `transcription` (`{ engine: "apple", locale }` or `{ engine: "openai", model }`: the engine it ran with; absent before 29 September 2026, which means OpenAI; see [Transcription](transcription.md)), label set, System 1 set |
 | `events.jsonl` | Every event the page received (except transient live text) |
 | `utterances.jsonl` | VAD utterances with times, speaker id, and the `loud` tag (`overlap` is computed later and appears only in Jev states) |
-| `transcriptions.jsonl` | One row per final (`transcription`) and live (`live_transcription`) transcription call, with cost |
+| `transcriptions.jsonl` | One row per final (`transcription`) and live (`live_transcription`) transcription call, with cost. Final rows carry `engine`: `apple` (always `cost_usd: 0`; Apple's live text logs no rows) or `openai` (rows from before 29 September 2026 have none: OpenAI) |
 | `jev_calls.jsonl`, `s2_calls.jsonl` | One row per Jev and GPT-6 Luna call, with state, answers, and cost |
 | `segments.jsonl`, `labels.jsonl`, `claims.jsonl`, `verdicts.jsonl`, `s1_versions.jsonl`, `audits.jsonl` | Pipeline results |
 | `speakers.json` | Final speaker list, written at session end |

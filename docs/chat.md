@@ -123,6 +123,8 @@ The **meter** (`GET /api/chats/:id`):
 - Its tooltip names the shortcut, ⌘K / Ctrl+K, which opens the chat from anywhere.
 - A pulsing dot on it means a reply is being written.
 
+**Without an OpenRouter key** the window shows "Please provide your OpenRouter API key to use Chat." with the key's card in place of the chat (`#chat-key`, inside the dialog); saving the key opens the chat. The chat's POST routes answer 400 `needsKey: "openrouter"` without the key, before calling OpenRouter (see [Setup](setup.md#asking-for-a-key-where-it-is-needed)).
+
 **The window** (`dlg-chat`, up to 1240 × 1000 px, 92 % of the window's height). Its header names what the chat is about ("About Episode 12 · on air"). A cited time plays a recording from there with the chat left open; on air, it closes the chat and scrolls the transcript to that line.
 
 - **Sidebar**, as in ChatGPT:

@@ -1,39 +1,53 @@
 ---
-description: The two API keys (OpenAI and OpenRouter) — the first-run setup screen that replaces the app until both are set, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.
-tags: [setup, api-keys, onboarding, credentials, security, openai, openrouter]
+description: The two API keys (OpenAI and OpenRouter), both optional — which one the transcription engine requires, the first-run setup screen (OpenAI only, on Macs that transcribe with OpenAI), the prompts that ask for the OpenRouter key when fact-checking, labels, or Chat need it, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.
+tags: [setup, api-keys, onboarding, credentials, security, openai, openrouter, first-run, key-prompt]
 source:
   - src/keys.ts
   - web/src/keys.ts
   - web/src/main.ts
   - src/cli/smoke.ts
   - src/cli/replay.ts
+  - src/cli/preflight.ts
 ---
 
 # Setup and API keys
 
-Tattle needs two keys, and nothing works without them:
+Tattle has two API keys, and neither is needed to open the app on macOS 26 or later:
 
-| Key | Service | Used for | About |
+| Key | Service | Needed for | About |
 | --- | --- | --- | --- |
-| `OPENAI_API_KEY` | OpenAI | Transcription, final and live (see [Transcription](transcription.md)) | $1.23 an hour |
-| `OPENROUTER_API_KEY` | OpenRouter | Jev, System 2 (GPT-6 Luna), and chat (see [Jev](jev.md), [Chat](chat.md)) | up to $0.40 an hour, plus chat |
+| `OPENAI_API_KEY` | OpenAI | Transcription with the OpenAI engine only (see [Transcription](transcription.md)) | $1.23 an hour |
+| `OPENROUTER_API_KEY` | OpenRouter | Fact-checking and labels (Jev, System 2), and Chat (see [Jev](jev.md), [Chat](chat.md)) | up to $0.40 an hour, plus chat |
+
+Which keys are **required** follows the transcription engine (`KeySetup.status().required`): `["openai"]` when OpenAI transcribes, `[]` with Apple Speech on this Mac. OpenRouter is never required: without it a session is transcript-only, and on macOS 26+ with Apple Speech it runs fully offline. Before 29 September 2026 both keys were required on every Mac.
 
 ## First run: the setup screen
 
-Until both keys are set, the page shows only the setup screen; the app's code is not even loaded. `web/src/main.ts` asks `GET /api/setup` first: when `configured` is false it shows the screen (`web/src/keys.ts`), otherwise it imports the app (`web/src/app.ts`). The page's shell is hidden (`body.booting`) until that answer arrives, so it never flashes first.
+Until the required keys are set, the page shows only the setup screen; the app's code is not even loaded. `web/src/main.ts` asks `GET /api/setup` first: when `configured` is false it shows the screen (`web/src/keys.ts`), otherwise it imports the app (`web/src/app.ts`). The page's shell is hidden (`body.booting`) until that answer arrives, so it never flashes first.
 
-The screen is built around one call to action: fill two fields, press one button. It fits a laptop screen without scrolling:
+So on macOS 26+ a first launch asks for nothing: the engine resolves to Apple Speech and the app opens (see [Transcription](transcription.md#choosing-the-engine--srcsettingsts)). The screen appears only when OpenAI transcribes without its key: a Mac on macOS 14.2–25, or someone who chose OpenAI. It shows only the required missing keys, so in practice one field. It fits a laptop screen without scrolling:
 
-- a title ("Add your two API keys to start") and one line on why;
-- one panel with a large field per missing key, labelled "OpenAI API key" / "OpenRouter API key", each with a **Required** badge. As a key is typed, `formatProblem` checks it in the page: the field turns green with "✓ Looks right", or red with "Check this key" and the reason (an OpenRouter key in the OpenAI field, spaces, too short). The field hides the key (Show reveals it), and Enter saves;
-- under each field, one line on what it does, and **How do I get an … key?**, folded: what the service does and costs, then the steps with direct links (create an account, **add prepaid credit** — $10 is plenty, automatic recharge off — create a key named Tattle, on OpenRouter with a credit limit such as $10, and paste it);
-- one full-width **Save keys and start** button, dimmed until both fields look right, with a counter ("1 of 2 keys added");
-- inside the panel, under the button, a padlock and **Your keys stay on this Mac**: the app has no server of its own; keys are saved on this computer and sent only to OpenAI and OpenRouter, to use the account with them — never to the project's authors or anywhere else. It sits where the eye lands before pressing Save, because that is when people worry about handing over a key;
-- one small footer line: what a show costs, and the file the keys are saved in.
+- a title ("Add your OpenAI API key to start") and one line on why: "On-device transcription needs macOS 26 or later. On this Mac, Tattle transcribes with OpenAI…" (from `GET /api/transcription`, which answers before any key is set), or "You chose OpenAI for transcription.";
+- one panel with a large field per missing key, with a **Required** badge. As a key is typed, `formatProblem` checks it in the page: the field turns green with "✓ Looks right", or red with "Check this key" and the reason (an OpenRouter key in the OpenAI field, spaces, too short). The field hides the key (Show reveals it), and Enter saves;
+- under the field, one line on what it does, and **How do I get an … key?**, folded: what the service does and costs, then the steps with direct links (create an account, **add prepaid credit** — $10 is plenty, automatic recharge off — create a key named Tattle, and paste it);
+- one full-width **Save key and start** button, dimmed until the field looks right;
+- inside the panel, under the button, a padlock and **Your keys stay on this Mac**: the app has no server of its own; each key is saved on this computer and sent only to its own service — never to the project's authors or anywhere else. It sits where the eye lands before pressing Save, because that is when people worry about handing over a key;
+- one small footer line: what a transcript costs, that fact-checking and labels need an OpenRouter key the app asks for when they are turned on, and the file the keys are saved in.
 
 The button checks each key with its service and saves them only if none is refused; each result shows under its field. If a check leaves a warning, the screen shows an **Open Tattle** button; otherwise the app opens by itself after about a second.
 
-Keys can be replaced later from **Tattle → Settings…** (⌘,) in the Mac app, or the cog menu → **API keys** in a browser; both open the same window (`?panel=keys`). There, the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
+## Asking for a key where it is needed
+
+`keyPrompt(name, heading, …)` in `web/src/keys.ts` shows a key's card (its guide open, the field, **Save**, and optionally **Not now**) inside the window that needs it. It is always inside the open `<dialog>`: everything outside a modal dialog is inert (see [Gotchas](gotchas.md#web-page)).
+
+- **Start live.** The switches start **on** when the OpenRouter key is set and **off** when it is not. Turning one on without the key shows, inside `#dlg-start`, "Please provide your OpenRouter API key to configure fact-checking or labeling." **Not now** turns every switch that needs the key back off; a saved key keeps the switch on. Pressing Start with a switch on and no key shows the prompt instead of starting.
+- **Chat.** Opening it without the key shows "Please provide your OpenRouter API key to use Chat." in place of the chat; saving opens the chat.
+- **Settings → Transcription.** Choosing OpenAI without its key shows the OpenAI card first, then saves the engine.
+- **Replays** started from the replay popover or the Recordings window run with fact-checking and labels only when the OpenRouter key is set.
+
+The server refuses the same cases, so a stale page cannot slip past: `POST /api/session/start` (live or replay) with a feature on and no OpenRouter key, and the chat's POST routes without it, answer 400 `{ error, needsKey: "openrouter" }`; starting with the OpenAI engine and no OpenAI key answers 400 `needsKey: "openai"`. The page reads `needsKey` from the error (`ApiError.body` in `web/src/api.ts`) and shows the prompt.
+
+Keys can be replaced later from **Tattle → Settings…** (⌘,) in the Mac app, or the cog menu → **API keys** in a browser; both open the same window (`?panel=keys`). There, each card says when its key is needed ("Needed only for OpenAI transcription." / "Needed for fact-checking, labels, and Chat."), the steps are folded under "How to get this key", each card shows the key in use by its last 4 characters, and a key set in `.env` is shown but cannot be edited.
 
 ## Where keys are stored
 
@@ -80,15 +94,15 @@ When `createApiServer` is given `setup` (`bootEngine()` always gives it, for `np
 
 | Method | Route | Does |
 | --- | --- | --- |
-| GET | `/api/setup` | `{ configured, keys: [{ name, env, set, source: "environment" \| "file" \| null, hint }], path }`; `path` uses `~` |
+| GET | `/api/setup` | `{ configured, required, keys: [{ name, env, set, source: "environment" \| "file" \| null, hint }], path }`; `required` lists the keys the engine needs; `path` uses `~` |
 | POST | `/api/setup/keys` | `{ openai?, openrouter? }`. Checks each key given, saves them all or none. Returns `{ saved, checks: { <name>: { ok, message, warning? } }, …status }`. 409 for a key set in the environment |
 
-- **Gate.** Until both keys are set, every other `/api/*` route answers `503 { error, setup: true }`, except `/api/about` and `/api/engine`.
+- **Gate.** Until the required keys are set, every other `/api/*` route answers `503 { error, setup: true }`, except `/api/transcription`, `/api/about`, `/api/licenses`, and `/api/engine`. With Apple Speech nothing is required, so nothing is gated.
 - **Only the page itself.** Like every route (see [Architecture](architecture.md#event-bus-and-api--srcstoreeventsts-srcservermaints)), the setup routes answer only when the `Host` is `127.0.0.1` or `localhost` (no DNS rebinding) and any `Origin` matches it (no other website open in the browser). The POST also requires `Content-Type: application/json`, which a cross-site form cannot send. In the Mac app, only the app's own window can reach the router at all, so the in-process connection presents its requests as the page itself: `Host: 127.0.0.1` and no `Origin` (see [The Mac app](desktop.md#the-in-process-connection--srcserverinprocessts)).
-- `npm run serve` prints which keys are missing when it starts. `serve --replay` refuses to start a replay until both are set.
+- `npm run serve` prints the engine and any missing required key when it starts. `serve --replay` runs fact-checking and labels, so it also needs the OpenRouter key.
 
 ## Command-line tools
 
-`smoke` and `replay` call `loadKeys()` before reading a key. `preflight`'s "keys are set" check says where each key came from, and names the missing ones with how to add them. All of them load `.env` only if it exists.
+`smoke` and `replay` call `loadKeys()` before reading a key. `replay` needs no key with `--engine apple --no-factcheck --no-labels`. `preflight`'s "keys are set" check says where each key came from; it fails only when the engine needs the OpenAI key, and notes a missing OpenRouter key without failing (its credit, Jev, and System 2 checks are then skipped). All of them load `.env` only if it exists.
 
 Related: [Architecture](architecture.md), [Mission](mission.md).

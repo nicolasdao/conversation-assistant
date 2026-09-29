@@ -42,7 +42,7 @@ flowchart LR
 - **The engine runs inside Electron's main process** (`desktop/main.ts` calls `bootEngine()` from `src/server/main.ts`, the same start-up `npm run serve` uses). Electron 44 bundles Node 24, the version the engine needs.
 - **The page loads from `app://conversation-assistant/`**, a private scheme registered as standard, secure, fetch-capable, and streaming. `protocol.handle("app", …)` passes each request to `inProcessHandler` (`src/server/inProcess.ts`), which feeds it to the unchanged router over an in-memory stream pair (`stream.duplexPair()` with `http.request({ createConnection })`) and streams the response back. JSON, server-sent events, Range requests for playback, uploads, and downloads all work unchanged, and the page's relative URLs (`fetch("/api/state")`) need no change.
 - **No TCP port.** Nothing listens, so nothing can collide with another program (4317, the port `npm run serve` uses, is also OpenTelemetry's default), and no other program or website can reach the engine. The address never changes, so the page's saved preferences and `/recordings/<id>` links survive restarts.
-- **The capture helper** is a child process, as with `npm run serve`; it only writes audio to a pipe.
+- **The capture helper** is a child process, as with `npm run serve`; it only writes audio to a pipe. So is **the transcription helper**, `tattle-transcribe`, on macOS 26+ (see [Transcription](transcription.md)); on older macOS it is never started, since it cannot load there.
 
 ### The in-process connection — `src/server/inProcess.ts`
 
@@ -60,6 +60,7 @@ flowchart LR
 | `root` (`package.json`, `LICENSE`) | the project folder | inside `app.asar` (`app.getAppPath()`) |
 | `web`, `config`, `models` | `web/`, `config/`, `models/` | `Contents/Resources/…`, read-only |
 | `helper` | `native/capture/.build/release/tattle-capture` | `Contents/Resources/bin/tattle-capture` |
+| `transcriber` | `native/transcribe/.build/release/tattle-transcribe` (without it, Apple Speech is unavailable: "tattle-transcribe is not built (npm run build:transcribe)") | `Contents/Resources/bin/tattle-transcribe` |
 | `sessions` | `sessions/` | `~/Library/Application Support/Tattle/sessions` |
 | `notices`, `licenses` (the Licenses window) | `THIRD_PARTY_NOTICES.md`, `licenses/` | `Contents/Resources/licenses/THIRD_PARTY_NOTICES.txt`, `Contents/Resources/licenses/` |
 | `src` (the restart banner's watch) | `src/` | none: `/api/engine` never reports stale |
@@ -116,7 +117,8 @@ In a browser `window.desktop` is undefined, and the page does without: the cog's
 
 macOS asks for **Microphone** and **System Audio Recording** the first time the capture helper starts, and gives both to the app: it attributes the helper's requests to the app that launched it (verified in macOS's permission log, `tccd`). System Settings → Privacy & Security lists **Tattle**, not Terminal.
 
-- **First launch.** When the microphone permission is undetermined, the app shows a sheet, "Tattle needs two permissions", then starts the helper for a moment (`--probe 1`), so macOS asks both questions now rather than at the start of a show.
+- **First launch.** When the microphone permission is undetermined, the app shows a sheet, "Tattle needs two permissions", then starts the helper for a moment (`--probe 1`), so macOS asks both questions now rather than at the start of a show. On macOS 26+ that is all a first launch asks: no API key (transcription runs on the Mac, see [Setup](setup.md)), and the speech model installs in the background with no question while everything but Start works.
+- **Speech Recognition.** Apple Speech (`SpeechAnalyzer`) asked for no permission in testing, so the app requests none up front. The app and the helper still declare `NSSpeechRecognitionUsageDescription`, in case a macOS version asks.
 - **A refused microphone.** At each launch, the app offers to open System Settings at Privacy & Security → Microphone. A refused System Audio Recording cannot be detected before a session: it records silence, which the page's stream meter shows in red ([Architecture](architecture.md#web-front-end--web)).
 - **Grants follow the signature.** macOS ties them to the app's code signature, so every version must be signed with the same Developer ID, or an update loses them. Ad-hoc test builds (below) are a different app to macOS.
 - **In development** (`npm run app`, or `npm run serve`), macOS still asks on behalf of the terminal that started it, so the first-launch sheet is skipped.
@@ -174,17 +176,17 @@ The app was called Conversation Assistant before 0.8.0 (and Podcast Assistant be
 | --- | --- |
 | `npm run app` | Builds the page and the bundle, then opens the app from the project folder (development) |
 | `npm run build:desktop` | Bundles `desktop/main.ts` and the engine with esbuild into `dist/desktop/main.mjs` (ESM; `electron`, `electron-updater`, and `sherpa-onnx-node` stay external), and `desktop/preload.ts` into `dist/desktop/preload.cjs` |
-| `npm run dist:mac` | `scripts/build-mac.sh`: the models if missing, the capture helper, the page, the bundle, then electron-builder into `out/` |
+| `npm run dist:mac` | `scripts/build-mac.sh`: the models if missing, the capture and transcription helpers, the page, the bundle, then electron-builder into `out/` |
 
 `npm run dist:mac` writes `out/Tattle-<version>-arm64.dmg` (what people download), `out/Tattle-<version>-arm64-mac.zip` (what updates download), their `.blockmap` files, `out/latest-mac.yml`, and the app itself in `out/mac-arm64/`. It takes about 3.5 minutes. Measured at 0.6.2: the app is about 345 MB (328 MiB), the DMG 146 MB; Electron's framework is most of it, then sherpa-onnx (33 MB) and the models (26 MB).
 
 What `electron-builder.yml` puts in the app:
 - `app.asar`: the bundle, `package.json` (the version), and `LICENSE`, plus the production `node_modules` (`electron-updater`, `sherpa-onnx-node`).
 - `app.asar.unpacked`: sherpa-onnx's addon and dylibs, which cannot load from inside the archive.
-- `Contents/Resources/`: `web/` (`index.html`, `licenses.html`, the styles, the compiled scripts without source maps, the fonts), `config/`, `models/*.onnx`, `bin/tattle-capture`, and `licenses/`.
-- `Info.plist`: the bundle id `com.cloudlesslabs.conversation-assistant`, macOS 14.2 or later (the Core Audio process tap), and the Microphone and System Audio usage descriptions macOS shows in its prompts.
+- `Contents/Resources/`: `web/` (`index.html`, `licenses.html`, the styles, the compiled scripts without source maps, the fonts), `config/`, `models/*.onnx`, `bin/tattle-capture`, `bin/tattle-transcribe` (built for macOS 26; the app itself stays at 14.2), and `licenses/`. electron-builder signs both helpers with the app's identity and entitlements.
+- `Info.plist`: the bundle id `com.cloudlesslabs.conversation-assistant`, macOS 14.2 or later (the Core Audio process tap), and the Microphone, System Audio, and Speech Recognition usage descriptions macOS shows in its prompts.
 - English only (`electronLanguages`): the page is in English, and Electron's other languages cost 47 MB.
-- Apple Silicon (`arm64`) only, like the capture helper and sherpa-onnx's addon.
+- Apple Silicon (`arm64`) only, like the helpers and sherpa-onnx's addon.
 
 The icon is `desktop/icon.svg`, the page's favicon as an app icon. After changing it, `npx electron scripts/make-icon.mjs` renders `desktop/icon.icns`.
 

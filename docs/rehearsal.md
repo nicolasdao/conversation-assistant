@@ -12,7 +12,7 @@ Everything to check before going on air with Tattle, the lines to plant, and how
 
 ## The day before
 
-1. **In development**, `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the keys (from `.env` or saved from the page), the config, the OpenRouter credit, one call each to transcription, Jev, and System 2 (about $0.01), and 2 GB of free disk. It runs from the terminal, so it checks the terminal's permissions, not the Mac app's. **With the Mac app**, the rehearsal session below is the check: both meters move, and a line is transcribed.
+1. **In development**, `npm run preflight` passes. It checks the models, the capture helper and both macOS permissions, the transcription engine (with Apple Speech, that its model is installed), the keys the engine needs (from `.env` or saved from the page), the config, the OpenRouter credit, one transcription (on this Mac with Apple Speech, free; OpenAI's otherwise), one call each to Jev and System 2 (about $0.01; skipped without an OpenRouter key), and 2 GB of free disk. It runs from the terminal, so it checks the terminal's permissions, not the Mac app's. **With the Mac app**, the rehearsal session below is the check: both meters move, and a line is transcribed.
 2. Record a fallback: run a live rehearsal session (below), stop it, and name it in **Recordings** (the cog menu; for example "Fallback — Ep 12").
 3. Check that it works as a fallback: in Recordings, clicking it opens it instantly for free; **Replay** re-runs it through the pipeline at real-time pace (about its original cost again). If anything fails on air, stop the live session and use one of the two. See [Recordings](recordings.md).
 
@@ -26,13 +26,13 @@ Everything to check before going on air with Tattle, the lines to plant, and how
 - [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
 - [ ] A **fallback session** was recorded the day before and is named in Recordings.
-- [ ] Privacy: OpenRouter calls already send `provider: { data_collection: "deny" }` (`config/app.json`). Podcast audio still goes to OpenAI for transcription.
+- [ ] Privacy: OpenRouter calls already send `provider: { data_collection: "deny" }` (`config/app.json`). Podcast audio goes to OpenAI only with the OpenAI engine; with Apple Speech (Settings → Transcription → On this Mac) it never leaves the Mac.
 
 ## Starting the show
 
 Open **Tattle**. (In development: `npm run serve`, which builds the page and serves http://127.0.0.1:4317, or `npm run app`.) The Mac app never checks for or downloads an update while a session is on air.
 
-Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream stays at or below −50 dBFS for more than 10 s, or no audio frame arrives for more than 3 s. Live text appears about 1.2 s after someone starts speaking; the final line replaces it about 2.5 s after they stop (see [Transcription](transcription.md)). Budget about $1.60 per hour of show.
+Pick the microphone (default: built-in), press **Start live**, and check that both meters move. A meter turns red when its stream stays at or below −50 dBFS for more than 10 s, or no audio frame arrives for more than 3 s. With OpenAI, live text appears about 1.2 s after someone starts speaking and the final line replaces it about 2.5 s after they stop; with Apple Speech, live text takes about 2 s and the final line about 1 s (see [Transcription](transcription.md)). Budget about $1.60 per hour of show with OpenAI, or up to about $0.40 with Apple Speech (Jev and fact-checking only; nothing with both switches off).
 
 ## Planted lines to say on air
 

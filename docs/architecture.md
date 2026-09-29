@@ -1,5 +1,5 @@
 ---
-description: The end-to-end architecture — native capture, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.
+description: The end-to-end architecture — native capture and the on-device transcription helper, the Node engine's pipeline from audio to utterances, transcripts, segments, labels, and fact-checks, the event bus and HTTP/SSE API, the web front end, storage, and budgets.
 tags: [architecture, pipeline, capture, api, events, web, budget]
 source:
   - src/pipeline/session.ts
@@ -14,7 +14,7 @@ source:
 
 # Architecture
 
-Tattle is an open-source Mac app: people download a signed, notarized build and it updates itself (see [The Mac app](desktop.md)); developers run the same engine and page from the project folder with `npm run serve` or `npm run app`. Either way, it has two parts. The **engine** — the Node engine plus a native capture helper — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
+Tattle is an open-source Mac app: people download a signed, notarized build and it updates itself (see [The Mac app](desktop.md)); developers run the same engine and page from the project folder with `npm run serve` or `npm run app`. Either way, it has two parts. The **engine** — the Node engine plus two native helpers, `tattle-capture` for audio and `tattle-transcribe` for on-device transcription (macOS 26+) — owns everything that captures, thinks, and stores. The **front end** is a thin web page that only reads the engine's state and events and posts commands; it could be replaced (for example by a SwiftUI app) without touching the engine.
 
 The engine runs in one of two hosts, with the same start-up (`bootEngine()` in `src/server/main.ts`) and the same router: **`npm run serve`**, a server on http://127.0.0.1:4317 for development and the command-line tools, or **the Mac app**, where it runs inside Electron's main process and the app's window reaches the router in-process, with no port (see [The Mac app](desktop.md)). Where the engine finds its files — the page, config, models, recordings, the helper — comes from `src/paths.ts`: the project folder by default, the app bundle and Application Support in the Mac app.
 
@@ -28,8 +28,8 @@ flowchart TB
   HELPER --> SRC[Audio sources: host, remote]
   FILES[WAV files] --> SRC
   SRC --> VAD[Silero VAD per stream] --> TAGS[Tags: loud, overlap] --> SPK[Speaker registry<br/>WeSpeaker embeddings]
-  VAD -.speech.-> LIVE[Live text<br/>gpt-live-transcribe]
-  SPK --> TR[Final transcript<br/>gpt-transcribe]
+  VAD -.speech.-> LIVE[Live text<br/>Apple Speech stream analyzers<br/>or gpt-live-transcribe]
+  SPK --> TR[Final transcript<br/>Apple Speech clip, tattle-transcribe<br/>or gpt-transcribe]
   TR --> SEG[Segmenter<br/>reorder buffer + Jev per utterance]
   SEG --> TL[Timeline<br/>Jev per segment]
   SEG --> FC[Fact-checker<br/>System 1 flags → System 2 research]
@@ -67,7 +67,7 @@ A `Session` wires everything together and runs until input ends or it is stopped
 2. **VAD.** One Silero VAD per stream (threshold 0.5, 0.25 s minimum speech, 0.5 s minimum silence, 30 s maximum) cuts utterances at pauses, never at fixed intervals. Utterance ids (`u_<n>`) come from one session-wide counter.
 3. **Tags.** `loud` — the utterance's RMS is at least 6 dB above the median of that stream's last 50 utterances. `overlap` — it overlaps an utterance on the other stream by at least 1 s (computed when the segmenter releases it).
 4. **Speakers.** Local voice embeddings assign or create a speaker (see [Speakers](speakers.md)).
-5. **Transcription.** Each utterance is uploaded for its final text; while it is still being spoken, live text streams to the page (see [Transcription](transcription.md)).
+5. **Transcription.** Each utterance gets its final text from the session's engine, fixed when it starts: a clip through Apple Speech on this Mac, or an upload to OpenAI. While it is still being spoken, live text streams to the page (see [Transcription](transcription.md)).
 6. **Segmenter.** A reorder buffer releases utterances in `startMs` order across both streams — when everything earlier has finished transcribing and the other stream has passed that time and is not mid-speech, or 8 s after transcription. Each non-filler utterance gets one Jev request carrying the `boundary` question and the System 1 fact-check questions; code closes segments (see [Jev](jev.md)).
 7. **Timeline.** Each closed segment gets one Jev request with the host-editable label set (see [Jev](jev.md)).
 8. **Fact-checker.** System 1 answers from step 6 flag claims; System 2 researches, audits, and rewrites (see [System 1 and System 2](system1-system2.md)).
@@ -77,11 +77,11 @@ At end of input, in order: close the WAVs (their final headers are written at on
 
 ## Event bus and API — `src/store/events.ts`, `src/server/main.ts`
 
-Every result is an event with a payload checked against a zod schema (a failed check is logged, the event still goes out), a sequence number, and a timestamp. The bus keeps the session's history (replayed to every new SSE connection), and the session appends each event to `events.jsonl`. Three types are transient, streamed but never stored: `utterance.partial`, and `call.started` / `call`, the live view of every Jev and System 2 call (the call logs on disk are their record).
+Every result is an event with a payload checked against a zod schema (a failed check is logged, the event still goes out), a sequence number, and a timestamp. The bus keeps the session's history (replayed to every new SSE connection), and the session appends each event to `events.jsonl`. Four types are transient, streamed but never stored: `utterance.partial`; `call.started` / `call`, the live view of every Jev and System 2 call (the call logs on disk are their record); and `transcription.status`, the engine setting and Apple's model install progress, which belong to no session.
 
 | Group | Events |
 | --- | --- |
-| Session | `session.started`, `session.ended`, `session.paused` / `session.resumed` (with the session time `atMs`), `echo.gate` (speaker mode on or off: `active`, `device`, `atMs`), `health` (per stream, every second: RMS dBFS, ms since last frame, utterances in the last minute, capture device; on the host in speaker mode, `echoMutedMs`) |
+| Session | `session.started` (with `features` and `transcription: { engine, locale \| model }`), `session.ended`, `session.paused` / `session.resumed` (with the session time `atMs`), `echo.gate` (speaker mode on or off: `active`, `device`, `atMs`), `health` (per stream, every second: RMS dBFS, ms since last frame, utterances in the last minute, capture device; on the host in speaker mode, `echoMutedMs`) |
 | Speech | `utterance.partial`, `utterance`, `utterance.failed` (a line not transcribed: `retrying`, `failed`, or `empty`; see [Transcription](transcription.md)), `speaker.created`, `speaker.updated`, `speaker.merged` |
 | Timeline | `segment.closed`, `segment.labels`, `section.updated` |
 | Fact-check | `claim.flagged`, `claim.duplicate`, `claim.repeat`, `claim.researching`, `claim.verdict`, `claim.dropped`, `claim.disputed`, `audit`, `s1.version`, `s1.memory` |
@@ -92,10 +92,11 @@ The router (`createApiServer`) uses Node's `http` module and serves one session 
 
 | Method | Route | Does |
 | --- | --- | --- |
-| GET, POST | `/api/setup`, `/api/setup/keys` | The API keys: what is set, and saving checked keys. Until both are set, every other route but `/api/about` and `/api/engine` answers 503 and the page shows only the setup screen (see [Setup](setup.md)) |
+| GET, POST | `/api/setup`, `/api/setup/keys` | The API keys: what is set and `required`, and saving checked keys. Until the keys the engine requires are set (OpenAI's, only when OpenAI transcribes), every other route but `/api/transcription`, `/api/about`, `/api/licenses`, and `/api/engine` answers 503 and the page shows only the setup screen (see [Setup](setup.md)) |
+| GET, PUT, POST | `/api/transcription`, `/api/transcription/install` | The transcription engine (Apple Speech or OpenAI) and Apple's model: read it, change it (409 on air), retry the model's install (see [Transcription](transcription.md#choosing-the-engine--srcsettingsts)) |
 | GET | `/api/events` | SSE: the session's events so far, then live |
 | GET | `/api/state` | Full current state (or a recorded session's snapshot) |
-| POST | `/api/session/start` | `{ mode: "live", mic?, name?, features? }` or `{ mode: "replay", dir \| sessionId, speed, name?, features? }`; `features: { factcheck?, labels? }` (booleans, both on by default; see [Features](#features-transcript-only-sessions)) |
+| POST | `/api/session/start` | `{ mode: "live", mic?, name?, features? }` or `{ mode: "replay", dir \| sessionId, speed, name?, features? }`; `features: { factcheck?, labels? }` (booleans, both on by default; see [Features](#features-transcript-only-sessions)). 400 `needsKey: "openrouter"` for a feature without the OpenRouter key, 400 `needsKey: "openai"` for the OpenAI engine without its key, 409 `preparing: true` while Apple's model installs |
 | POST | `/api/session/stop` | Stop reading input; in-flight work completes. When the session ends, the engine serves it as an opened recording (see [Recordings](recordings.md)) |
 | POST | `/api/session/pause`, `/api/session/resume` | Live sessions only: while paused, incoming audio is replaced by silence, so nothing is heard, transcribed, or spent, and the WAVs and session times stay aligned; Stop still works |
 | GET | `/api/devices` | The helper's input devices |
@@ -111,7 +112,7 @@ The router (`createApiServer`) uses Node's `http` module and serves one session 
 | GET | `/api/engine` | `{ startedAt, stale }`: `stale` is true when a `src/**/*.ts` file changed after the engine started; the page then shows a banner asking for a restart. Never in the packaged Mac app, which has no sources |
 | GET, PATCH, POST, DELETE | `/api/sessions`, `/api/sessions/:id`, `/api/sessions/:id/open` | The recordings library (see [Recordings](recordings.md)) |
 | GET, POST | `/api/sessions/:id/export`, `/api/exports/:token`, `/api/sessions/import` | Export and import a recording as one `.tattle` file (see [Recordings](recordings.md#export-and-import)) |
-| GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)) |
+| GET, POST, PATCH, DELETE | `/api/chat/models`, `/api/chats`, `/api/chats/:id`, `/api/chats/:id/messages` (a server-sent event stream), `/api/chats/:id/stop` | The chat window, for the session on screen (see [Chat](chat.md)). Its POST routes answer 400 `needsKey: "openrouter"` without that key |
 
 **Every request must come from the page itself** (`fromThisPage`): the `Host` must be `127.0.0.1` or `localhost`, which defeats DNS rebinding, and any `Origin` must match it, so another website open in the browser can neither read anything nor act, not even with the "simple" cross-site requests that skip CORS (a text/plain POST that would start a recording). Anything else gets 403 (added 27 September 2026, after a review found only the setup routes guarded). The page itself is served with a Content-Security-Policy (`PAGE_CSP`): scripts, fonts, media, and connections from its own origin only, inline styles allowed because the page sets them from code.
 
@@ -119,7 +120,7 @@ It also serves `web/index.html` at `/` and at `/recordings/<id>` (the page's own
 
 ## Web front end — `web/`
 
-Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`, `npm run app`, and `npm run dist:mac`) — no bundler, no framework, no chart library. `main.ts` first asks `GET /api/setup`: with a key missing it shows only the setup screen ([Setup](setup.md)); otherwise it imports `app.ts`, which loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
+Plain TypeScript compiled by `tsc` to browser ES modules (`npm run build:web`, run by `npm run serve`, `npm run app`, and `npm run dist:mac`) — no bundler, no framework, no chart library. `main.ts` first asks `GET /api/setup`: with a required key missing it shows only the setup screen ([Setup](setup.md)); otherwise it imports `app.ts`, which loads `GET /api/state`, then applies `GET /api/events`; every update is idempotent (by id, and audits by timestamp) because the stream replays history on connect.
 
 The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Barlow Condensed for labels and Barlow for text (both self-hosted in `web/fonts/`, SIL Open Font License), drawn SVG glyphs for markers (no emoji), and angled straps instead of rounded cards. The layout is three rows:
 
@@ -137,14 +138,14 @@ The look is "On Air", modelled on TV broadcast graphics: one dark navy theme, Ba
   | `/recordings/<id>` | That recording, opened read-only |
   | `?t=1:23:45` | The playback position in a recording (kept current on seeks, on pause, and every 5 s while playing) |
   | `?tab=thinking` · `?tab=jev-log` | The right column's tab (Fact-check is the default) |
-  | `?panel=recordings` · `insights` · `speakers` · `labels` · `chat` · `keys` | The window that is open |
+  | `?panel=recordings` · `insights` · `speakers` · `labels` · `transcription` · `chat` · `keys` | The window that is open |
   | `?panel=insights&section=fact-checker` · `log` | The Insights tab (Overview is the default). The former windows' URLs, `?panel=stats`, `system-1`, and `log`, open their tab |
   | `?panel=chat&chat=chat_2` | A chat of the session on screen ([Chat](chat.md)) |
 
   The URL follows the screen: opening or leaving a recording, or a session ending as one, adds a history entry; tabs, windows, and the position update it silently. Opening a URL makes the screen match: on load it opens the recording it names (unless a session is on air, which is shown instead, with a message), and Back to `/` leaves the recording (`POST /api/sessions/close`). Loading `/` while the engine shows a recording puts that recording in the URL rather than closing it. Transcript filters, timeline zoom, and column and timeline sizes are browser preferences, not part of the URL.
 - **Playback (recordings only, never on air):** a play/pause button, a speed picker (1×, 1.25×, 1.5×, 2×, 3×, 4×; voices keep their pitch), a volume boost (100–300 %, remembered in the browser), and the position, in the timeline's header (`web/src/player.ts`). The timeline is the progress bar: a yellow playhead moves with the audio and stays in view when zoomed; clicking the timeline outside segments and markers seeks there, and clicking a segment or marker seeks to its start. Every transcript timestamp becomes a button that plays from that line. Every jump, from either side, moves both at once, playing or paused: the transcript scrolls to the line at that time and the timeline brings the playhead into view. While playing, the line being heard is highlighted and kept centred, unless the reader scrolled in the last 4 s. Space plays and pauses. The audio is the recording's two streams mixed by the server (see [Recordings](recordings.md)).
 - **Timeline (bottom, full width):** HTML lanes positioned in percent of the session length, with an inline-SVG heat and hype chart: section brackets, the `subject` lane (AI subjects as shades of one colour), the `mode` lane, heat and hype lines on 0–4, marker pins (disagreement, hot take, prediction, recommendation, clip-worthy, humour), a dashed "in progress" block for the open segment, hatched paused stretches, the axis, and a now line. Faded labels are dimmed; clicking a segment or marker jumps to the transcript. A dotted line follows the pointer with the exact time. Zoom with − / + / Fit or ⌘/Ctrl + scroll (a trackpad pinch), from the whole session down to about 30 s across; zoomed in, the strip scrolls sideways (the wheel scrolls through time), segment labels stay in view, axis ticks adapt to the zoom, and a live session stays pinned to the newest moment while scrolled to the end. Dragging the strip's top edge (or its arrow keys) makes the heat · hype chart taller or shorter; double-click resets it, and the height is remembered in the browser.
-- **Settings (the cog menu), each in a modal:** Recordings, **Insights**, Speakers (rename, merge), Labels (question editor, stories, relabel), and API keys (replace a key; see [Setup](setup.md)). Each item has a one-line summary; Insights' is the off-topic index, the flag count, and the error count in red when there are errors. Speakers and Labels act on the session on screen, so with none (nothing on air and no recording open) they are greyed out, reading "Start or open a recording", and a URL naming either opens nothing; Labels reads "Off for this session" when the session runs without labels. Its footer shows the version and a **Licenses** link, which opens the Licenses and Acknowledgements page (`/licenses`: a new tab in a browser, its own window in the Mac app). In the Mac app the menu bar can open these windows too (**Settings…** opens API keys), through `window.desktop` (`web/src/desktop.ts`; see [The Mac app](desktop.md#the-bridge-to-the-page--desktoppreloadts-websrcdesktopts)). The Mac app leaves out what its menu bar has: API keys (**Settings…**), the footer (**About** and **Help → Licenses and Acknowledgements**), and the Replay-a-folder button, a developer's tool whose folder is relative to the project (`body.in-app .browser-only`, set in `web/src/main.ts`).
+- **Settings (the cog menu), each in a modal:** Recordings, **Insights**, Speakers (rename, merge), Labels (question editor, stories, relabel), **Transcription** (Apple Speech on this Mac or OpenAI, with the model's state; read-only on air; its summary is "On this Mac" or "OpenAI"; see [Transcription](transcription.md)), and API keys (replace a key, both optional; see [Setup](setup.md)). Each item has a one-line summary; Insights' is the off-topic index, the flag count, and the error count in red when there are errors. Speakers and Labels act on the session on screen, so with none (nothing on air and no recording open) they are greyed out, reading "Start or open a recording", and a URL naming either opens nothing; Labels reads "Off for this session" when the session runs without labels. Its footer shows the version and a **Licenses** link, which opens the Licenses and Acknowledgements page (`/licenses`: a new tab in a browser, its own window in the Mac app). In the Mac app the menu bar can open these windows too (**Settings…** opens API keys), through `window.desktop` (`web/src/desktop.ts`; see [The Mac app](desktop.md#the-bridge-to-the-page--desktoppreloadts-websrcdesktopts)). The Mac app leaves out what its menu bar has: API keys (**Settings…**), the footer (**About** and **Help → Licenses and Acknowledgements**), and the Replay-a-folder button, a developer's tool whose folder is relative to the project (`body.in-app .browser-only`, set in `web/src/main.ts`).
 - **Insights (since 28 September 2026), one window with three tabs:** what the session on screen produced, how the fact-checker did, and what went wrong. They were three windows (Stats, System 1, Log) that repeated each other's fact-check counts. Speakers and Labels stay windows of their own, because they edit rather than report.
   - **Overview:** the Off-topic index, talk time, disagreements, and hype per speaker, and the predictions, recommendations, and clips (each jumps to its segment). Updated every minute and at the end.
   - **Fact-checker:** System 1's active version and memory questions; flags, good flags, false alarms, misses, and repeats; the verdicts, System 2's research (researched, duplicates, dropped), and rewrites promoted and rejected (from the stats); the last promotion or rejection with its gate; rollback. It says so when fact-checking is off. What the Fast · slow thinking tab shows (calls, times, costs) is not repeated.
@@ -177,7 +178,7 @@ A session runs two features beyond its transcript, **fact-checking** (System 1 a
 - **What still works:** capture, transcription and live text, speakers, the timeline's segments and playhead, Pause, Resume, Stop, recordings and playback, and [Chat](chat.md).
 - **Refused commands:** for a feature that is off, the engine answers 409 ("labels are off for this session", "fact-checking is off for this session"). This covers `PUT /api/labels`, `PUT /api/stories`, `POST /api/labels/relabel`, `POST /api/claims/:id/override`, and `POST /api/s1/rollback`.
 - **The page:**
-  - **Start live** opens a window with the microphone and people-on-the-call pickers and two switches, both on each time. It shows an estimated cost per hour: about $1.23 for the transcript alone, $0.04 more for Jev, and up to $0.35 more for fact-checking.
+  - **Start live** opens a window with the microphone and people-on-the-call pickers and two switches, on each time when the OpenRouter key is set and off when it is not (turning one on then asks for the key, in the window; see [Setup](setup.md#asking-for-a-key-where-it-is-needed)). It shows an estimated cost per hour: the transcript is free on this Mac with Apple Speech ("Free: nothing leaves this Mac" with both switches off) and about $1.23 with OpenAI, $0.04 more for Jev, and up to $0.35 more for fact-checking. With Apple Speech, Start waits for the on-device model ("Getting on-device speech recognition ready… 42 %", with Try again on an error).
   - The header chip names what is off.
   - The Fact-check tab, Fast · slow thinking, the Jev log, System 1, and Labels say why they are empty.
   - With labels off, the transcript's marker and subject filters and the timeline's legend give way to "Labels off for this session".
@@ -212,16 +213,16 @@ One ledger per session, plus the development total read from the recordings fold
 
 | File | Holds |
 | --- | --- |
-| `config/app.json` | Server port (`npm run serve` only), budgets, VAD, echo gate (speaker mode), speakers, transcription (final and live), Jev client, segmentation (including `pauseBoundaryMs`, used only without Jev), timeline, System 2, fact-check loop, chat |
+| `config/app.json` | Server port (`npm run serve` only), budgets, VAD, echo gate (speaker mode), speakers, transcription (OpenAI's final and live layers, Apple's clips), Jev client, segmentation (including `pauseBoundaryMs`, used only without Jev), timeline, System 2, fact-check loop, chat |
 | `config/labels.default.json` | The `boundary` question and the host-editable timeline label set |
 | `config/factcheck.s1.default.json` | System 1's default question set and thresholds (`s1@1`) |
 
-The API keys are not in `config/`: they come from the environment (`.env`, in development) or `~/Library/Application Support/Tattle/credentials.json` (see [Setup](setup.md)).
+The API keys are not in `config/`: they come from the environment (`.env`, in development) or `~/Library/Application Support/Tattle/credentials.json` (see [Setup](setup.md)). Neither is the transcription engine, a user setting in `settings.json` next to them (see [Transcription](transcription.md)).
 
 Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a `choice` without criteria or without a `none` / `other…` option, a `score` with fewer than 2 levels, non-snake_case ids, and a System 1 set whose `claim_type` does not have exactly its 7 keys.
 
 ## Tests
 
-`npm test` runs offline: `tests/setup.ts` replaces `fetch` with a function that throws, and every client takes its `fetch` (or WebSocket) through its constructor so tests pass fakes. The suite covers audio and VAD on the fixture, speakers, transcription, live text, the Jev client's retry rules, the segmenter, the fact-checker loop and gate, the timeline, stats, the capture adapter (with a fake helper process), the HTTP API, the library, and an end-to-end session with fake services that also checks no API key reaches any file or event. `npm run smoke` and `npm run preflight` are the live checks.
+`npm test` runs offline: `tests/setup.ts` replaces `fetch` with a function that throws, and every client takes its `fetch` (or WebSocket) through its constructor so tests pass fakes. The suite covers audio and VAD on the fixture, speakers, transcription, live text, the Jev client's retry rules, the segmenter, the fact-checker loop and gate, the timeline, stats, the capture adapter and Apple Speech (each with a fake helper process), the engine setting and the key gate, the HTTP API, the library, and an end-to-end session with fake services that also checks no API key reaches any file or event. `npm run smoke` and `npm run preflight` are the live checks.
 
 Related: [Setup](setup.md), [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md), [Chat](chat.md).

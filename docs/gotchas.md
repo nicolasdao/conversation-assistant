@@ -1,10 +1,11 @@
 ---
-description: Verified traps in this project — macOS capture permissions, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.
-tags: [gotchas, macos, openai, openrouter, jev, sherpa-onnx, electron, website, cloudflare]
+description: Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.
+tags: [gotchas, macos, apple-speech, speechanalyzer, openai, openrouter, jev, sherpa-onnx, electron, website, cloudflare]
 source:
   - native/capture/**
   - src/audio/nativeSource.ts
   - src/transcribe/**
+  - native/transcribe/**
   - src/factcheck/s1.ts
   - src/factcheck/s2.ts
   - scripts/make-fixtures.ts
@@ -26,6 +27,20 @@ source:
 - **A global system-audio tap makes other apps hang when they start a microphone.** With the helper's old global tap (`CATapDescription(monoGlobalTapButExcludeProcesses: [])`) running, another app starting a microphone (ffmpeg in the tests; in real use, recorders reporting the microphone as taken) hung in `AudioDeviceStart` → `HALB_IOThread::StartAndWaitForState`, waiting on coreaudiod, and could ignore SIGTERM. It hung in 28 of 32 attempts on macOS 26.2, on the built-in mic and a USB wireless mic alike. With the helper capturing only the mic it hung in 0 of 3 attempts, so the cause is the tap, not the mic. Aggregate variants did not help: no sub-device, the IO proc on the realtime thread, no drift compensation, a public tap. A tap that lists processes hung in 0 of 20 attempts, so the helper's tap now follows the apps playing sound (see [Architecture](architecture.md#capture--nativecapture-and-srcaudionativesourcets)). Test: `native/capture/.build/release/tattle-capture --no-mic` with stdin kept open, then `ffmpeg -f avfoundation -i ":MacBook Air Microphone" -t 2 -f null -` under `timeout -s KILL 8`.
 - **Speaker mode treats every Bluetooth output as headphones.** Core Audio does not say whether a Bluetooth device is earbuds or a Bluetooth speaker, so a Bluetooth speaker leaves the microphone open, and the call is transcribed twice again. With a Bluetooth speaker, set `echoGate.mode` to `always` in `config/app.json`. Every non-Bluetooth output that is not the headphone jack counts as speakers, so a USB headset mutes the mic while the call plays, which is harmless.
 - **A mic start can block on a permission prompt** instead of failing. The helper warns after 5 s and exits with code 5 after 30 s rather than hanging.
+
+## Apple Speech
+
+Found building on-device transcription on macOS 26.2, 29 September 2026 (see [Transcription](transcription.md)).
+
+- **`finalize(through:)` on a streaming analyzer destroys words.** Finalizing a stream's `SpeechAnalyzer` at each utterance end (the obvious way to get per-line text fast: it returns in 74 ms p50) made its transcript disagree with OpenAI's on 25 % of words, with 17 % deleted and about 22 % of lines empty; the first word after each finalize was usually lost. Finalizing 400 ms later, or calling it 2 s late, did the same. Without finalize the stream disagreed on 9.6 %, but its own final results arrived 3.4 s p50 / 12.6 s p95 after the speaker stopped. Final text therefore comes from one clip per utterance, each in its own short-lived analyzer (9.3 %, 0.3 s p50), and stream analyzers are only for live text.
+- **A word's start time covers the pause before it.** In final results the first word after a silence starts where the previous result ended ("Tell" stamped 1202.04–1203.12 s for speech at 1203.06 s), so the midpoint rule put 3–9 % of words in no line. End times are reliable: compare `endMs − 100 ms`.
+- **Volatile results have no word times.** A volatile result is one run whose `audioTimeRange` covers the whole unsettled range (from the last final to the audio fed so far). It also lags speech by 1–2 s, so a line's last words arrive after the VAD closed it and would open the next line's live text. `LiveText` strips them using the closed line's clip word count.
+- **The model's installation is per app.** `AssetInventory.status` said `supported` for a new binary although another binary had just installed the same en-US model; `--install` for the new one took 1–13 s and asked nothing (it allocates the locale; `reservedLocales` lists it). So the packaged app's helper installs once more at its first launch, which the engine does at boot.
+- **Without a live analyzer, each clip reloads the model.** A clip's p90 was 2.1 s and its max 3.4 s when no other analyzer was running, against 0.7 s and 0.8 s with one idle analyzer started and never fed, which the helper now keeps. `SpeechAnalyzer.Options(modelRetention: .lingering)` or `.processLifetime` instead made a later clip never answer: do not use them.
+- **A clip on stdin waits for a busy engine.** A clip (100–300 KB) is larger than a macOS pipe holds, so Node delivers it over several turns of its event loop. At `--speed max` the session's loop is busy, and 40 clips took 49 s with 50 ms turns and 139 s with 200 ms turns (21 s with 5 ms turns). The engine writes each clip to a private temp file and sends its path (frame kind 3): 16 s either way. Streaming all the audio to the helper for it to cut clips failed worse: the audio arrived faster than the helper read it and every clip queued behind it.
+- **No Speech Recognition permission.** `SpeechAnalyzer` made no Speech Recognition request in the `tccd` log, while other services did. The usage string is declared anyway.
+- **`contextualStrings` does nothing for `SpeechTranscriber`.** Setting `AnalysisContext.contextualStrings[.general] = ["Jev", …]` left the "Jev" count unchanged (16 and 16 over the episode). It is documented for `DictationTranscriber` only.
+- **In zsh, `log` is a builtin.** `log show …` in a zsh shell fails with "too many arguments"; use `/usr/bin/log` to read the `tccd` log.
 
 ## sherpa-onnx
 
