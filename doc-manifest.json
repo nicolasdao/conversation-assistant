@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 250,
+      "line_count": 252,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -78,7 +78,7 @@
         "Configuration — `config/`",
         "Tests"
       ],
-      "line_count": 228,
+      "line_count": 241,
       "links_to": [
         "docs/chat.md",
         "docs/desktop.md",
@@ -101,6 +101,7 @@
         "src/audio/**",
         "src/budget.ts",
         "src/config.ts",
+        "src/labels/store.ts",
         "native/capture/**",
         "web/**"
       ],
@@ -313,14 +314,15 @@
         "Limits and price",
         "Where this project asks Jev",
         "The boundary question (per utterance)",
-        "The timeline questions (per segment)",
+        "The timeline questions (per segment): label sets",
         "The client — `src/jev/client.ts`",
         "Measured performance and cost"
       ],
-      "line_count": 179,
+      "line_count": 199,
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
+        "docs/recordings.md",
         "docs/system1-system2.md",
         "docs/transcription.md"
       ],
@@ -333,7 +335,12 @@
         "src/pipeline/segmenter.ts",
         "src/pipeline/timeline.ts",
         "src/factcheck/gate.ts",
-        "config/labels.default.json",
+        "config/timeline.json",
+        "config/labels/**",
+        "src/labels/model.ts",
+        "src/labels/legacy.ts",
+        "src/labels/try.ts",
+        "src/labels/assist.ts",
         "config/factcheck.s1.default.json"
       ],
       "source_unresolved": [],
@@ -493,7 +500,7 @@
         "Routes and the gate",
         "Command-line tools"
       ],
-      "line_count": 108,
+      "line_count": 109,
       "links_to": [
         "docs/architecture.md",
         "docs/chat.md",

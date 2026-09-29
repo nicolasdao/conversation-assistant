@@ -7,7 +7,12 @@ source:
   - src/pipeline/segmenter.ts
   - src/pipeline/timeline.ts
   - src/factcheck/gate.ts
-  - config/labels.default.json
+  - config/timeline.json
+  - config/labels/**
+  - src/labels/model.ts
+  - src/labels/legacy.ts
+  - src/labels/try.ts
+  - src/labels/assist.ts
   - config/factcheck.s1.default.json
 ---
 
@@ -39,9 +44,9 @@ The response carries `answers` (one per question id), `id`, `model` (the resolve
 
 | Type | Question shape | Answer shape | Used for |
 | --- | --- | --- | --- |
-| `noul` | `{ type, instructions, criteria?: { true, false } }` | `{ type: "noul", noul: p }` — `p` is the probability of yes | Yes/no judgments: `boundary`, `claim`, `hedged`, `disagreement`, memory questions |
-| `choice` | `{ type, instructions, criteria: { label: description } }` | `{ choice, confidence, probabilities }` | Picking one of your labels: `claim_type`, `subject`, `mode`, `story` |
-| `score` | `{ type, instructions, criteria: [levels, lowest first] }` | `{ score, confidence, probabilities, legend }` — `score` is the probability-weighted level index, 0 to n − 1 | Graded judgments: `worth`, `heat`, `hype`, `clip_worthy` |
+| `noul` | `{ type, instructions, criteria?: { true, false } }` | `{ type: "noul", noul: p }` — `p` is the probability of yes | Yes/no judgments: `boundary`, `claim`, `hedged`, memory questions, and a label set's markers (`disagreement`, `clip_worthy`…) |
+| `choice` | `{ type, instructions, criteria: { label: description } }` | `{ choice, confidence, probabilities }` | Picking one of your labels: `claim_type`, a label set's categories (`subject`, `mode`), `story` |
+| `score` | `{ type, instructions, criteria: [levels, lowest first] }` | `{ score, confidence, probabilities, legend }` — `score` is the probability-weighted level index, 0 to n − 1 | Graded judgments: `worth`, and a label set's scores (`heat`, `hype`) |
 
 ### A real exchange from this project
 
@@ -98,10 +103,11 @@ Calibration reported by OpenRouter (Banking77): 96.3% accuracy on the 58% of inp
 | Purpose | When | State | Questions | Settings |
 | --- | --- | --- | --- | --- |
 | `utterance` | Every non-filler utterance, in time order (`src/pipeline/segmenter.ts`); with fact-checking off, `boundary` only; with fact-checking and labels both off, never | `{ current_segment, new_utterance }` | `boundary` + the active System 1 set (`claim`, `claim_type`, `public`, `hedged`, `worth`, 0–3 `attention_*`) + memory questions (0–40 `known_*`) → 6 to 49 questions | Live: 3 s timeout, 2 attempts |
-| `segment` | Each closed segment (`src/pipeline/timeline.ts`); never when labels are off | `{ previous_segment, segment }` | The timeline label set: 10 questions, plus `story` when stories are set | Live: 5 s timeout, 2 attempts; up to 4 in parallel |
-| `relabel` | `POST /api/labels/relabel` | Same as `segment` | The current label set | Background: 30 s timeout, 5 attempts |
+| `segment` | Each closed segment (`src/pipeline/timeline.ts`); never when labels are off | `{ previous_segment, segment }` | The session's label set: one question per label (10 in the built-in set), plus `story` when stories are set | Live: 5 s timeout, 2 attempts; up to 4 in parallel |
+| `relabel` | `POST /api/labels/relabel` | Same as `segment` | The session's label set | Background: 30 s timeout, 5 attempts |
+| `try` | **Try on a recording** (`src/labels/try.ts`): a draft label set, on the segments that start in a recording's first 10 minutes (40 at most) | Same as `segment` (speakers by their current names) | The draft's questions | Background: 30 s timeout, 5 attempts; 4 in parallel |
 | `gate` | Replay gate for a System 1 rewrite (`src/factcheck/gate.ts`) | The logged `utterance` states of graded flags and audit misses (up to 300) | The candidate System 1 set only (no `boundary`, no memory) | Background |
-| `preflight`, `smoke` | Pre-show and development checks | Fixture text | `boundary` + `s1@1`; the label set; a 48-question worst case | Background, or as each check states |
+| `preflight`, `smoke` | Pre-show and development checks | Fixture text | `boundary` + `s1@1`; the built-in label set; a 48-question worst case | Background, or as each check states |
 
 The **state never contains timestamps, ids, costs, or scores** — only display names, text, and tags (`loud`, `overlap`). Each utterance in a state has the shape `{ speaker, text, tags }`; failed transcriptions are left out, fillers are kept. Because display names are resolved when each request is built, renaming a speaker changes what Jev sees from the next request on.
 
@@ -123,25 +129,39 @@ It is a **comparison**, not "is this a complete idea?", because Jev reads questi
 
 A session started with fact-checking and labels both off never asks Jev (see [Architecture](architecture.md#features-transcript-only-sessions)). Its segments close by code alone: at a pause of at least `pauseBoundaryMs` (2 s) once the segment is 12 s long, or forced before 75 s.
 
-The boundary question is part of the label set file but is **not** host-editable live: `PUT /api/labels` returns 409 if it changes, because its threshold is calibrated (`npm run calibrate:boundary`).
+The boundary question lives in `config/timeline.json`, with the wording of the `story` question, and is the same for every label set. It is **locked**: its threshold is calibrated (`npm run calibrate:boundary`), so no set and no command changes it.
 
-### The timeline questions (per segment)
+### The timeline questions (per segment): label sets
 
-`config/labels.default.json` holds the host-editable label set. Every timeline question's instructions get the prefix "Judge only segment; previous_segment is context only." at request time.
+Since 29 September 2026 the timeline's labels come from a **label set** (`src/labels/model.ts`), chosen when a session starts and fixed for its run. A set is data, validated by one zod schema:
 
-| Id | Type | Asks |
+| Part | Limit | Asked as | Shown as |
+| --- | --- | --- | --- |
+| **Categories** | 0–2 | `choice`: each option's `description` is its criterion; 2–255 options, one of them a fallback (`none` or `other…`) | One lane each (options in their `color`); the first also draws the section brackets. `group` puts options together in the filter (the built-in "AI"); an optional `index` turns some options' share of time into Insights' big number |
+| **Scores** | 0–2 | `score` with exactly 5 `levels`, so every score shares the chart's 0–4 axis | One chart line each, coloured by slot (first `--heat`, second `--hype`) |
+| **Markers** | 0–8 | `noul`, with optional `criteria.true` / `false` | A pin with the marker's `icon` (one of the 30 in `web/src/icons.ts`) when Jev's answer reaches its own `threshold`; `perSpeaker` counts it per speaker in Insights, `list` lists it there |
+
+A set also holds `name`, `description`, the `prefix` put before every instruction ("Judge only segment; previous_segment is context only." in the built-in set), `fadedBelowConfidence`, and the `companies` spotted by code. Ids are snake_case and unique across the set; `story` and `boundary` are reserved. At least one label is required.
+
+The built-in set, `config/labels/ai-podcast.json` (read-only, id `ai-podcast`):
+
+| Id | Kind | Asks |
 | --- | --- | --- |
-| `subject` | choice | What the segment is mainly about: `ai_models`, `ai_tools`, `ai_industry`, `tech`, `marketing`, `personal_life`, `other_topics`, `the_show` |
-| `mode` | choice | What the speakers are doing: `news`, `analysis`, `personal_story`, `explainer`, `banter`, `transition`, `other` |
-| `disagreement`, `humour`, `hot_take`, `prediction`, `recommendation` | noul | Whether each happens in the segment |
-| `heat` | score | Calm → Very heated (5 levels) |
-| `hype` | score | Very skeptical → Very enthusiastic (5 levels) |
-| `clip_worthy` | score | Unusable → Must clip (5 levels) |
+| `subject` | category | What the segment is mainly about: `ai_models`, `ai_tools`, `ai_industry` (group AI), `tech`, `marketing`, `personal_life`, `other_topics`, `the_show`. Its index, **Off-topic**, is `personal_life` + `other_topics` |
+| `mode` | category | What the speakers are doing: `news`, `analysis`, `personal_story`, `explainer`, `banter`, `transition`, `other` |
+| `heat`, `hype` | score | Calm → Very heated; Very skeptical → Very enthusiastic |
+| `disagreement` (per speaker), `hot_take`, `prediction` (listed), `recommendation` (listed), `clip_worthy` (listed), `humour` | marker, at 0.7 | Whether each happens in the segment |
 | `story` | choice | Generated only when tonight's stories are set: `s1`…`sN` for the headlines, plus `none` |
 
-Computed in code, not by Jev: a **marker** for any noul answer ≥ 0.7 and for `clip_worthy` ≥ 3; `faded` for any choice with confidence < 0.5; **sections** (consecutive segments with the same non-faded `subject`); company **mentions** (case-insensitive whole-word matches of `timeline.companies`); the `ai` display lane for the three `ai_*` subjects. A failed segment request marks the segment `unlabeled`, and relabel can fill it later. The label set's version is the first 12 hex characters of a SHA-256 over its canonical JSON.
+Its wording is byte for byte the old single set's (`tests/labels.test.ts` checks it against a copy), except `clip_worthy`: it was a score (a marker at 3 or more) and is now a yes/no marker with concrete true/false criteria.
 
-No LLM writes or changes these labels: the host is System 2 for the timeline, because the timeline has no outcome signal to learn from (unlike fact-checks, whose verdicts grade the flags — see [System 1 and System 2](system1-system2.md)).
+Computed in code, not by Jev: a **marker** when its answer reaches the marker's `threshold`; `faded` for any choice with confidence below `fadedBelowConfidence`; **sections** (consecutive segments with the same non-faded option of the first category); company **mentions** (case-insensitive whole-word matches of the set's `companies`); the display `lane` (the first category's option, or its `group`). A failed segment request marks the segment `unlabeled`, and relabel can fill it later. The label set's version is the first 12 hex characters of a SHA-256 over the canonical JSON of the questions it asks (stories included). Recordings made before label sets keep their old set in `session.json`; `src/labels/legacy.ts` converts it for display (see [Recordings](recordings.md#session-folders)).
+
+No LLM changes these labels or a set on its own: the host is System 2 for the timeline, because the timeline has no outcome signal to learn from (unlike fact-checks, whose verdicts grade the flags — see [System 1 and System 2](system1-system2.md)).
+
+**Try on a recording** (`POST /api/label-sets/try`) shows what a draft would draw before a show: it rebuilds the recording's segments from its events, asks Jev the draft's questions about those that start in the first 10 minutes, and returns the draft's labels next to the recording's own. It works on transcript-only recordings too, whose segments were closed at pauses rather than by the boundary question. Nothing is written into the recording's folder; the calls are logged to `label-tries.jsonl` beside the recordings, so the development total counts them. It needs the OpenRouter key and is refused on air (409).
+
+**Create with AI** (`POST /api/label-sets/assist`, `src/labels/assist.ts`) lets an LLM **draft** a set, as the mission allows: the host describes the show, `labelsAssist.model` (GPT-6 Luna, fixed in `config/app.json`, no picker) answers in strict JSON `{ reply, set }`, and the set must pass the same validation as a hand-made one (an invalid set is sent back once with its errors, then dropped with the reply kept). The system prompt carries the three kinds and their limits, the 30 icons, the wording rules above, and the built-in set as an example. Each message also carries the draft on screen, so the host's own edits win. The host reviews, edits, and saves; nothing is saved by the model. A conversation spends at most `labelsAssist.capUsd` ($1); its calls are logged to `label-assist.jsonl` beside the recordings. It needs the OpenRouter key.
 
 ## The client — `src/jev/client.ts`
 
@@ -157,7 +177,7 @@ No LLM writes or changes these labels: the host is System 2 for the timeline, be
 | Any other 402 (credits or key limit exhausted) | Fail, and the budget is marked exhausted (`budget.exhausted` event) |
 
 - **Live purposes** (`utterance`, `segment`) make at most 2 attempts, and the second only immediately after a no-status failure, a 5xx, or a retryable 2xx error body. A 429 or the transient 402 goes straight to the caller's fallback — a live call never waits out a backoff.
-- **Background purposes** (`relabel`, `gate`, `preflight`) make up to 5 attempts with a 30 s timeout, waiting `retry-after` (seconds or an HTTP date) or `min(30 s, 1 s × 2^attempt)`, plus 0–500 ms of jitter.
+- **Background purposes** (`relabel`, `try`, `gate`, `preflight`) make up to 5 attempts with a 30 s timeout, waiting `retry-after` (seconds or an HTTP date) or `min(30 s, 1 s × 2^attempt)`, plus 0–500 ms of jitter.
 - **The pause is shared.** A 429 or transient 402 on any call — live included — sets a pause, and so does every retryable failure of a background call. Every background attempt waits until that pause ends; live calls ignore it.
 - **Concurrency** is shared (`jev.concurrency`, 8); live calls queue ahead of background calls.
 - **Budget:** `assertCanSpend` before every call (a refused call is logged with 0 attempts and never reaches the network) and `record("jev", usage.cost)` after.

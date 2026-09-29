@@ -22,7 +22,7 @@ Everything to check before going on air with Tattle, the lines to plant, and how
 - [ ] Riverside's microphone is set to the **MacBook's built-in mic**, like the capture helper's. If any app opens the AirPods microphone, macOS switches the AirPods to the low-quality call profile.
 - [ ] A **Focus mode** is on and other apps are quiet: the system tap captures every sound the Mac plays, notifications included.
 - [ ] The **spend cap** is set: `budget.sessionCapUsd` in `config/app.json` (default $10; in the Mac app the config is built in, so changing it means building the app again), and a credit limit on the OpenRouter key.
-- [ ] **Tonight's stories** are typed in (cog → Labels → Save stories).
+- [ ] The **label set** is picked and **tonight's stories** are ready to type in Start live (one headline per line). A new set was tried on a recording first (cog → Labels).
 - [ ] **Speakers are renamed** as they first speak (click a name in the transcript, or use cog → Speakers). Merge duplicates there (see [Speakers](speakers.md)).
 - [ ] The **app window is shared** in Riverside (the page is laid out for 1280 × 720).
 - [ ] A **fallback session** was recorded the day before and is named in Recordings.
