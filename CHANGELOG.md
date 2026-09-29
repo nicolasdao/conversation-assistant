@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-29
+
+### Added
+- Transcription on your Mac with Apple Speech (macOS 26 or later): free, and the audio never leaves the Mac. It is the default for new users on macOS 26; the speech model downloads in the background at first launch, with its progress in the Start live window
+- Settings → Transcription (cog menu): choose On this Mac (Apple Speech) or OpenAI, for the next session
+- The website, hey-tattle.com: the download, what the app does, and how Jev and the two systems work
+
+### Changed
+- API keys are optional: on macOS 26 or later a first run asks for none; on older macOS it asks only for an OpenAI key, for transcription
+- The OpenRouter key is asked for when it is needed: turning on fact-checking or labels in Start live, or opening Chat, shows its form in that window. Without it, sessions and replays are transcript-only
+- Already using Tattle with an OpenAI key? You keep OpenAI transcription until you switch in Settings → Transcription
+- Start live shows the transcript as free with Apple Speech, and starts with fact-checking and labels off when no OpenRouter key is set
+
 ## [0.8.0] - 2026-09-28
 
 The first published release since 0.6.2: it also ships everything listed under 0.7.0, which was tagged but never published.
