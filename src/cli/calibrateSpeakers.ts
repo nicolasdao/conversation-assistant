@@ -1,5 +1,6 @@
 // Prints how many speakers each similarity threshold creates on the given WAVs (§4.4). Local only: no API calls.
 import { parseArgs } from "node:util";
+import { pathToFileURL } from "node:url";
 import { loadConfig } from "../config.ts";
 import { FileSource, mergeSources, type AudioSource } from "../audio/source.ts";
 import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
@@ -29,7 +30,7 @@ export async function speakerCounts(host: string | undefined, remote: string | u
   };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { values } = parseArgs({ options: { host: { type: "string" }, remote: { type: "string" }, voices: { type: "string" } } });
   if (!values.host && !values.remote) {
     console.error("usage: npm run calibrate:speakers -- --host <host.wav> --remote <remote.wav>");

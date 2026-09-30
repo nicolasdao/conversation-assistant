@@ -1,6 +1,7 @@
 // Offline: precision, recall, and F1 of the boundary threshold on host-labelled rows (§4.12). No API calls.
 // Input: JSONL rows { utterance_id, speaker, text, boundary_p, human_boundary } from `replay --export`, with human_boundary filled in.
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 export interface BoundaryRow { utterance_id: string; speaker: string; text: string; boundary_p: number; human_boundary: boolean | null }
 export interface ThresholdScore { threshold: number; tp: number; fp: number; fn: number; precision: number; recall: number; f1: number }
@@ -34,7 +35,7 @@ export function best(scores: ThresholdScore[]): ThresholdScore {
   return scores.reduce((a, b) => (b.f1 > a.f1 ? b : a));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = process.argv[2];
   if (!file) {
     console.error("usage: npm run calibrate:boundary -- <labelled.jsonl>");
