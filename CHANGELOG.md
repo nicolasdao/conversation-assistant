@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-30
+
+### Fixed
+- Replaying a recording in the Mac app works again: it stopped at once with "External buffers are not allowed"
+- The right column's tabs (Fact-check, Fast · slow thinking, Jev log) redraw for the recording on screen: an opened recording could show the previous recording's "Jev is off" text, and a page opened on a tab (`?tab=`) did not load (since 0.8.0)
+- A speaker filter with a marker or subject filter shows that speaker's lines in the matching segments, instead of an empty transcript; a speaker filter alone no longer dims every timeline segment
+- The connection dot no longer shows the event stream as lost when the engine reports an error, and after a reconnect each error is listed once in Insights → Log
+- A session name over 120 characters is refused before the session starts, instead of leaving it on air
+- An error without a message shows its status instead of an empty notice
+- Licenses and Acknowledgements: links written as `<https://…>` open the right address
+- `npm run replay` and the calibration tools run from a folder whose path has a space or goes through a symlink
+
+### Security
+- An exported `.tattle` file no longer contains the path of the folder the recording was made in, which named your macOS user account
+
+### Changed
+- hey-tattle.com: a link-preview image, icons, search-engine metadata, a robots.txt and a sitemap
+
 ## [1.0.1] - 2026-09-30
 
 ### Changed
