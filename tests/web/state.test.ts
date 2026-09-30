@@ -434,9 +434,9 @@ describe("applyEvent: System 1, cost, stats, calls, errors", () => {
     expect({ ...s, calls: { ...s.calls, keys: [] } }).toEqual(before);
   });
 
-  // S-state-1: the engine replays a session's whole history on every EventSource (re)connect, and every other update
-  // is idempotent; errors are not, so a reconnect lists every error twice in Insights → Log.
-  test.fails("BUG S-state-1: a replayed error event is not added twice", () => {
+  // The engine replays a session's whole history on every EventSource (re)connect: an error seen before is not added
+  // again (S-state-1: a reconnect listed every error twice in Insights → Log).
+  test("a replayed error event is not added twice", () => {
     const s = withSession();
     apply(s, "error", { component: "jev", message: "timeout" }, "2026-09-30T10:00:00.000Z");
     apply(s, "error", { component: "jev", message: "timeout" }, "2026-09-30T10:00:00.000Z");

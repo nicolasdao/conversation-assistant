@@ -83,8 +83,7 @@ test("the page shows a lost event stream, reconnects by itself, and keeps what i
   await expect(page.locator("#speaker-mode")).toBeHidden();
 });
 
-test("BUG S-state-1: the history replayed after a reconnect does not count an error twice", async ({ page, harness }) => {
-  test.fail(); // `error` events have no id, and the reducer adds them again (web/src/state.ts)
+test("the history replayed after a reconnect does not count an error twice", async ({ page, harness }) => {
   await goLive(page);
   await emit(harness, "error", { component: "jev", message: "one error" });
   await expect(page.locator("#log-count")).toHaveText("1");
@@ -95,19 +94,16 @@ test("BUG S-state-1: the history replayed after a reconnect does not count an er
   await expect(page.locator("#log-count")).toHaveText("1");
 });
 
-// Known bugs, recorded, not fixed (SPEC §4.0.4); `test.fail` passes while a bug is there and fails once it is fixed.
-// E2E-L1 and W7-L2: the engine's `error` event shares its name with EventSource's own connection error
-// (web/src/app.ts, connect()).
-test("BUG E2E-L1: an engine error does not mark the event stream as lost", async ({ page, harness }) => {
-  test.fail();
+// The engine's `error` event shares its name with EventSource's own connection error (web/src/app.ts, connect();
+// E2E-L1 and W7-L2, fixed on 30 September 2026).
+test("an engine error does not mark the event stream as lost", async ({ page, harness }) => {
   await goLive(page);
   await emit(harness, "error", { component: "jev", message: "Jev timed out after 5 s" });
   await expect(page.locator("#log-count")).toHaveText("1");
   await expect(page.locator("#conn")).not.toHaveClass(/down/, { timeout: 2000 });
 });
 
-test("BUG W7-L2: a lost event stream raises no error in the page", async ({ page, harness }) => {
-  test.fail();
+test("a lost event stream raises no error in the page", async ({ page, harness }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await goLive(page);

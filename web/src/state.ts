@@ -371,6 +371,8 @@ export function applyEvent(s: State, type: string, d: any, at: string, dirty: Di
       break;
     }
     case "error":
+      // the history is replayed on every reconnect: an error seen before is not listed again
+      if (s.errors.some((x) => x.at === at && x.component === d.component && x.message === d.message)) break;
       s.errors.unshift({ component: d.component, message: d.message, at });
       s.errors.length = Math.min(s.errors.length, 30);
       dirty.add("errors");

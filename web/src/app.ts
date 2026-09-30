@@ -227,6 +227,8 @@ function connect() {
   let reloading: Promise<void> | null = null;
   es.onmessage = () => {};
   const handle = async (ev: MessageEvent) => {
+    // the engine's `error` events share their name with the EventSource's own error, which carries no data
+    if (typeof ev.data !== "string") return;
     const e = JSON.parse(ev.data);
     // the engine setting and Apple's model are not part of any session
     if (e.type === "transcription.status") { setTranscription(e.data); schedule(); return; }
@@ -246,7 +248,8 @@ function connect() {
     "claim.verdict", "claim.dropped", "claim.disputed", "audit", "s1.version", "s1.memory", "cost", "budget.exhausted", "stats", "error"]) {
     es.addEventListener(t, (ev) => void handle(ev as MessageEvent));
   }
-  es.onerror = () => {
+  es.onerror = (ev) => {
+    if ((ev as MessageEvent).data !== undefined) return; // an engine `error` event, not a dropped connection
     $("#conn")?.classList.add("down");
   };
   es.onopen = () => {

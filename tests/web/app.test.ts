@@ -216,9 +216,28 @@ describe("the event stream", () => {
   });
 
   // app.ts: `JSON.parse(ev.data)` has no guard, so a malformed event is an unhandled rejection in the page (inventory
-  // 4 §14.17). Worse (W7-L2): the page listens for the engine's `error` events with addEventListener("error"), the
-  // name an EventSource uses for a dropped connection, so every drop runs the handler on a plain Event and throws
-  // (JSON.parse(undefined)). Neither can be written as it.fails: the rejection fails the test run. See the report.
+  // 4 §14.17); it cannot be written as it.fails, since the rejection fails the test run.
+
+  // The engine's `error` events share their name with the EventSource's own error for a dropped connection (W7-L2,
+  // E2E-L1): a dropped connection is not an engine error, and an engine error is not a dropped connection.
+  test("a dropped connection is not read as an engine error", async () => {
+    await boot();
+    es.dispatchEvent(new Event("error")); // what the browser dispatches when the connection drops
+    es.onerror!(new Event("error"));
+    await settle();
+    expect(document.getElementById("conn")!.classList.contains("down")).toBe(true);
+    expect(document.getElementById("log-count")!.textContent).toBe("");
+  });
+
+  test("an engine error is not read as a dropped connection", async () => {
+    await boot();
+    const ev = new MessageEvent("error", { data: JSON.stringify({ type: "error", at: T0, data: { component: "jev", message: "timeout" } }) });
+    es.dispatchEvent(ev);
+    es.onerror!(ev); // a browser runs the onerror handler for every event named "error"
+    await settle();
+    expect(document.getElementById("conn")!.classList.contains("down")).toBe(false);
+    expect(document.getElementById("log-count")!.textContent).toBe("1");
+  });
 });
 
 describe("the right column's tabs", () => {
