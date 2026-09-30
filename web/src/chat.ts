@@ -118,8 +118,19 @@ export function bindChat(opts: { onTime: (ms: number) => void }) {
       openChat();
     }
   });
-  void api.chatModels().then((r) => { models = r.models; defaultModel = r.default; draw(); }).catch(() => {});
   draw();
+}
+
+let modelsAsked = false;
+
+/**
+ * The model list (names, context sizes, prices) comes from OpenRouter, so it is asked for only once Chat opens with
+ * the key set: a transcript-only show on this Mac then contacts nothing (see docs/chat.md).
+ */
+function loadModels() {
+  if (modelsAsked) return;
+  modelsAsked = true;
+  void api.chatModels().then((r) => { models = r.models; defaultModel = r.default; draw(); }).catch(() => { modelsAsked = false; });
 }
 
 function autosize() {
@@ -186,6 +197,7 @@ export function chatOpened() {
     void setupStatus().then(() => { if (!needKey()) chatOpened(); });
     return;
   }
+  loadModels();
   // before the chat the URL names has loaded, keep it there
   if (current) setRoute({ chat: current.id });
   requestAnimationFrame(() => { scrollToEnd(true); if (!editing) el.input().focus(); });

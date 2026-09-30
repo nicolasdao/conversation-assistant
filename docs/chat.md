@@ -50,7 +50,7 @@ Nothing is created, sent, or spent until the first question of a new chat. Openi
 | `effort` | `low` | `reasoning.effort`, so replies start quickly; models without reasoning ignore it |
 | `timeoutMs`, `maxAttempts` | `120000`, `2` | A failure before the first word is retried once; a reply already streaming is never retried |
 
-Each model's facts come from OpenRouter's catalogue (`GET https://openrouter.ai/api/v1/models`), read by the engine and kept for an hour (a failed read is retried after a minute):
+Each model's facts come from OpenRouter's catalogue (`GET https://openrouter.ai/api/v1/models`), read by the engine and kept for an hour (a failed read is retried after a minute). The page asks for them only when Chat opens with the OpenRouter key set, or when its model picker opens: before 1.0.1 it asked at every launch, so even a transcript-only show on Apple Speech reached openrouter.ai once. Offline, the list shows without its facts:
 
 - the context window (`context_length`);
 - the input, output, and cached-input price per million tokens (`pricing.*` × 10⁶);
