@@ -14,9 +14,9 @@ export default defineConfig({
       // Per-folder floors (docs/testing.md § Coverage policy). They only go up: raise them to the new floor after each
       // round of tests, never lower them to get a green run.
       thresholds: {
-        "src/**": { lines: 86, statements: 83, functions: 83, branches: 72 },
-        "web/src/**": { lines: 1, statements: 0, functions: 0, branches: 1 },
-        "desktop/**": { lines: 0, statements: 0, functions: 0, branches: 0 },
+        "src/**": { lines: 93, statements: 91, functions: 91, branches: 86 },
+        "web/src/**": { lines: 100, statements: 99, functions: 98, branches: 97 },
+        "desktop/**": { lines: 100, statements: 100, functions: 100, branches: 100 },
       },
     },
   },
