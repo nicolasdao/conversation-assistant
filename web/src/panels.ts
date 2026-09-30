@@ -587,8 +587,7 @@ export function segmentMatches(g: Segment): boolean {
     const picked = l?.choices[catId]?.choice;
     if (!picked || !filterOptions(filterSet, catId, value).has(picked)) return false;
   }
-  if (filters.speaker) return false; // speaker filtering is per utterance; segments dim only on label filters
-  return true;
+  return true; // speaker filtering is per utterance; segments dim only on label filters
 }
 
 /**
