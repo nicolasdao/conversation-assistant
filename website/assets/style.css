@@ -448,7 +448,12 @@ main { position: relative; z-index: 1; }
 .credit-name a { color: var(--ink); text-decoration: none; }
 .credit-name a:hover { color: var(--accent); }
 .credit p:not(.credit-role) { margin: 0; color: var(--ink-2); font-size: 16.5px; line-height: 1.6; max-width: 34em; }
-.credit .lnk { margin-top: 4px; }
+.credit .lnk, .credit .links { margin-top: 4px; }
+/* the podcast Tattle was first demoed on: the full width, lit like a show on air */
+.credit-show { grid-column: 1 / -1; border-left-color: var(--live); background: linear-gradient(100deg, rgba(232, 38, 59, 0.14), var(--deck) 55%); }
+.credit-live { display: inline-flex; align-items: center; gap: 7px; margin-right: 12px; padding: 5px 12px 5px 9px; background: var(--live); color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+.credit-live i { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
 
 /* ---------- fine print ---------- */
 .fine { border-top: 1px solid var(--rule); background: var(--deck); }

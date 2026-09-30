@@ -44,7 +44,7 @@ The page was chosen from experiment `02-record-button`. Its sections, top to bot
 4. **Fast and slow** (`#systems`): System 1 and System 2, with a live stream of lines and the two systems' costs. See [System 1 and System 2](system1-system2.md).
 5. **Your labels** (`#labels`, since 29 September 2026): label sets — the three kinds of label (up to 2 categories, 2 scores, 8 markers) with small drawn examples, Create with AI's interview ("An interview, not a blank page", with a static example of one turn and the checklist, labelled as an example), Try on a recording, sharing `.tattle-labels` files, and the copy each recording keeps. See [Jev](jev.md#the-timeline-questions-per-segment-label-sets).
 6. **Before you go live**: the keys, the cost, privacy, signing.
-7. **Credits** (`#credits`): who made Tattle, [Nicolas Dao](https://nicolasdao.com) at [Cloudless Labs](https://cloudlesslabs.com). The JSON-LD names them as `author` and `publisher`, and the head carries `<link rel="author">`.
+7. **Credits** (`#credits`): who made Tattle, [Nicolas Dao](https://nicolasdao.com) at [Cloudless Labs](https://cloudlesslabs.com), with his [YouTube channel](https://www.youtube.com/@nicolasdao) and [X](https://x.com/realnicdao) (`rel="me"`), and a full-width card for [MadKoo](https://www.youtube.com/@theMadKoo), the podcast where Tattle was first demoed. The footer's "Made by" line links the same three. The JSON-LD names them as `author` (with both profiles in `sameAs`) and `publisher`, and the head carries `<link rel="author">`.
 8. **Fine print**: made by, license, consent, trademarks, and the latest release line.
 
 Every figure on the page comes from the docs (`jev.md`, `system1-system2.md`, `mission.md`, `transcription.md`, `setup.md`). How well Create with AI's model writes Jev's questions has not been measured, so the page makes no claim about it. Change the page's claims only from there. Since v0.9.0 the cue card says what is true on macOS 26 or later (no key, free transcripts, audio kept on the Mac) and names the older-macOS case (an OpenAI key, about $1.23 an hour); it must not drop that qualifier, because Tattle still supports macOS 14.2.
@@ -61,7 +61,7 @@ What search engines and link previews (X, LinkedIn, Slack, iMessage, WhatsApp, D
 | Description | About 155 characters (at most 160), with no macOS 26 claim: "free" there means the app, which is true everywhere |
 | Canonical | `https://hey-tattle.com/` (`/index.html` answers 307 to it, `www` 301) |
 | Open Graph | `og:type`, `og:site_name`, `og:url`, `og:title`, `og:description`, and `og:image` with its type, width, height, and alt text |
-| X | `twitter:card` `summary_large_image`, and `twitter:image` and `twitter:image:alt` (the same as Open Graph's); title and description fall back to Open Graph's |
+| X | `twitter:card` `summary_large_image`, `twitter:site` and `twitter:creator` `@realnicdao`, and `twitter:image` and `twitter:image:alt` (the same as Open Graph's); title and description fall back to Open Graph's |
 | Icons | `/favicon.ico` (16, 32, 48), `/favicon.svg`, `/apple-touch-icon.png` (180, full-bleed, because iOS rounds it and turns transparency black). Google does not show a `data:` favicon in results, which the page used before |
 | Headings | One `<h1>`, the hero's lede, so it carries what the app does |
 | JSON-LD | An `@graph` of `WebSite` (the site name Google shows), `SoftwareApplication` (with `url`, `image`, `isAccessibleForFree`, `featureList`, and the repository in `sameAs`), and the publisher `Organization`, Cloudless Labs. There are no ratings, so Google shows no software rich result; never invent any |
@@ -80,7 +80,7 @@ node scripts/make-site-images.mjs --capture-key         # the 3D key again, from
 
 **Changing the image:** platforms cache it by its address for days or weeks, so a new image needs a new file name (or a `?v=` query) in `og:image`, `twitter:image`, and the JSON-LD `image`. Keep it under 300 KB (the test checks it): WhatsApp is reported to skip larger preview images. X, LinkedIn (Post Inspector), and Facebook (Sharing Debugger) each have a tool that fetches the page again.
 
-**Cloudflare's robots.txt.** Before `website/robots.txt` existed, `/robots.txt` answered with Cloudflare's managed content-signals text: comments only, with no rules and no sitemap. After the first deploy, check whether Cloudflare serves ours, adds its own text before it, or replaces it (the zone's managed robots.txt setting): `curl https://hey-tattle.com/robots.txt` must still end with our `Sitemap:` line.
+**Cloudflare's robots.txt.** Before `website/robots.txt` existed, `/robots.txt` answered with Cloudflare's managed content-signals text (comments only, no rules, no sitemap). Since the first deploy with our file (30 September 2026, with v1.0.2), Cloudflare serves ours exactly as written.
 
 **Outside the repository:** verify the site in Google Search Console and Bing Webmaster Tools (a DNS TXT record, through the `cloudflare-config` skill) and submit `https://hey-tattle.com/sitemap.xml`. The GitHub repository's social preview (Settings → Social preview, 1280×640) is a separate upload.
 

@@ -134,6 +134,40 @@ describe("structured data", () => {
   });
 });
 
+describe("who made it", () => {
+  const YOUTUBE = "https://www.youtube.com/@nicolasdao";
+  const X = "https://x.com/realnicdao";
+  const PODCAST = "https://www.youtube.com/@theMadKoo";
+  const section = (id: string) => page.match(new RegExp(`<section[^>]*id="${id}"[\\s\\S]*?</section>`))![0];
+  const anchors = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]*)"[^>]*>/g)].map((m) => ({ href: m[1]!, tag: m[0] }));
+
+  it("the credits link Nicolas's YouTube channel and X, and the podcast Tattle was first demoed on, each in a new tab", () => {
+    const links = anchors(section("credits"));
+    for (const url of [YOUTUBE, X, PODCAST]) {
+      const link = links.find((l) => l.href === url);
+      expect(link, url).toBeDefined();
+      expect(link!.tag).toContain('target="_blank"');
+      expect(link!.tag).toMatch(/rel="[^"]*\bnoopener\b/);
+    }
+    expect(section("credits")).toMatch(/first demoed/i);
+    // his own profiles say they are his (rel="me"); the podcast is a show, not a profile of his
+    for (const url of [YOUTUBE, X]) expect(links.find((l) => l.href === url)!.tag).toMatch(/rel="[^"]*\bme\b/);
+  });
+
+  it("the footer names them too", () => {
+    const footer = page.match(/<footer[\s\S]*?<\/footer>/)![0];
+    const hrefs = anchors(footer).map((l) => l.href);
+    expect(hrefs).toEqual(expect.arrayContaining([YOUTUBE, X, PODCAST]));
+  });
+
+  it("X cards credit @realnicdao, and the structured data ties both profiles to the author", () => {
+    expect(meta("name", "twitter:site")).toBe("@realnicdao");
+    expect(meta("name", "twitter:creator")).toBe("@realnicdao");
+    const app = jsonLd().find((n) => n["@type"] === "SoftwareApplication")!;
+    expect(app.author.sameAs).toEqual(expect.arrayContaining([YOUTUBE, X]));
+  });
+});
+
 describe("what a change to the page must not break", () => {
   it("the release's update-website.sh still finds each field it rewrites, as many times as it expects", () => {
     const script = read(".agents/skills/release-tattle/scripts/update-website.sh");
