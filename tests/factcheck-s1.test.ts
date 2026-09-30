@@ -501,6 +501,21 @@ describe("FactChecker: rewrites and the gate", () => {
     expect(h.rows.filter((r) => r.file === "s1_versions").at(-1)!.row).toMatchObject({ id: "s1@2", status: "rejected", errors: ["jev_calls.jsonl unreadable"] });
   });
 
+  it("no second rewrite starts while one is running, even when more evidence arrives", async () => {
+    const gate = deferred<RewriteProposal>();
+    const { s2, calls } = fakeS2({ verdict: FALSE_ALARM, rewrite: () => gate.promise });
+    const h = checker({ s2, app: rwApp() });
+    opinions(h, 3);
+    await settle(); await settle();
+    expect(calls.rewrite).toHaveLength(1);
+    opinions(h, 2, 4); // two more false alarms while the rewrite waits
+    await settle(); await settle();
+    expect(calls.rewrite).toHaveLength(1);
+    gate.resolve(proposal());
+    await h.fc.drain();
+    expect(h.of("s1.version").map((e) => e.data.outcome)).toEqual(["invalid"]);
+  });
+
   it("gate_failed reports a non-Error throw as its string", async () => {
     const { s2 } = fakeS2({ verdict: FALSE_ALARM, rewrite: valid });
     const h = checker({ s2, app: rwApp(), stateOf: () => { throw "no state"; } });
