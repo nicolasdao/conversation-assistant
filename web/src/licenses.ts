@@ -12,7 +12,7 @@ const FOLD_OVER = 60_000;
 
 /** Bare URLs become links (the renderer links only [text](url)); code blocks and trailing punctuation are left alone. */
 function linkify(md: string): string {
-  return md.split(/(```[\s\S]*?```)/).map((part, i) => (i % 2 ? part : part.replace(/(?<!\]\()\bhttps?:\/\/[^\s)`]+/g, (u) => {
+  return md.split(/(```[\s\S]*?```)/).map((part, i) => (i % 2 ? part : part.replace(/(?<!\]\()\bhttps?:\/\/[^\s)`>]+/g, (u) => {
     const url = u.replace(/[.,;:]+$/, "");
     return `[${url}](${url})${u.slice(url.length)}`;
   }))).join("");
