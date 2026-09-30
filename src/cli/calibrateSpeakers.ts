@@ -30,17 +30,22 @@ export async function speakerCounts(host: string | undefined, remote: string | u
   };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { values } = parseArgs({ options: { host: { type: "string" }, remote: { type: "string" }, voices: { type: "string" } } });
+/** The command: `argv` is what follows the script's path; `deps` lets tests capture the output and the exit. */
+export async function run(argv = process.argv.slice(2), deps: { stdout?: (text: string) => void; exit?: (code: number) => void } = {}) {
+  const log = (line: string) => (deps.stdout ?? ((t: string) => { process.stdout.write(t); }))(`${line}\n`);
+  const exit = deps.exit ?? ((code: number) => process.exit(code));
+  const { values } = parseArgs({ args: argv, options: { host: { type: "string" }, remote: { type: "string" }, voices: { type: "string" } } });
   if (!values.host && !values.remote) {
     console.error("usage: npm run calibrate:speakers -- --host <host.wav> --remote <remote.wav>");
-    process.exit(1);
+    return exit(1);
   }
   const thresholds = Array.from({ length: 9 }, (_, i) => Math.round((0.35 + i * 0.05) * 100) / 100);
   // --voices <n>: the people on the call (the host's mic always carries one), as the app uses them live
   const limits: VoiceLimits = values.voices !== undefined ? { host: 1, remote: Number(values.voices) } : {};
   const { utterances, rows } = await speakerCounts(values.host, values.remote, thresholds, limits);
-  console.log(`${utterances} utterances${values.voices !== undefined ? `, at most 1 voice on the host mic and ${values.voices} on the call` : ", no limit on voices per stream"}`);
-  console.log("threshold  speakers");
-  for (const r of rows) console.log(`${r.threshold.toFixed(2).padStart(9)}  ${r.speakers}`);
+  log(`${utterances} utterances${values.voices !== undefined ? `, at most 1 voice on the host mic and ${values.voices} on the call` : ", no limit on voices per stream"}`);
+  log("threshold  speakers");
+  for (const r of rows) log(`${r.threshold.toFixed(2).padStart(9)}  ${r.speakers}`);
 }
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await run();

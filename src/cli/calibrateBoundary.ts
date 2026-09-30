@@ -35,24 +35,29 @@ export function best(scores: ThresholdScore[]): ThresholdScore {
   return scores.reduce((a, b) => (b.f1 > a.f1 ? b : a));
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const file = process.argv[2];
+/** The command: `argv` is what follows the script's path; `deps` lets tests capture the output and the exit. */
+export async function run(argv = process.argv.slice(2), deps: { stdout?: (text: string) => void; exit?: (code: number) => void } = {}) {
+  const log = (line: string) => (deps.stdout ?? ((t: string) => { process.stdout.write(t); }))(`${line}\n`);
+  const exit = deps.exit ?? ((code: number) => process.exit(code));
+  const file = argv[0];
   if (!file) {
     console.error("usage: npm run calibrate:boundary -- <labelled.jsonl>");
-    process.exit(1);
+    return exit(1);
   }
   const rows = parseRows(readFileSync(file, "utf8"));
   const labelled = rows.filter((r) => typeof r.human_boundary === "boolean").length;
   if (labelled === 0) {
     console.error("no row has human_boundary set to true or false");
-    process.exit(1);
+    return exit(1);
   }
   const scores = scoreThresholds(rows);
-  console.log(`${labelled} labelled rows (${rows.length - labelled} unlabelled skipped)`);
-  console.log("threshold  precision  recall   F1");
+  log(`${labelled} labelled rows (${rows.length - labelled} unlabelled skipped)`);
+  log("threshold  precision  recall   F1");
   for (const s of scores) {
-    console.log(`${s.threshold.toFixed(1).padStart(9)}  ${s.precision.toFixed(3).padStart(9)}  ${s.recall.toFixed(3).padStart(6)}  ${s.f1.toFixed(3)}`);
+    log(`${s.threshold.toFixed(1).padStart(9)}  ${s.precision.toFixed(3).padStart(9)}  ${s.recall.toFixed(3).padStart(6)}  ${s.f1.toFixed(3)}`);
   }
   const b = best(scores);
-  console.log(`best threshold: ${b.threshold.toFixed(1)} (F1 ${b.f1.toFixed(3)}); set segmentation.boundaryThreshold in config/app.json`);
+  log(`best threshold: ${b.threshold.toFixed(1)} (F1 ${b.f1.toFixed(3)}); set segmentation.boundaryThreshold in config/app.json`);
 }
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await run();
