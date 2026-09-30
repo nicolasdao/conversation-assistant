@@ -241,7 +241,7 @@
     },
     {
       "dangling": false,
-      "description": "Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.",
+      "description": "Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, testing (fake timers, real user data, happy-dom, end-to-end isolation), and test-fixture voices — each with its fix.",
       "has_frontmatter": true,
       "headings": [
         "Gotchas",
@@ -256,13 +256,15 @@
         "Mac app (Electron)",
         "Website and Cloudflare",
         "Jev questions",
+        "Testing",
         "Test fixture"
       ],
-      "line_count": 112,
+      "line_count": 127,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
         "docs/recordings.md",
+        "docs/testing.md",
         "docs/transcription.md",
         "docs/website.md"
       ],
@@ -295,7 +297,8 @@
         "sherpa-onnx",
         "electron",
         "website",
-        "cloudflare"
+        "cloudflare",
+        "testing"
       ],
       "toc": {
         "linked": false,

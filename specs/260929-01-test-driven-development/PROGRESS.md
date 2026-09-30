@@ -17,7 +17,7 @@ The running log for `SPEC.md`. Updated after every phase.
 - [x] Phase 10 — E2E Electron
 - [x] Phase 11 — Swift tests for the capture helper (2026-09-30, done while Phases 3–8 ran in parallel worktrees)
 - [x] Phase 12 — The suite becomes Step 1 of every release
-- [ ] Phase 13 — Close out
+- [x] Phase 13 — Close out
 
 ## Coverage
 
@@ -103,6 +103,25 @@ Every folder is above its §3 target. Thresholds raised: src 99/99/99/97. Files 
 runs only as a child process); `src/server/main.ts` ~96 % (`main()`, the `npm run serve` body, runs only as a child
 process, and S2 does not cover it; the `BudgetExhaustedError` catches in `assist`/`tryOn` and some `??` fallbacks are
 unreachable).
+
+### Final (Phase 13, `npm run test:all` via `test-suite.sh`, exit 0 in 192 s)
+
+| Layer | Result |
+|---|---|
+| Vitest | 74 files, 2,212 tests: 2,157 pass, 55 expected fails (`it.fails`, each a ledger row) |
+| Swift | 25 tests in 5 suites; ClockLock.swift 98.8 % lines (gate 90 %) |
+| Playwright, web | 23 scenarios (3 of them `test.fail` bugs); 69/69 over `--repeat-each=3` |
+| Playwright, Mac app | 15 scenarios (1 `test.fail` bug); 45/45 over `--repeat-each=3`, beside the installed Tattle |
+
+| Folder | lines | statements | functions | branches | §3 target |
+|---|---|---|---|---|---|
+| `src/**` | 99.45 | 99.22 | 99.18 | 97.31 | 95 / 95 / 95 / 90 |
+| `web/src/**` | 100.00 | 99.53 | 98.95 | 97.42 | 90 / 90 / 90 / 85 |
+| `desktop/**` | 100.00 | 100.00 | 100.00 | 100.00 | 90 / 90 / 90 / 85 |
+
+Thresholds in `vitest.config.ts`: src 99/99/99/97, web/src 100/99/98/97, desktop 100/100/100/100.
+
+**Exclusions:** none. `grep -rn "v8 ignore" src desktop web/src` finds nothing.
 
 ## Bug ledger
 
@@ -301,6 +320,42 @@ Phase 12 (2026-09-30):
   `test-suite.sh` first in "Without Claude Code"), `docs/website.md` (Step 12), `docs/testing.md` § Release gate.
   `checks.sh` is unchanged. The release itself was not run.
 
+Phase 13 (2026-09-30):
+
+- Every §3 box is checked: `npm run test:all` exits 0; the per-folder coverage is above target and enforced; no
+  exclusion; `swift test` passes with ClockLock at 98.8 %; 23 web and 15 Mac app scenarios; `CLAUDE.md`,
+  `docs/testing.md` (frontmatter, README index, manifest); release Step 1, `skill.json` 0.6.0, README; the notices
+  check passes; conventional commits, nothing pushed.
+- Docs were brought up to date by hand rather than through the `/update-doc` skill, with the items the spec lists:
+  `docs/testing.md` (final), `docs/gotchas.md` § Testing (the six traps the spec names, plus the network-through-a-
+  global, the Electron-only `readWave`, `pathToFileURL(undefined)` and the untracked `tests/fixtures/`), its
+  description and tags, `docs/architecture.md` § Tests, the README doc index and scripts, and `doc-manifest.json`
+  regenerated with `build-doc-manifest.py`.
+
+## Suggested follow-ups (for the user to decide)
+
+By severity:
+
+1. **E2E-L5, the Mac app cannot replay a recording** (`src/audio/wav.ts:41`: `sherpa.readWave(path)` → `readWave(path, false)`).
+   Every replay in the Mac app (Recordings → Replay) fails as it opens the audio. The fix is one argument, and the
+   `test.fail` in `e2e/electron/app.spec.ts` turns red when it lands. A candidate for the next patch release.
+2. **§11.5, privacy:** a `.tattle` export carries the exporter's home path in `events.jsonl`.
+3. **`tests/fixtures/` is not in git** (the `.gitignore` rule `fixtures/` matches it): a fresh clone fails three test
+   files. Add `!tests/fixtures/` after checking the two JSON files hold nothing private.
+4. **The web page's event stream** (`web/src/app.ts`): the engine's `error` event collides with EventSource's own
+   (W7-L2: a throw on every dropped connection; E2E-L1: every engine error marks the stream lost), and a reconnect
+   lists every error twice (S-state-1).
+5. **Engine robustness** (session, capture, transcription): P4-L1…L4, A2-L2…L6, AP-L1 (a line queued while the Apple
+   helper cannot start never settles, so `Session.finish` would wait forever), P2-L1, §11.2, §11.4.
+6. **B3 with a symlinked path:** S3's `pathToFileURL` guard still does nothing when the tool is started through a
+   symlink (Node resolves the module's symlinks but not `argv[1]`). A `realpathSync` in the guard would fix it; S3 did
+   not allow it.
+7. **Chat and label-set window bugs** (§14.4–§14.20, W7-L1, LBW-L1…L4, P6-L2, PLY-L1, PAN-L1, LIC-L1…L3), and the
+   behaviours pinned in Phase 4 for a decision (the gate's rounding at G = 1, the missing `s2_calls` row on a budget
+   refusal, deleting a chat mid-reply, Create with AI's 402, a negative `retry-after`).
+8. **Tests still out of scope:** the website (`website/`), the release scripts, `scripts/**`, and the Apple Speech
+   Swift helper (`native/transcribe`).
+
 ## Resume notes
 
-Next: Phase 13 (close out).
+The spec is complete. Nothing is pushed: every commit is local on `master`.

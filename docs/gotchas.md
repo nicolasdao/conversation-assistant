@@ -1,6 +1,6 @@
 ---
-description: Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, and test-fixture voices — each with its fix.
-tags: [gotchas, macos, apple-speech, speechanalyzer, openai, openrouter, jev, sherpa-onnx, electron, website, cloudflare]
+description: Verified traps in this project — macOS capture permissions, Apple Speech (SpeechAnalyzer) on-device transcription, sherpa-onnx, OpenAI and OpenRouter behaviour, the Electron Mac app, the website on Cloudflare, Jev question wording, testing (fake timers, real user data, happy-dom, end-to-end isolation), and test-fixture voices — each with its fix.
+tags: [gotchas, macos, apple-speech, speechanalyzer, openai, openrouter, jev, sherpa-onnx, electron, website, cloudflare, testing]
 source:
   - native/capture/**
   - src/audio/nativeSource.ts
@@ -105,6 +105,21 @@ Found building on-device transcription on macOS 26.2, 29 September 2026 (see [Tr
 
 - **A memory question needs concrete criteria or it cannot recognise a repeat.** Worded only as "new_utterance restates or relies on this already-checked claim", a verbatim repeat scored 0.55 and a mere reaction to the claim 0.50. With the "Judge only new_utterance." opener and true/false criteria, repeats score 0.73–0.87 and non-repeats ≤ 0.06, hence `factcheck.knownMatchThreshold` 0.6.
 - **Jev's `worth` score can sit on the threshold**: "Jev can never hallucinate" scored 1.94–2.01 across runs, so `s1@1` uses `worthMin` 1.5 rather than 2, or the claim is flagged only some of the time.
+
+## Testing
+
+Confirmed while making the project test-driven, 30 September 2026 (see [Testing](testing.md)).
+
+- **Never fake `setImmediate` around a Session or `recordedVoiceprints`.** Both wait on it, so `vi.useFakeTimers()` with its defaults deadlocks them. List what to fake (`vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] })`), and for Jev's pauses and the chat catalogue's cache fake only `Date`.
+- **Several functions read the real user's files when given no path.** `new KeyStore()` without `path` and `env`, `loadKeys()`, `credentialsPath()`, `appSupportDir()` and `migrateAppSupportDir()` without `base` touch `~/Library/Application Support/Tattle` (real keys and recordings), and `appPaths().sessions` defaults to the repository's `sessions/`. A test passes tmp paths every time; `tests/setup.ts` already points `TATTLE_LABEL_SETS` at a tmp folder.
+- **A test can reach the network through a global it never names.** A live session built through `Engine` without a `liveConnect` opened a real WebSocket to OpenAI's realtime endpoint on every run (refused, since no key was set). `tests/setup.ts` now makes the global `WebSocket` throw, like `fetch`.
+- **happy-dom 20 lacks the Popover API, `EventSource` and `AudioContext`**, and `:popover-open` parses but is never true. `installBrowserStubs()` in `tests/web/helpers.ts` adds them; `tests/web/probe.test.ts` fails when happy-dom changes. It also fires a dialog's `close` event synchronously (a browser fires it later), has no `Option` constructor, and a select's value ignores the `selected` attribute.
+- **`AVAudioConverter` holds about 240 samples.** The first 4,800-sample buffer at 48 kHz converts to about 1,360 samples, not 1,600, so a Swift test of the converters asserts cumulative totals with a tolerance of 300 or more, never per call.
+- **The Mac app's end-to-end tests need an isolated `HOME`.** Without it, the development app shares the installed Tattle's Application Support folder, window storage and single-instance lock (a second instance quits at once). They also run from a tmp folder with symlinks, because in development `web`, `config`, `models` and `sessions` are relative to the working folder, and set `TATTLE_FORCE_NO_APPLE_SPEECH=1` so the on-device helper never starts.
+- **`networkidle` never comes.** `/api/events` stays open, so Playwright waits with `waitUntil: "domcontentloaded"` and web-first assertions. The page's shell also shows before `app.js` has bound its controls (the `booting` class goes first, in `web/src/main.ts`), so `open()` waits for the app's first render: a click in that gap does nothing.
+- **An Electron-only failure is invisible to the Node tests.** `sherpa.readWave(path)` throws "External buffers are not allowed" in Electron, like the calls in § Mac app (Electron); `src/audio/wav.ts` still calls it without `false`, so a replay in the Mac app fails (E2E-L5, recorded, not fixed yet). The Electron end-to-end tests run sherpa-onnx in the app's main process for this reason.
+- **`pathToFileURL(undefined)` throws.** A packaged app started from Finder has no `process.argv[1]`, and `src/server/main.ts` is bundled into it, so an entry guard must check that the path exists before comparing URLs, or the app does not start.
+- **`tests/fixtures/` is not in git.** The `.gitignore` rule `fixtures/` (for the recorded fixture audio) also matches it, so `labels.default.legacy.json` and `legacy-session.json` exist only in this checkout, and a fresh clone or worktree fails three test files until they are copied or linked in.
 
 ## Test fixture
 
