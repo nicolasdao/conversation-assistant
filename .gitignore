@@ -15,6 +15,8 @@
 # ------------------------------------------------------------
 sessions/
 fixtures/
+# ...but not the tests' own small JSON fixtures (label-set and session definitions, no audio or transcript)
+!tests/fixtures/
 data/
 models/
 *.onnx
