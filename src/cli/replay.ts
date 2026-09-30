@@ -1,6 +1,5 @@
 // npm run replay -- --host <wav> --remote <wav> --speed max|1 [--engine apple|openai] [--no-factcheck] [--no-labels]
 //                    [--export <file>]
-import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { loadConfig } from "../config.ts";
 import { FileSource, type AudioSource } from "../audio/source.ts";
@@ -10,6 +9,7 @@ import { loadKeys } from "../keys.ts";
 import { resolveEngine, SettingsStore } from "../settings.ts";
 import { appleSpeechStatus, installAppleModel } from "../transcribe/apple.ts";
 import type { TranscriptionEngine } from "../pipeline/session.ts";
+import { isMain } from "../entry.ts";
 
 /**
  * The command: `argv` is what follows the script's path. `deps` lets tests replay offline: the services' fetch, the
@@ -105,4 +105,4 @@ export async function run(
   exit(0);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await run();
+if (isMain(import.meta.url)) await run();

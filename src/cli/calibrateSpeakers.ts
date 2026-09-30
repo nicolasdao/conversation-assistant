@@ -1,11 +1,11 @@
 // Prints how many speakers each similarity threshold creates on the given WAVs (§4.4). Local only: no API calls.
 import { parseArgs } from "node:util";
-import { pathToFileURL } from "node:url";
 import { loadConfig } from "../config.ts";
 import { FileSource, mergeSources, type AudioSource } from "../audio/source.ts";
 import { StreamVad, UtteranceIds, type Utterance } from "../audio/vad.ts";
 import { SAMPLE_RATE } from "../audio/wav.ts";
 import { Embedder, SpeakerRegistry, type VoiceLimits } from "../speakers/registry.ts";
+import { isMain } from "../entry.ts";
 
 /** `limits` caps the voices per stream (the default is no cap, so the count shows what the threshold alone does). */
 export async function speakerCounts(host: string | undefined, remote: string | undefined, thresholds: number[], limits: VoiceLimits = {}) {
@@ -48,4 +48,4 @@ export async function run(argv = process.argv.slice(2), deps: { stdout?: (text: 
   for (const r of rows) log(`${r.threshold.toFixed(2).padStart(9)}  ${r.speakers}`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await run();
+if (isMain(import.meta.url)) await run();

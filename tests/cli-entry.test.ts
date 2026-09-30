@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
@@ -53,6 +54,21 @@ describe("the command-line tools run from a path with spaces", () => {
   });
 });
 
+describe("the command-line tools run through a symlinked path", () => {
+  // Node runs a module under its real path, so a guard comparing it with the symlinked path it was started from never
+  // matched, and the tool silently did nothing (the rest of bug B3)
+  test("calibrate:boundary started through a symlink prints its usage and exits 1", () => {
+    const link = join(tmp, "linked tattle");
+    if (!existsSync(link)) symlinkSync(base, link);
+    const env: NodeJS.ProcessEnv = { ...process.env, HOME: tmp };
+    delete env.OPENAI_API_KEY;
+    delete env.OPENROUTER_API_KEY;
+    const r = spawnSync(process.execPath, ["--import", "tsx", join(link, "src/cli/calibrateBoundary.ts")], { cwd: ROOT, env, encoding: "utf8", timeout: 110_000 });
+    expect(r.stderr).toContain("usage: npm run calibrate:boundary");
+    expect(r.status).toBe(1);
+  });
+});
+
 describe("npm run serve, as a child process with an isolated home and no keys", () => {
   test("says what is missing, refuses a replay without the keys, stays up, and exits 0 on SIGTERM", async () => {
     // its own working folder: the config it reads, and a recordings folder that is not the repository's
@@ -98,4 +114,13 @@ describe("the entry guards with no script path (the packaged Mac app)", () => {
       }
     });
   }
+});
+
+describe("isMain", () => {
+  test("is false with no script path, and for a path that does not exist", async () => {
+    const { isMain } = await import("../src/entry.ts");
+    expect(isMain(import.meta.url, undefined)).toBe(false);
+    expect(isMain(import.meta.url, join(tmp, "no such file.ts"))).toBe(false);
+    expect(isMain(pathToFileURL(realpathSync(join(ROOT, "tests", "cli-entry.test.ts"))).href, join(ROOT, "tests", "cli-entry.test.ts"))).toBe(true);
+  });
 });

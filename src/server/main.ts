@@ -2,7 +2,6 @@ import { appendFileSync, createReadStream, existsSync, readdirSync, readFileSync
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { pathToFileURL } from "node:url";
 import { DEFAULT_LABEL_SET, loadConfig, type Config } from "../config.ts";
 import { FileSource, type AudioSource, type Speed } from "../audio/source.ts";
 import { Session, type Features, type SessionOptions, type TranscriptionEngine } from "../pipeline/session.ts";
@@ -29,6 +28,7 @@ import { KeyError, KeySetup, KeyStore, type KeyName } from "../keys.ts";
 import { TranscriptionSettings, type TranscriptionStatus } from "../settings.ts";
 import { appPaths, migrateAppSupportDir } from "../paths.ts";
 import { licenses } from "../licenses.ts";
+import { isMain } from "../entry.ts";
 
 /** Export and import of recordings as one `.tattle` file (see docs/recordings.md § Export and import). */
 export interface TransferApi {
@@ -1126,7 +1126,7 @@ async function main() {
   process.on("SIGTERM", shutdown);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   main().catch((e) => {
     console.error(e instanceof Error ? e.message : e);
     process.exit(1);
