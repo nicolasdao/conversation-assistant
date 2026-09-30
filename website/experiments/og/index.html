@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tattle · Link preview cards</title>
+<link rel="stylesheet" href="../../assets/theme.css">
+<style>
+  body { padding: 40px 24px 80px; }
+  main { max-width: 1200px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font: 800 40px/1 var(--cond); text-transform: uppercase; letter-spacing: 0.02em; }
+  .intro { margin: 0 0 40px; max-width: 46em; color: var(--ink-2); }
+  code { font-size: 0.92em; color: var(--ink); }
+  section { margin: 0 0 56px; padding-top: 24px; border-top: 1px solid var(--rule); }
+  h2 { margin: 0 0 6px; font: 800 26px/1 var(--cond); text-transform: uppercase; letter-spacing: 0.04em; }
+  h2 small { font-size: 16px; color: var(--accent); letter-spacing: 0.12em; margin-left: 10px; }
+  .why { margin: 0 0 16px; color: var(--ink-2); max-width: 52em; }
+  .full { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
+  .row { display: flex; gap: 24px; align-items: flex-start; margin-top: 18px; flex-wrap: wrap; }
+  .row figure { margin: 0; }
+  .row figcaption { margin-top: 6px; font: 700 12px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute); }
+  .feed { width: 500px; max-width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--rule); }
+  .square { width: 240px; height: 240px; background-size: cover; background-position: center; border-radius: 12px; border: 1px solid var(--rule); }
+  .ca-back { position: static; display: inline-block; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="ca-back" href="../">All experiments</a>
+  <h1>Link preview cards</h1>
+  <p class="intro">Five candidates for hey-tattle.com's <code>og:image</code>, the picture a link to the site shows on X, LinkedIn, Slack, iMessage, WhatsApp and Discord. Each card is an HTML page in this folder (1200×630, the site's own tokens and fonts), rendered by <code>node scripts/make-site-images.mjs</code>. Each is shown full size, at feed size, and cropped square, as some chat apps show it. <code>--ship &lt;card&gt;</code> makes one the site's image (<code>website/og.jpg</code>).</p>
+
+  <section>
+    <h2>01 · Caught live</h2>
+    <p class="why">A myth everyone knows, stopped by a CONTRADICTED lower third. One claim and one verdict read in under a second, and the tension is the hook.</p>
+    <img class="full" src="png/01-caught-live.png" alt="">
+    <div class="row"><figure><img class="feed" src="png/01-caught-live.png" alt=""><figcaption>Feed size</figcaption></figure><figure><div class="square" style="background-image:url(png/01-caught-live.png)"></div><figcaption>Square crop</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>02 · The record key <small>Shipped</small></h2>
+    <p class="why">The site's own 3D record key and on-air rings. Brand first: the click lands on the same key the preview promised.</p>
+    <img class="full" src="png/02-record-key.png" alt="">
+    <div class="row"><figure><img class="feed" src="png/02-record-key.png" alt=""><figcaption>Feed size</figcaption></figure><figure><div class="square" style="background-image:url(png/02-record-key.png)"></div><figcaption>Square crop</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>03 · The show on screen</h2>
+    <p class="why">A simplified view of the app during a call: transcript, verdicts, and the timeline. Clarity: you see what you get.</p>
+    <img class="full" src="png/03-the-show.png" alt="">
+    <div class="row"><figure><img class="feed" src="png/03-the-show.png" alt=""><figcaption>Feed size</figcaption></figure><figure><div class="square" style="background-image:url(png/03-the-show.png)"></div><figcaption>Square crop</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>04 · True or false?</h2>
+    <p class="why">Four myths with their verdicts, the last one still being checked. The open verdict is the reason to click.</p>
+    <img class="full" src="png/04-true-or-false.png" alt="">
+    <div class="row"><figure><img class="feed" src="png/04-true-or-false.png" alt=""><figcaption>Feed size</figcaption></figure><figure><div class="square" style="background-image:url(png/04-true-or-false.png)"></div><figcaption>Square crop</figcaption></figure></div>
+  </section>
+
+  <section>
+    <h2>05 · Tattle tells</h2>
+    <p class="why">The name becomes the promise. The most memorable line, backed by a claim and its verdict.</p>
+    <img class="full" src="png/05-tattle-tells.png" alt="">
+    <div class="row"><figure><img class="feed" src="png/05-tattle-tells.png" alt=""><figcaption>Feed size</figcaption></figure><figure><div class="square" style="background-image:url(png/05-tattle-tells.png)"></div><figcaption>Square crop</figcaption></figure></div>
+  </section>
+</main>
+</body>
+</html>

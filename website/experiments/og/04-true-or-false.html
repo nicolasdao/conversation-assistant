@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>04 · True or false?</title>
+<link rel="stylesheet" href="og.css">
+<style>
+  .hl { position: absolute; left: 48px; top: 176px; font-size: 80px; }
+  .sub { position: absolute; left: 48px; top: 452px; margin: 0; font: 700 26px/1.2 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+  .url { position: absolute; left: 48px; bottom: 40px; font: 700 26px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+  .board { position: absolute; left: 540px; right: 48px; top: 48px; bottom: 48px; display: grid; gap: 14px; align-content: center; }
+  .board .fc { grid-template-columns: 244px minmax(0, 1fr); }
+  .board .fc-verdict { padding: 14px 28px 14px 18px; }
+  .board .fc-verdict .vw { font-size: 35px; }
+  .board .fc-body { padding: 12px 22px; }
+  .board .fc .restated { font-size: 25px; white-space: nowrap; }
+  .board .fc .correction { font-size: 19px; }
+  .v-researching .restated { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="onair"><i></i>On air</div><div class="strap"><span class="eyebrow"><span class="ca-mark" style="--s:18px"></span>Open-source Mac app</span><b class="name">Tattle</b></div></div>
+
+  <h1 class="hl">Your podcast<br>has a<br><span class="red">fact-checker.</span></h1>
+  <p class="sub">Live, as it's said · Free Mac app</p>
+  <div class="url">hey-tattle.com</div>
+
+  <div class="board">
+    <div class="fc v-supported">
+      <div class="fc-verdict"><span class="vw">Supported</span><span class="vm">Sourced</span></div>
+      <div class="fc-body"><p class="restated">"Bananas are berries."</p><p class="correction">Botanically, yes.</p></div>
+    </div>
+    <div class="fc v-contradicted">
+      <div class="fc-verdict"><span class="vw">Contradicted</span><span class="vm">Sourced</span></div>
+      <div class="fc-body"><p class="restated">"Bats are blind."</p><p class="correction">All bats can see.</p></div>
+    </div>
+    <div class="fc v-misleading">
+      <div class="fc-verdict"><span class="vw">Misleading</span><span class="vm">Sourced</span></div>
+      <div class="fc-body"><p class="restated">"Coffee dehydrates you."</p><p class="correction">Its water outweighs the effect.</p></div>
+    </div>
+    <div class="fc v-researching">
+      <div class="fc-verdict"><span class="vw">Checking</span><span class="vm">On the web</span></div>
+      <div class="fc-body"><p class="restated">"Octopuses have three hearts."</p></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

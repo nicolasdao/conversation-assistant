@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>03 · The show on screen</title>
+<link rel="stylesheet" href="og.css">
+<style>
+  .hl { position: absolute; left: 48px; top: 172px; font-size: 88px; }
+  .sub { position: absolute; left: 48px; top: 452px; width: 440px; margin: 0; font: 500 24px/1.35 var(--body); color: var(--ink-2); }
+  .url { position: absolute; left: 48px; bottom: 40px; font: 700 26px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+
+  /* the app's window, simplified: transcript, a verdict, the timeline */
+  .win { position: absolute; left: 540px; top: 40px; width: 612px; height: 550px; background: var(--ground); border: 1px solid var(--rule);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(43, 212, 240, 0.08); display: grid; grid-template-rows: auto 1fr auto; }
+  .win-bar { display: flex; align-items: stretch; height: 46px; background: var(--deck); border-bottom: 1px solid var(--rule); }
+  .win-bar .onair { font-size: 17px; padding: 0 20px 0 14px; gap: 8px; }
+  .win-bar .onair i { width: 9px; height: 9px; box-shadow: none; }
+  .win-bar .t { display: flex; align-items: center; gap: 10px; padding: 0 16px; font: 700 17px/1 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+  .win-bar .t b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .lines { padding: 14px 16px 0; display: grid; gap: 8px; align-content: start; }
+  .line { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline; padding: 8px 14px; background: var(--deck); border-left: 4px solid var(--c); }
+  .line.host { --c: var(--host); }
+  .line.remote { --c: var(--remote); }
+  .line .who { font: 800 15px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--c); }
+  .line p { margin: 0; font: 500 21px/1.3 var(--body); color: var(--ink-2); }
+  .line.claim p { color: var(--ink); }
+  .line.claim u { text-decoration: underline dashed var(--accent); text-underline-offset: 5px; text-decoration-thickness: 2px; }
+  .win .fc { margin: 0 0 0 88px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); }
+  .win .fc-verdict { padding: 10px 26px 10px 14px; gap: 4px; }
+  .win .fc-verdict .vw { font-size: 26px; }
+  .win .fc-verdict .vm { font-size: 11px; }
+  .win .fc-body { padding: 8px 16px; gap: 3px; }
+  .win .fc .restated { font-size: 19px; }
+  .win .fc .correction { font-size: 16px; }
+  .tl { padding: 14px 18px 18px; display: grid; gap: 8px; border-top: 1px solid var(--rule); background: var(--deck); }
+  .tl-row { display: grid; grid-template-columns: 70px 1fr; gap: 10px; align-items: center; }
+  .tl-l { font: 700 13px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+  .segs { display: flex; gap: 3px; height: 20px; }
+  .segs i { flex: var(--f); background: var(--c); }
+  .tl svg { width: 100%; height: 40px; display: block; }
+  .tl polyline { fill: none; stroke-width: 3; vector-effect: non-scaling-stroke; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="onair"><i></i>On air</div><div class="strap"><span class="eyebrow"><span class="ca-mark" style="--s:18px"></span>Open-source Mac app</span><b class="name">Tattle</b></div></div>
+
+  <h1 class="hl">Your calls,<br>fact-checked<br><span class="red">live.</span></h1>
+  <p class="sub">A live transcript, a timeline, and sourced verdicts, as people speak.</p>
+  <div class="url">hey-tattle.com</div>
+
+  <div class="win">
+    <div class="win-bar"><div class="onair"><i></i>On air</div><span class="t">Rec <b>00:14:32</b></span></div>
+    <div class="lines">
+      <div class="line host"><span class="who">Host</span><p>Enough about models. How was surfing?</p></div>
+      <div class="line remote claim"><span class="who">Guest</span><p><u>Mount Everest gets a little taller every year.</u></p></div>
+      <div class="fc v-supported">
+        <div class="fc-verdict"><span class="vw">Supported</span><span class="vm">Sourced</span></div>
+        <div class="fc-body"><p class="restated">A few millimetres a year.</p></div>
+      </div>
+      <div class="line host"><span class="who">Host</span><p>Wait, really? That's wild.</p></div>
+      <div class="line remote claim"><span class="who">Guest</span><p><u>Octopuses have three hearts.</u></p></div>
+      <div class="fc v-researching">
+        <div class="fc-verdict"><span class="vw">Checking</span><span class="vm">On the web</span></div>
+        <div class="fc-body"><p class="restated">Researching the claim…</p></div>
+      </div>
+    </div>
+    <div class="tl">
+      <div class="tl-row"><span class="tl-l">Topic</span><div class="segs">
+        <i style="--f:3; --c: var(--s-ai-models)"></i><i style="--f:1.2; --c: var(--s-ai-tools)"></i><i style="--f:2; --c: var(--s-personal-life)"></i><i style="--f:1.6; --c: var(--s-tech)"></i><i style="--f:.8; --c: var(--s-the-show)"></i></div></div>
+      <div class="tl-row"><span class="tl-l">Heat<br>Hype</span><svg viewBox="0 0 120 36" preserveAspectRatio="none">
+        <polyline style="stroke: var(--heat)" points="0,28 12,24 24,26 36,14 46,8 56,18 68,22 80,12 92,16 104,26 120,20"/>
+        <polyline style="stroke: var(--hype)" points="0,30 12,30 24,20 36,22 46,26 56,12 68,6 80,18 92,24 104,14 120,10"/></svg></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

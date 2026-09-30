@@ -29,6 +29,7 @@ Every change to Tattle is test-first (the rule is in [CLAUDE.md](../CLAUDE.md)).
 | Shared fakes and builders | `tests/fakes/*.ts`, imported from `tests/fakes/index.ts` | — | — |
 | Web page, DOM | `tests/web/<module>.test.ts`, first line `// @vitest-environment happy-dom` | Vitest | happy-dom |
 | Web test helpers | `tests/web/helpers.ts` | — | — |
+| The website, hey-tattle.com (its head, icons, crawl files, and what the release rewrites in it) | `tests/website.test.ts`, which reads `website/` | Vitest | node |
 | End-to-end, web page | `e2e/web/*.spec.ts` (harness in `e2e/harness/`) | Playwright (Chromium) | real browser |
 | End-to-end, Mac app | `e2e/electron/*.spec.ts` | Playwright `_electron` | development app |
 | Capture helper (Swift) | `native/capture/Tests/tattle-capture-tests/*.swift` | `swift test` | — |

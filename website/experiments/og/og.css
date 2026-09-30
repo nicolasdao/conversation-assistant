@@ -1,0 +1,82 @@
+/* Link-preview (Open Graph) cards for hey-tattle.com: 1200×630, rendered to images by scripts/make-site-images.mjs.
+   The site's own tokens and fonts (../../assets/theme.css); no colour outside them, as the site brief requires. */
+@import url("../../assets/theme.css");
+
+html, body { margin: 0; background: var(--ground); }
+.card {
+  position: relative; width: 1200px; height: 630px; overflow: hidden; isolation: isolate; color: var(--ink);
+  background:
+    radial-gradient(820px 560px at 82% 38%, rgba(43, 212, 240, 0.10), transparent 62%),
+    radial-gradient(760px 520px at 0% 108%, rgba(232, 38, 59, 0.16), transparent 62%),
+    linear-gradient(180deg, var(--ground) 0%, var(--deck) 100%);
+}
+/* the site's broadcast texture: faint scan lines and two light beams */
+.card::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(112deg, transparent 58%, rgba(243, 246, 250, 0.03) 58%, rgba(243, 246, 250, 0.03) 66%, transparent 66%),
+    linear-gradient(112deg, transparent 72%, rgba(243, 246, 250, 0.025) 72%, rgba(243, 246, 250, 0.025) 75%, transparent 75%),
+    repeating-linear-gradient(0deg, rgba(243, 246, 250, 0.018) 0 1px, transparent 1px 4px);
+}
+
+/* the app's header strap: ON AIR block, then the white name strap */
+.brand { position: absolute; left: 48px; top: 40px; display: flex; align-items: stretch; height: 78px; filter: drop-shadow(0 14px 26px rgba(0, 0, 0, 0.45)); }
+.onair {
+  display: flex; align-items: center; gap: 12px; padding: 0 30px 0 22px; background: var(--live); color: #fff;
+  font: 800 27px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+.onair i { width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.25); }
+.strap {
+  background: var(--paper); color: var(--paper-ink); display: flex; flex-direction: column; justify-content: center;
+  padding: 0 38px 0 34px; margin-left: calc(-1 * var(--slant));
+  clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+.strap .eyebrow { display: flex; align-items: center; gap: 8px; font: 700 14px/1 var(--cond); letter-spacing: 0.16em; text-transform: uppercase; color: var(--strap-eyebrow); }
+.strap .name { margin-top: 6px; font: 800 38px/1 var(--cond); letter-spacing: 0.03em; text-transform: uppercase; }
+
+/* headlines: Barlow Condensed 800, uppercase */
+.hl { margin: 0; font: 800 96px/0.9 var(--cond); letter-spacing: 0.005em; text-transform: uppercase; }
+.hl .red { color: var(--live); }
+.hl .cyan { color: var(--accent); }
+.hl .outline { color: transparent; -webkit-text-stroke: 3px var(--live); }
+
+/* the address and the offer, bottom right */
+.foot { position: absolute; right: 48px; bottom: 40px; display: flex; align-items: center; gap: 18px; font: 700 24px/1 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; }
+.foot .url { color: var(--ink); }
+.foot .meta { color: var(--mute); }
+.pill {
+  display: inline-flex; align-items: center; gap: 10px; background: var(--accent); color: var(--paper-ink);
+  font: 800 24px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; padding: 13px calc(20px + var(--slant)) 13px 18px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+.pill svg { width: 22px; height: 22px; }
+
+/* a transcript line, as the site's captions draw it */
+.cap { display: grid; gap: 10px; padding: 18px 26px 20px 22px; background: rgba(15, 32, 56, 0.92); border-left: 6px solid var(--c); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4); }
+.cap.host { --c: var(--host); }
+.cap.remote { --c: var(--remote); }
+.cap .who { display: flex; align-items: center; gap: 12px; font: 800 18px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--c); }
+.cap .flag { color: var(--accent); padding: 4px 8px; background: repeating-linear-gradient(135deg, var(--deck-3) 0 6px, var(--deck-2) 6px 12px); }
+.cap .said { font: 600 44px/1.18 var(--body); color: var(--ink); }
+.cap.claim .said u { text-decoration: underline dashed var(--accent); text-underline-offset: 8px; text-decoration-thickness: 3px; }
+
+/* a verdict, as a TV lower third */
+.fc { display: grid; grid-template-columns: max-content minmax(0, 1fr); background: var(--deck); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); }
+.fc-verdict {
+  color: #fff; padding: 16px 34px 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px; background: var(--neutral);
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+.fc-verdict .vw { font: 800 40px/0.95 var(--cond); letter-spacing: 0.02em; text-transform: uppercase; }
+.fc-verdict .vm { font: 700 15px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.9; }
+.v-contradicted .fc-verdict { background: var(--bad); }
+.v-supported .fc-verdict { background: var(--good); }
+.v-misleading .fc-verdict { background: var(--warn); color: var(--paper-ink); }
+.v-researching .fc-verdict { background: repeating-linear-gradient(135deg, var(--deck-3) 0 10px, var(--deck-2) 10px 20px); color: var(--accent); }
+.fc-body { padding: 14px 24px; display: grid; gap: 6px; align-content: center; }
+.fc .restated { margin: 0; font: 700 28px/1.2 var(--body); }
+.fc .correction { margin: 0; font: 500 22px/1.3 var(--body); color: var(--ink-2); }
+
+/* the 3D record key, captured from the site's hero, feathered into the card */
+.key { position: absolute; background: url("assets/key.jpg") center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); }

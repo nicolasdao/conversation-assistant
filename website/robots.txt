@@ -1,0 +1,5 @@
+# hey-tattle.com: every crawler is welcome.
+User-agent: *
+Allow: /
+
+Sitemap: https://hey-tattle.com/sitemap.xml

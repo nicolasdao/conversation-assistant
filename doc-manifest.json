@@ -259,7 +259,7 @@
         "Testing",
         "Test fixture"
       ],
-      "line_count": 127,
+      "line_count": 128,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
@@ -658,7 +658,7 @@
         "Coverage policy",
         "Rules for new tests"
       ],
-      "line_count": 142,
+      "line_count": 143,
       "links_to": [
         "CLAUDE.md",
         "docs/architecture.md",
@@ -748,11 +748,12 @@
     },
     {
       "dangling": false,
-      "description": "Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.",
+      "description": "Tattle's website, hey-tattle.com — what the page contains, its search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.",
       "has_frontmatter": true,
       "headings": [
         "Website",
         "What is in `website/`",
+        "Search and link previews",
         "Hosting",
         "Deploying",
         "Security",
@@ -760,7 +761,7 @@
         "Changing the site",
         "Releases update the site"
       ],
-      "line_count": 138,
+      "line_count": 182,
       "links_to": [
         "docs/desktop.md",
         "docs/gotchas.md",
@@ -778,7 +779,14 @@
         "website/wrangler.jsonc",
         "website/_headers",
         "website/.assetsignore",
-        "website/experiments/**"
+        "website/experiments/**",
+        "website/robots.txt",
+        "website/sitemap.xml",
+        "website/og.jpg",
+        "website/favicon.*",
+        "website/apple-touch-icon.png",
+        "scripts/make-site-images.mjs",
+        "tests/website.test.ts"
       ],
       "source_unresolved": [],
       "tags": [
@@ -789,7 +797,9 @@
         "workers",
         "dns",
         "security",
-        "csp"
+        "csp",
+        "seo",
+        "open-graph"
       ],
       "toc": {
         "linked": false,

@@ -130,7 +130,7 @@ Expect about $1.60 per hour of show with OpenAI transcription: roughly $1.00 str
 - [System 1 and System 2](docs/system1-system2.md) — The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.
 - [Testing](docs/testing.md) — How Tattle is tested, test-first — the TDD loop, the test layers and where each test goes, the commands, the shared fakes, DOM tests under happy-dom, the coverage thresholds and their exclusions, and the rules every test follows (offline, no real user data, no spend).
 - [Transcription](docs/transcription.md) — How speech becomes text, with two engines — Apple Speech on this Mac (the default on macOS 26+, free, nothing leaves the Mac), with one clip per utterance and live text from stream analyzers, or OpenAI's gpt-transcribe and gpt-live-transcribe — how the engine is chosen and saved, the tattle-transcribe helper, costs, and configuration.
-- [Website](docs/website.md) — Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
+- [Website](docs/website.md) — Tattle's website, hey-tattle.com — what the page contains, its search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
 <!-- END doc-index -->
 
 ## Design decisions

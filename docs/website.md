@@ -1,6 +1,6 @@
 ---
-description: Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
-tags: [website, cloudflare, hosting, deployment, workers, dns, security, csp]
+description: Tattle's website, hey-tattle.com — what the page contains, its search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
+tags: [website, cloudflare, hosting, deployment, workers, dns, security, csp, seo, open-graph]
 source:
   - website/index.html
   - website/assets/**
@@ -8,6 +8,13 @@ source:
   - website/_headers
   - website/.assetsignore
   - website/experiments/**
+  - website/robots.txt
+  - website/sitemap.xml
+  - website/og.jpg
+  - website/favicon.*
+  - website/apple-touch-icon.png
+  - scripts/make-site-images.mjs
+  - tests/website.test.ts
 ---
 
 # Website
@@ -23,12 +30,15 @@ Tattle's official website is **https://hey-tattle.com**. It is one page whose jo
 | `wrangler.jsonc` | The Cloudflare Worker's configuration |
 | `_headers` | Security headers for every response (see [Security](#security)) |
 | `.assetsignore` | Files in `website/` that are never uploaded: the config files, `experiments/`, Markdown, `.wrangler/` |
-| `experiments/` | The ten design experiments the page grew out of (28 September 2026), with a gallery (`experiments/index.html`) and their shared brief (`experiments/_shared/BRIEF.md`). Kept for reference; **not deployed** |
+| `og.jpg` | The link-preview image (`og:image`), 1200×630 (see [Search and link previews](#search-and-link-previews)) |
+| `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | The icons, made from `desktop/icon.svg` |
+| `robots.txt`, `sitemap.xml` | For crawlers: everything allowed, and the one page |
+| `experiments/` | The ten design experiments the page grew out of (28 September 2026), with a gallery (`experiments/index.html`) and their shared brief (`experiments/_shared/BRIEF.md`), and the link-preview card candidates (`experiments/og/`). Kept for reference; **not deployed** |
 
 The page was chosen from experiment `02-record-button`. Its sections, top to bottom:
 
-0. **The header bar** (`assets/nav.js`), pinned to the top as the page scrolls: the app's own header strap (the ON AIR block, which the record key turns on, the name, the record clock), the show's rundown as tabs (`01 Rundown` … `06 Credits`; the section on screen lights up red like a segment going on air), a compact Download that slides in once the hero's is off screen, and a playhead along its bottom edge with a tick where each section starts. On a phone the tabs are a swipeable second row.
-1. **The record key** (`assets/scene.js`, Three.js): the app icon as a glossy 3D key. Pressing it takes the page "on air" with rings, rising captions, and fact-check lower thirds. Without WebGL, `assets/main.js` draws a CSS key instead; with reduced motion, a calm version.
+0. **The header bar** (`assets/nav.js`), pinned to the top as the page scrolls: the app's own header strap (the ON AIR block, which the record key turns on, the name as a `<p>`, the record clock), the show's rundown as tabs (`01 Rundown` … `06 Credits`; the section on screen lights up red like a segment going on air), a compact Download that slides in once the hero's is off screen, and a playhead along its bottom edge with a tick where each section starts. On a phone the tabs are a swipeable second row.
+1. **The hero**: the page's only `<h1>` is the lede beside the key ("Tattle listens to your calls…"), so the heading says what the app does. **The record key** (`assets/scene.js`, Three.js): the app icon as a glossy 3D key. Pressing it takes the page "on air" with rings, rising captions, and fact-check lower thirds. Without WebGL, `assets/main.js` draws a CSS key instead; with reduced motion, a calm version.
 2. **Rundown**: what the app does, in five steps, closed by **Your Mac does the listening** (`.onmac`): on macOS 26 or later transcripts are free, private, and work offline with Apple Speech. Its claims must keep "transcript-only" and "once the speech model has downloaded", and name the older-macOS and online-feature cases (see [Transcription](transcription.md)).
 3. **Jev** (`#jev`): why a decision model makes live judgment affordable, with a replaying **Jev call** (`assets/sections.js`). The questions shown are Tattle's real ones; the answers are labelled as examples. It links to [TypeSafe AI](https://typesafe.ai) and [Jev's documentation](https://docs.typesafe.ai/). See [Jev](jev.md).
 4. **Fast and slow** (`#systems`): System 1 and System 2, with a live stream of lines and the two systems' costs. See [System 1 and System 2](system1-system2.md).
@@ -40,6 +50,39 @@ The page was chosen from experiment `02-record-button`. Its sections, top to bot
 Every figure on the page comes from the docs (`jev.md`, `system1-system2.md`, `mission.md`, `transcription.md`, `setup.md`). How well Create with AI's model writes Jev's questions has not been measured, so the page makes no claim about it. Change the page's claims only from there. Since v0.9.0 the cue card says what is true on macOS 26 or later (no key, free transcripts, audio kept on the Mac) and names the older-macOS case (an OpenAI key, about $1.23 an hour); it must not drop that qualifier, because Tattle still supports macOS 14.2.
 
 **The download button and the release line.** The page names the latest published release in its HTML: the two Download for Mac links go to that release's DMG, the line under the button gives its version and size, the footer's "Latest release" line its version, date, and release notes, and the JSON-LD its `softwareVersion` and `downloadUrl`. Each release writes these (see [Releases update the site](#releases-update-the-site)), so the page is right without JavaScript and for search engines. On top of that, `assets/download.js` asks GitHub's API for the latest release (`api.github.com/repos/nicolasdao/tattle/releases/latest`), points every `[data-download]` link at its `-arm64.dmg` asset, and fills the version, size, date, and release-notes link (the footer's "Latest release" line). The DMG's file name carries the version, so it cannot be a fixed URL. If the API cannot be reached (offline, rate limit of 60 requests an hour per visitor), the page keeps what its HTML says. On anything but a Mac (an iPad counts as not a Mac), the page shows "It's a Mac app" with a Copy link button instead of the download.
+
+## Search and link previews
+
+What search engines and link previews (X, LinkedIn, Slack, iMessage, WhatsApp, Discord) read, all in the page's `<head>` or next to it. `tests/website.test.ts` checks every item below.
+
+| What | Value |
+| --- | --- |
+| Title | `Tattle · Live transcription and fact-checking for Mac`: at most 60 characters, or Google cuts it |
+| Description | About 155 characters (at most 160), with no macOS 26 claim: "free" there means the app, which is true everywhere |
+| Canonical | `https://hey-tattle.com/` (`/index.html` answers 307 to it, `www` 301) |
+| Open Graph | `og:type`, `og:site_name`, `og:url`, `og:title`, `og:description`, and `og:image` with its type, width, height, and alt text |
+| X | `twitter:card` `summary_large_image`, and `twitter:image` and `twitter:image:alt` (the same as Open Graph's); title and description fall back to Open Graph's |
+| Icons | `/favicon.ico` (16, 32, 48), `/favicon.svg`, `/apple-touch-icon.png` (180, full-bleed, because iOS rounds it and turns transparency black). Google does not show a `data:` favicon in results, which the page used before |
+| Headings | One `<h1>`, the hero's lede, so it carries what the app does |
+| JSON-LD | An `@graph` of `WebSite` (the site name Google shows), `SoftwareApplication` (with `url`, `image`, `isAccessibleForFree`, `featureList`, and the repository in `sameAs`), and the publisher `Organization`, Cloudless Labs. There are no ratings, so Google shows no software rich result; never invent any |
+| `robots.txt`, `sitemap.xml` | Everything allowed, and the canonical page |
+
+**The link-preview image** (`og.jpg`) is card `02-record-key`, chosen on 30 September 2026: the site's 3D record key on its on-air rings, **Press record. Every claim gets checked.**, a Free for Mac strap, and a Contradicted lower third on "Bats are blind." Its claims come from the site brief's safe examples, like everything else on the page. Five candidates live in `experiments/og/` as HTML pages (1200×630, the site's `theme.css` and fonts, the rules in `og.css`), with a gallery (`experiments/og/index.html`) that shows each full size, at feed size, and cropped square. The key is captured from the live page into `experiments/og/assets/key.jpg`.
+
+`scripts/make-site-images.mjs` renders them with Playwright's Chromium, offline:
+
+```bash
+node scripts/make-site-images.mjs                       # every card to website/experiments/og/png/
+node scripts/make-site-images.mjs --ship 02-record-key  # also that card to website/og.jpg (refused over 300 KB)
+node scripts/make-site-images.mjs --icons               # favicon.svg, favicon.ico and apple-touch-icon.png from desktop/icon.svg
+node scripts/make-site-images.mjs --capture-key         # the 3D key again, from https://hey-tattle.com (network)
+```
+
+**Changing the image:** platforms cache it by its address for days or weeks, so a new image needs a new file name (or a `?v=` query) in `og:image`, `twitter:image`, and the JSON-LD `image`. Keep it under 300 KB (the test checks it): WhatsApp is reported to skip larger preview images. X, LinkedIn (Post Inspector), and Facebook (Sharing Debugger) each have a tool that fetches the page again.
+
+**Cloudflare's robots.txt.** Before `website/robots.txt` existed, `/robots.txt` answered with Cloudflare's managed content-signals text: comments only, with no rules and no sitemap. After the first deploy, check whether Cloudflare serves ours, adds its own text before it, or replaces it (the zone's managed robots.txt setting): `curl https://hey-tattle.com/robots.txt` must still end with our `Sitemap:` line.
+
+**Outside the repository:** verify the site in Google Search Console and Bing Webmaster Tools (a DNS TXT record, through the `cloudflare-config` skill) and submit `https://hey-tattle.com/sitemap.xml`. The GitHub repository's social preview (Settings → Social preview, 1280×640) is a separate upload.
 
 ## Hosting
 
@@ -124,7 +167,8 @@ The `cloudflare` skill's `cf.js` needs a workaround in this repository (see [Got
 
 1. Edit files under `website/`; preview with `npx wrangler dev`.
 2. If the import map or a Three.js version changed, recompute the hashes ([Security](#security)).
-3. Commit and push to `master`. Cloudflare redeploys within minutes; check **Deployments** in the dashboard, or https://hey-tattle.com.
+3. Run `npx vitest run tests/website.test.ts`: it fails when the head loses a tag, the image outgrows its limits, the release's `update-website.sh` no longer finds a field it rewrites, or the import map's hash is stale.
+4. Commit and push to `master`. Cloudflare redeploys within minutes; check **Deployments** in the dashboard, or https://hey-tattle.com.
 
 ### Releases update the site
 

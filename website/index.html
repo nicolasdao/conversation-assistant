@@ -3,16 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tattle · Live transcripts and fact-checks for your Mac</title>
-<meta name="description" content="Tattle is a free, open-source Mac app that transcribes your calls live, on your Mac for free on macOS 26, maps the conversation on a timeline, and fact-checks claims as they're said. Built on Jev, TypeSafe AI's decision model.">
+<title>Tattle · Live transcription and fact-checking for Mac</title>
+<meta name="description" content="Tattle is a free, open-source Mac app that transcribes calls and podcasts live, maps the conversation on a timeline, and fact-checks claims as they're said.">
+<link rel="canonical" href="https://hey-tattle.com/">
 <meta name="theme-color" content="#0a1628">
 <meta name="author" content="Nicolas Dao">
 <link rel="author" href="https://nicolasdao.com">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Tattle">
+<meta property="og:url" content="https://hey-tattle.com/">
 <meta property="og:title" content="Tattle: live transcripts and fact-checks for your Mac">
 <meta property="og:description" content="An open-source Mac app that transcribes live conversations on your Mac, free and private on macOS 26, maps them on a timeline, and fact-checks claims as they're said.">
+<meta property="og:image" content="https://hey-tattle.com/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Tattle, the open-source Mac app: its red record key, with the line Press record, every claim gets checked, and a lower third marking the claim Bats are blind as Contradicted. Free for Mac.">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f0384c'/%3E%3Cstop offset='1' stop-color='%23c9142a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' fill='url(%23g)'/%3E%3Ccircle cx='512' cy='512' r='190' fill='%23fff'/%3E%3Ccircle cx='512' cy='512' r='250' fill='none' stroke='%23fff' stroke-opacity='0.35' stroke-width='28'/%3E%3C/svg%3E">
+<meta name="twitter:image" content="https://hey-tattle.com/og.jpg">
+<meta name="twitter:image:alt" content="Tattle, the open-source Mac app: its red record key, with the line Press record, every claim gets checked, and a lower third marking the claim Bats are blind as Contradicted. Free for Mac.">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/BarlowCondensed-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/Barlow-500.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/theme.css">
@@ -20,18 +32,51 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Tattle",
-  "description": "An open-source Mac app that transcribes live conversations on your Mac, free and private on macOS 26, maps them on a timeline, and fact-checks claims as they're said.",
-  "applicationCategory": "MultimediaApplication",
-  "operatingSystem": "macOS 14.2 or later (Apple Silicon)",
-  "softwareVersion": "1.0.1",
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "license": "https://opensource.org/license/bsd-3-clause",
-  "downloadUrl": "https://github.com/nicolasdao/tattle/releases/download/v1.0.1/Tattle-1.0.1-arm64.dmg",
-  "codeRepository": "https://github.com/nicolasdao/tattle",
-  "author": { "@type": "Person", "name": "Nicolas Dao", "url": "https://nicolasdao.com", "jobTitle": "Cloud & AI engineer", "worksFor": { "@type": "Organization", "name": "Cloudless Labs", "url": "https://cloudlesslabs.com" } },
-  "publisher": { "@type": "Organization", "name": "Cloudless Labs", "legalName": "Cloudless Consulting Pty Ltd", "url": "https://cloudlesslabs.com" }
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://hey-tattle.com/#website",
+      "name": "Tattle",
+      "alternateName": "Tattle for Mac",
+      "url": "https://hey-tattle.com/",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://cloudlesslabs.com/#organization" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://hey-tattle.com/#app",
+      "name": "Tattle",
+      "url": "https://hey-tattle.com/",
+      "description": "An open-source Mac app that transcribes live conversations on your Mac, free and private on macOS 26, maps them on a timeline, and fact-checks claims as they're said.",
+      "image": "https://hey-tattle.com/og.jpg",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "macOS 14.2 or later (Apple Silicon)",
+      "softwareVersion": "1.0.1",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "isAccessibleForFree": true,
+      "license": "https://opensource.org/license/bsd-3-clause",
+      "downloadUrl": "https://github.com/nicolasdao/tattle/releases/download/v1.0.1/Tattle-1.0.1-arm64.dmg",
+      "sameAs": ["https://github.com/nicolasdao/tattle"],
+      "featureList": [
+        "Live transcription of your microphone and the call your Mac plays, with any call app",
+        "On-device transcription with Apple Speech on macOS 26 or later",
+        "Speakers told apart and named",
+        "A live timeline of topics, modes, heat, hype, disagreements, hot takes, predictions and clip-worthy moments",
+        "Claims fact-checked as they're said, with sourced verdicts within seconds",
+        "Chat about the transcript, live or afterwards",
+        "A recordings library with playback at up to 4x and export"
+      ],
+      "author": { "@type": "Person", "name": "Nicolas Dao", "url": "https://nicolasdao.com", "jobTitle": "Cloud & AI engineer", "worksFor": { "@id": "https://cloudlesslabs.com/#organization" } },
+      "publisher": { "@id": "https://cloudlesslabs.com/#organization" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://cloudlesslabs.com/#organization",
+      "name": "Cloudless Labs",
+      "legalName": "Cloudless Consulting Pty Ltd",
+      "url": "https://cloudlesslabs.com"
+    }
+  ]
 }
 </script>
 <script type="importmap">
@@ -59,7 +104,7 @@
       <div class="onair" id="onair"><i></i><span id="onair-label">Off air</span></div>
       <div class="strap">
         <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
-        <h1 class="name"><a href="#top">Tattle</a></h1>
+        <p class="name"><a href="#top">Tattle</a></p>
       </div>
       <div class="clock" aria-hidden="true"><span class="eyebrow">Rec</span><time id="clock">00:00</time></div>
     </div>
@@ -95,7 +140,7 @@
   </div>
 
   <div class="hero-copy">
-    <p class="lede">Tattle listens to your calls. It transcribes them as people speak, maps the conversation on a timeline, and <b>fact-checks claims as they're said.</b></p>
+    <h1 class="lede">Tattle listens to your calls. It transcribes them as people speak, maps the conversation on a timeline, and <b>fact-checks claims as they're said.</b></h1>
 
     <div class="dl" data-when="mac">
       <a class="ca-download big" data-download href="https://github.com/nicolasdao/tattle/releases/download/v1.0.1/Tattle-1.0.1-arm64.dmg">
