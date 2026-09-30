@@ -648,11 +648,12 @@
         "Offline, free, and away from real data",
         "Fakes (`tests/fakes/`)",
         "Web DOM tests (happy-dom)",
+        "End-to-end tests of the web page",
         "Swift tests (the capture helper)",
         "Coverage policy",
         "Rules for new tests"
       ],
-      "line_count": 117,
+      "line_count": 129,
       "links_to": [
         "CLAUDE.md",
         "docs/architecture.md",
@@ -672,7 +673,6 @@
         ".agents/skills/release-tattle/scripts/test-suite.sh"
       ],
       "source_unresolved": [
-        "e2e/**",
         ".agents/skills/release-tattle/scripts/test-suite.sh"
       ],
       "tags": [

@@ -90,6 +90,18 @@ A page module is tested in happy-dom with the page's real markup:
 - `flush()` lets pending promises and zero-delay timers run.
 - In happy-dom a dialog's `close` event fires synchronously; in a browser it fires in a later task.
 
+## End-to-end tests of the web page
+
+`npm run test:e2e` builds the page and runs Playwright (Chromium) against the real engine: its router, the page, the key setup and the whole session pipeline, with only the external services faked. `npx playwright test --project=web` runs these alone.
+
+- **The harness** (`e2e/harness/server.ts`) composes the engine the way `bootEngine` does, in its own process: the network is off (`fetch` and `WebSocket` throw, the key variables are deleted), and one fake answers everything the engine calls (`e2e/harness/fakes.ts`: transcription, Jev and System 2 from the fixture's script, the chat's catalogue and streamed replies, the key checks). Apple Speech is reported unavailable, so sessions transcribe with the fake OpenAI and never start the on-device helper. It listens on `127.0.0.1` and prints `E2E_READY <url>`.
+- **Isolation:** the fixture (`e2e/fixtures.ts`) starts a fresh harness for every test, in its own tmp folder: `HOME`, `TMPDIR`, `TATTLE_CREDENTIALS`, `TATTLE_SETTINGS` and `TATTLE_LABEL_SETS` all point inside it, and the harness refuses to start otherwise. Nothing touches the real Application Support folder or `sessions/`.
+- **Switches** (`test.use({ harnessEnv: {...} })`): `E2E_KEYS=missing` (the first-run screen), `E2E_REFUSE_KEYS=<text>` (key checks refuse keys containing it), `E2E_402=1` (OpenRouter's credit is used up), `E2E_SEED=library` (two recordings with real audio), `E2E_LIVE=hold` (Start live captures nothing until stopped), `E2E_LIVE_TEXT=off`, `E2E_CONTROL=1` (commands on the harness's stdin: `harness.control({ emit, data })` puts an event on the engine's bus, `{ dropEvents: true }` closes every open event stream, `{ push: {...} }` feeds audio to a held capture). The scripted scenarios use the real engine with a held live session and injected events, for states a real session cannot reach on demand (health, speaker mode, OpenRouter's refusal, a System 1 rewrite, errors, a lost event stream).
+- **The page:** always `http://127.0.0.1:<port>` (anything else gets 403 from the Host/Origin guard); navigate with `waitUntil: "domcontentloaded"` and wait with web-first assertions, **never `networkidle`** (`/api/events` stays open). `open(page, path)` also waits for the app's first render, because the page's shell shows before its controls are bound. Every request that would leave `127.0.0.1` is aborted and fails the test.
+- **Bespoke selects** are comboboxes: `getByRole("combobox", { name: /^Playback speed/ })`, then `getByRole("option", { name: "4×" })`.
+- **Known bugs** are `test.fail()` tests named `BUG <id>: …`, like `it.fails` in Vitest.
+- **Flakes:** before committing a change to these tests, run them three times: `npx playwright test --project=web --repeat-each=3`. A failure is investigated, never retried away.
+
 ## Swift tests (the capture helper)
 
 `native/capture/Package.swift` has a test target, `tattle-capture-tests` (`native/capture/Tests/tattle-capture-tests/`), written with Swift Testing (`import Testing`) against `@testable import tattle_capture` (the module name has an underscore). SwiftPM builds the executable for tests with its entry point renamed, so `main.swift`'s top-level code never runs, and no library split is needed; `swift build -c release` (`npm run build:capture`) does not build the tests.

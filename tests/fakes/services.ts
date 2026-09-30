@@ -8,9 +8,9 @@ export const TEST_OPENAI_KEY = "sk-proj-test-openai-key-9876543210";
  * script says `claim`, recognises the repeated line, and marks the topic change as a boundary; one Jev call echoes
  * the key in an error body to prove redaction.
  */
-export function fakeServicesFetch(script: ReturnType<typeof loadScript>) {
+export function fakeServicesFetch(script: ReturnType<typeof loadScript>, opts: { echoKeyOnce?: boolean } = {}) {
   let transcribeCalls = 0;
-  let echoed = false;
+  let echoed = opts.echoKeyOnce === false; // the end-to-end harness turns the one echoed error off
   const texts = new Map<string, number>(); // text → line
   for (const l of script.lines) texts.set(l.text, l.line);
   const f = async (url: string, init: RequestInit): Promise<Response> => {
