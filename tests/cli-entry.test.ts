@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 // Bug B3: each command-line tool runs its main only when started as the program, which it tells by comparing its own
 // URL with the path it was started from. Compared as `file://${path}`, a path with a space (percent-encoded in the URL)
@@ -81,4 +81,21 @@ describe("npm run serve, as a child process with an isolated home and no keys", 
     expect(await exited).toBe(0);
     expect(existsSync(join(cwd, "sessions"))).toBe(false); // nothing was recorded
   });
+});
+
+// A packaged Mac app started from Finder has no process.argv[1]. src/server/main.ts is bundled into the app's main
+// process, so its entry guard must not throw then: pathToFileURL(undefined) does, and the app would not start.
+describe("the entry guards with no script path (the packaged Mac app)", () => {
+  for (const file of ["../src/server/main.ts", "../src/cli/replay.ts", "../src/cli/calibrateBoundary.ts", "../src/cli/calibrateSpeakers.ts"]) {
+    test(`${file.slice(3)} loads, and does not run`, async () => {
+      const argv = process.argv;
+      process.argv = [process.execPath];
+      vi.resetModules();
+      try {
+        await expect(import(file)).resolves.toBeDefined();
+      } finally {
+        process.argv = argv;
+      }
+    });
+  }
 });

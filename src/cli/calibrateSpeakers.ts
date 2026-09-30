@@ -48,4 +48,4 @@ export async function run(argv = process.argv.slice(2), deps: { stdout?: (text: 
   for (const r of rows) log(`${r.threshold.toFixed(2).padStart(9)}  ${r.speakers}`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) await run();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await run();

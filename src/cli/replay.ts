@@ -105,4 +105,4 @@ export async function run(
   exit(0);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) await run();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await run();
