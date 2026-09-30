@@ -45,7 +45,8 @@ Every change to Tattle is test-first (the rule is in [CLAUDE.md](../CLAUDE.md)).
 | `npm run test:coverage` | Every Vitest test with coverage; fails under the thresholds. The report is in `coverage/index.html` |
 | `npx vitest run --coverage --coverage.include='src/pipeline/**'` | Coverage of one folder while working on it |
 | `npm run test:e2e` | Builds the page and the Mac app's bundle, then runs Playwright |
-| `npm run test:all` | Type checks, then coverage, then the end-to-end tests |
+| `npm run test:swift` | The capture helper's Swift tests with coverage, and the ClockLock gate (`scripts/swift-coverage.mjs`) |
+| `npm run test:all` | Type checks, then coverage, then the Swift tests, then the end-to-end tests |
 | `npm run typecheck` | Type checks the engine, the tests, and the page |
 
 `npx playwright install chromium` downloads Playwright's browser once per Mac (outside `node_modules`). With no end-to-end test yet, `npx playwright test --list` needs `--pass-with-no-tests` to exit 0.
@@ -88,6 +89,16 @@ A page module is tested in happy-dom with the page's real markup:
 - `layout(el, {...})` sets `clientWidth`, `scrollWidth` and the other sizes that are always 0 in happy-dom, and `getBoundingClientRect`.
 - `flush()` lets pending promises and zero-delay timers run.
 - In happy-dom a dialog's `close` event fires synchronously; in a browser it fires in a later task.
+
+## Swift tests (the capture helper)
+
+`native/capture/Package.swift` has a test target, `tattle-capture-tests` (`native/capture/Tests/tattle-capture-tests/`), written with Swift Testing (`import Testing`) against `@testable import tattle_capture` (the module name has an underscore). SwiftPM builds the executable for tests with its entry point renamed, so `main.swift`'s top-level code never runs, and no library split is needed; `swift build -c release` (`npm run build:capture`) does not build the tests.
+
+- **What is tested:** the pure logic. `ClockLock` places each buffer on session time (padding a late stream with silence, trimming one that runs ahead, clamping and scaling to 16-bit, framing 100 ms frames with continuous `sessionMs`, flushing, and the watchdog that pads a stalled stream), `Levels`, the converters (`MonoConverter`, `AdaptiveConverter`), `Devices.transportName`, `Devices.address`, `Devices.fourCC`, and `CaptureError`. Frames go to a collecting `FrameSink`; host times are computed from `ClockLock.startHost`.
+- **The converter's latency:** `AVAudioConverter` holds about 240 samples (15 ms), so the first 4,800-sample buffer at 48 kHz converts to about 1,360 samples, not 1,600. Assert cumulative totals with a tolerance of 300 or more, never per call.
+- **Not tested:** `SystemTap.swift`, `Mic.swift` and `main.swift` need the real devices and the macOS permissions (`npm run capture:test` checks them by hand).
+- **The gate:** `npm run test:swift` runs `scripts/swift-coverage.mjs`, which runs `swift test --enable-code-coverage`, prints line coverage per source file, and fails when `ClockLock.swift` is below 90 %.
+- The first build of the test target takes a minute or two; later runs take seconds.
 
 ## Coverage policy
 

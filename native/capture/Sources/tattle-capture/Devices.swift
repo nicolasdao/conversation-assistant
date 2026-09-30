@@ -86,7 +86,7 @@ enum Devices {
         return src
     }
 
-    private static func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { $0 << 8 | UInt32($1) } }
+    static func fourCC(_ s: String) -> UInt32 { s.utf8.reduce(0) { $0 << 8 | UInt32($1) } }
 
     /// Where an output device plays: `speakers` (heard in the room, so the microphone hears it too), `headphones`, or
     /// `virtual` (nobody hears it). Bluetooth counts as headphones (AirPods, earbuds). Anything unsure counts as speakers:

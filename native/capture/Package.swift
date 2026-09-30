@@ -20,5 +20,12 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
             ]
         ),
+        // Unit tests of the pure logic (docs/testing.md § Swift tests); `swift build -c release` does not build them.
+        .testTarget(
+            name: "tattle-capture-tests",
+            dependencies: ["tattle-capture"],
+            path: "Tests/tattle-capture-tests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

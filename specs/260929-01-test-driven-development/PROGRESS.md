@@ -15,7 +15,7 @@ The running log for `SPEC.md`. Updated after every phase.
 - [ ] Phase 8 — `web/src` panels, timeline, player, markdown, licenses, dom (+ `labels.ts`, `icons.ts`)
 - [ ] Phase 9 — E2E web (Playwright + Chromium)
 - [ ] Phase 10 — E2E Electron
-- [ ] Phase 11 — Swift tests for the capture helper
+- [x] Phase 11 — Swift tests for the capture helper (2026-09-30, done while Phases 3–8 ran in parallel worktrees)
 - [ ] Phase 12 — The suite becomes Step 1 of every release
 - [ ] Phase 13 — Close out
 
@@ -102,6 +102,15 @@ Phase 2:
 
 - `docs/testing.md` covers what exists now (loop, layers, commands, offline rules, fakes, DOM tests, coverage policy, rules). Its E2E web, E2E Electron, Swift and release-gate sections are written in Phases 9–12, as the spec says. `CLAUDE.md` names `npm run test:swift`, which Phase 11 adds.
 - The doc manifest was regenerated with `build-doc-manifest.py`; `--affects tests/foo.test.ts` names `docs/testing.md`.
+
+Phase 11:
+
+- 25 Swift tests in 5 suites (`ClockLockTests`, `LevelsTests`, `ConverterTests`, `DevicesTests`, `CaptureErrorTests`). Line coverage: ClockLock.swift 98.8 % (169/171), Devices.swift 17.9 %, Mic.swift 4.4 %, SystemTap.swift 0 %, main.swift 0 % (the last three are hardware- and permission-only, not gated). Proved to bite: raising the late-stream tolerance a hundredfold failed `padsALateStreamWithSilence` and `trimsAStreamThatRunsAhead`. The gate fails (exit 1) when set above the measured value.
+- Seam S6 only: `Devices.fourCC` is `static` (internal) instead of `private static`.
+- **Deviation:** `test:swift` is `node scripts/swift-coverage.mjs` alone rather than `swift test … && node scripts/swift-coverage.mjs`, because the script runs `swift test --enable-code-coverage` itself; the spec's form would run the tests twice.
+- Not testable without a zero-rate `AVAudioFormat` (which cannot be made): `AdaptiveConverter`'s `r <= 0` guard.
+- `npm run build:capture` (release) still builds; it does not build the test target.
+- Order: Phase 11 was done before Phases 3–8 landed (they ran as parallel agents in separate worktrees, and Phase 11 touches only `native/capture`, `scripts/` and `package.json`).
 
 ## Resume notes
 

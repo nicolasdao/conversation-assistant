@@ -87,7 +87,8 @@ On macOS 26+ with `tattle-transcribe` built, the page asks for no key: it transc
 | `npm test` / `npm run typecheck` | Offline tests (no network) and type checks |
 | `npm run test:coverage` | The same tests with coverage; fails below the thresholds in `vitest.config.ts` (see [Testing](docs/testing.md)) |
 | `npm run test:e2e` | End-to-end tests of the web page and the Mac app with Playwright (offline) |
-| `npm run test:all` | Everything: type checks, coverage, and the end-to-end tests |
+| `npm run test:swift` | The capture helper's Swift tests, with a coverage gate on its clock |
+| `npm run test:all` | Everything: type checks, coverage, the Swift tests, and the end-to-end tests |
 | `npm run models` | Downloads the local models |
 | `npm run fixtures` | Builds `fixtures/conversation/{host,remote}.wav` and `script.json` with macOS `say` |
 | `npm run smoke` | Live checks of transcription, Jev, and System 2 (measured at about $0.05); streaming text is not checked |

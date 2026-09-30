@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 254,
+      "line_count": 255,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -648,10 +648,11 @@
         "Offline, free, and away from real data",
         "Fakes (`tests/fakes/`)",
         "Web DOM tests (happy-dom)",
+        "Swift tests (the capture helper)",
         "Coverage policy",
         "Rules for new tests"
       ],
-      "line_count": 106,
+      "line_count": 117,
       "links_to": [
         "CLAUDE.md",
         "docs/architecture.md",
@@ -672,8 +673,6 @@
       ],
       "source_unresolved": [
         "e2e/**",
-        "native/capture/Tests/**",
-        "scripts/swift-coverage.mjs",
         ".agents/skills/release-tattle/scripts/test-suite.sh"
       ],
       "tags": [
