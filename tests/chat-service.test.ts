@@ -628,6 +628,57 @@ describe("stop, and the cost of a stopped reply", () => {
   });
 });
 
+describe("odd inputs", () => {
+  it("an error response whose body cannot be read still reports its status", async () => {
+    const r = rig();
+    await r.svc.create();
+    const broken = () => new Response(new ReadableStream({ start(c) { c.error(new TypeError("terminated")); } }), { status: 400 });
+    r.or.completions.push(broken);
+    const ev = await r.run("chat_1", { content: "q" });
+    expect((ev.find((e) => e.type === "error") as any).message).toBe("HTTP 400");
+  });
+
+  it("a stream that fails with a non-Error reason is a no-status error named by that reason", async () => {
+    const r = rig();
+    await r.svc.create();
+    const odd = () => new Response(new ReadableStream({ start(c) { c.error("socket gone"); } }), { status: 200 });
+    r.or.completions.push(odd, odd);
+    const ev = await r.run("chat_1", { content: "q" });
+    expect(r.done(ev).call).toMatchObject({ ok: false, attempts: 2, error: "socket gone" });
+  });
+
+  it("a chunk without an id leaves the generation id to a later chunk; a generation record without token counts gives 0", async () => {
+    const r = rig();
+    await r.svc.create();
+    r.or.completions.push((_b, init) => sse([sseData({ choices: [{ delta: { content: "A" } }] }), sseData({ id: "gen-9", choices: [{ delta: { content: "B" } }] })], { holdOpen: true, signal: init.signal }));
+    r.or.generations.push(() => json({ data: { total_cost: 0.0002 } }));
+    let n = 0;
+    const ev = await r.run("chat_1", { content: "q" }, (e) => { if (e.type === "delta" && ++n === 2) r.svc.stop("chat_1"); });
+    expect(r.done(ev).call).toMatchObject({ id: "gen-9", cost_usd: 0.0002, usage: { prompt_tokens: 0, completion_tokens: 0 } });
+    expect(r.or.urls).toContain(`${GENERATION_URL}?id=gen-9`);
+  });
+
+  it("an old question row without 'sent' is re-sent as its content; unknown row kinds and ops are ignored", async () => {
+    const r = rig([line(1)]);
+    await r.svc.create();
+    const at = new Date().toISOString();
+    const extra = [
+      { kind: "chat_message", chat_id: "chat_1", id: "m_1", role: "user", content: "old question", at },
+      { kind: "chat_message", chat_id: "chat_1", id: "m_2", role: "assistant", content: "old answer", at },
+      { kind: "chat", op: "pin", chat_id: "chat_1", at },
+      { kind: "note", chat_id: "chat_1", at },
+    ];
+    writeFileSync(join(r.dir, "chats.jsonl"), readFileSync(join(r.dir, "chats.jsonl"), "utf8") + extra.map((x) => JSON.stringify(x)).join("\n") + "\n");
+    r.reply();
+    await r.run("chat_1", { content: "new" });
+    const msgs = r.or.bodies[0].messages;
+    expect(msgs[1]).toEqual({ role: "user", content: "old question" });
+    expect(msgs[2]).toEqual({ role: "assistant", content: "old answer" });
+    expect(msgs[3].content).toContain('<transcript status="live, still being recorded" lines="1"'); // no earlier cursor: every line
+    expect((await r.svc.chat("chat_1")).messages.map((m: any) => m.id)).toEqual(["m_1", "m_2", "m_3", "m_4"]);
+  });
+});
+
 describe("the meter", () => {
   it("after an edit it uses the latest call still kept; totals count every call; pending lines and tokens", async () => {
     const lines = [line(1), line(2)];
