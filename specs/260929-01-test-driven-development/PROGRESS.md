@@ -9,12 +9,12 @@ The running log for `SPEC.md`. Updated after every phase.
 - [x] Phase 2 — CLAUDE.md and docs/testing.md (2026-09-30)
 - [x] Phase 3 — `src/audio`, `src/speakers`, `src/transcribe`, `src/pipeline`
 - [x] Phase 4 — `src/jev`, `src/factcheck`, `src/chat`, budget, config, keys, paths, licenses, version (+ `src/labels`, `src/settings.ts`)
-- [ ] Phase 5 — `src/server`, `src/store`, `src/cli`
+- [x] Phase 5 — `src/server`, `src/store`, `src/cli`
 - [x] Phase 6 — `desktop/`
 - [x] Phase 7 — `web/src` state, router, api, desktop, calls, transfer, keys, ui, chat, app, main
 - [x] Phase 8 — `web/src` panels, timeline, player, markdown, licenses, dom (+ `labels.ts`, `icons.ts`)
 - [x] Phase 9 — E2E web (Playwright + Chromium)
-- [ ] Phase 10 — E2E Electron
+- [x] Phase 10 — E2E Electron
 - [x] Phase 11 — Swift tests for the capture helper (2026-09-30, done while Phases 3–8 ran in parallel worktrees)
 - [ ] Phase 12 — The suite becomes Step 1 of every release
 - [ ] Phase 13 — Close out
@@ -88,10 +88,29 @@ phase under Deviations). The one file under a target: `src/speakers/registry.ts`
 `?? 0` / `?? []` at :115, 149, 155, 165–166, 199–204 and the fallback at :123 are unreachable, because `create()`
 always sets those maps and a stream with no centroid always has a placeholder.
 
+### After Phases 5 and 10 (74 files, 2,212 tests: 2,157 pass, 55 expected fails)
+
+| Folder | lines | statements | functions | branches |
+|---|---|---|---|---|
+| `src/**` | 99.45 | 99.22 | 99.18 | 97.31 |
+| `web/src/**` | 100.00 | 99.53 | 98.95 | 97.42 |
+| `desktop/**` | 100.00 | 100.00 | 100.00 | 100.00 |
+
+Every folder is above its §3 target. Thresholds raised: src 99/99/99/97. Files under a per-file target (branches):
+`src/speakers/registry.ts` 84.93 % (above) and `src/server/inProcess.ts` 86.66 % (`v !== undefined` and
+`res.statusCode ?? 500` cannot take their other arm from Node's http). Also below 100 % but above target:
+`src/cli/replay.ts` functions 91.7 % (the bus's `onInvalid` callback never fires, and the entry guard's true branch
+runs only as a child process); `src/server/main.ts` ~96 % (`main()`, the `npm run serve` body, runs only as a child
+process, and S2 does not cover it; the `BudgetExhaustedError` catches in `assist`/`tryOn` and some `??` fallbacks are
+unreachable).
+
 ## Bug ledger
 
 | Id | File:line | Impact | Status |
 |---|---|---|---|
+| B1 | `src/server/main.ts:506` (`Engine.start`) | A name over 120 characters answered 400 while the session kept running; a retry got 409 | Fixed, `6dc0522` |
+| B3 | `src/server/main.ts:1129`, `src/cli/calibrateBoundary.ts:63`, `src/cli/calibrateSpeakers.ts:51` | The command-line tools silently did nothing from a path with a space | Fixed for spaces, `8c5313b` (S3's `pathToFileURL`); **a symlinked path still does nothing**: Node resolves the main module's symlinks but not `argv[1]`. Decision for the user |
+| B3-L1 | the same guards | S3's guard threw `ERR_INVALID_ARG_TYPE` when `process.argv[1]` is undefined, as in the packaged Mac app started from Finder: `src/server/main.ts` is bundled into the app, so the app would not have started. Found in review before any release | Fixed, `8cb59f2` (test first) |
 | B2 | `web/src/panels.ts:590` (`segmentMatches`) | A speaker filter plus a label filter emptied the transcript; a speaker filter alone dimmed every segment | Fixed, `1e64d51` |
 | B4 | `web/src/licenses.ts:15` (`linkify`) | `<https://x>` linked to `https://x>`, breaking 7 real notices | Fixed, `6884e05` |
 | B5 | `web/src/api.ts:19` | An error with an empty body gave an empty message: blank toasts | Fixed, `4a83370` |
@@ -121,6 +140,7 @@ always sets those maps and a stream with no centroid always has a placeholder.
 | W7-L1 | `web/src/chat.ts:297-310` | A reply stream that ends without `done` is never fetched again: the unsaved version stays on screen | `it.fails` |
 | W7-L2 | `web/src/app.ts:230, 244-247` | The page listens for the engine's `error` events under the name EventSource uses for a dropped connection: every drop runs `JSON.parse(undefined)` and throws | `test.fail` (end-to-end); not writable as a unit `it.fails` |
 | E2E-L1 | `web/src/app.ts:248-250` (`es.onerror`) | Same cause: every engine `error` event (and each one replayed on reconnect) marks the event stream as lost (`#conn.down`) while it is connected | `test.fail` (end-to-end) |
+| E2E-L5 | `src/audio/wav.ts:41` (`readWav16k`) | **Severe for the Mac app**: `sherpa.readWave(path)` without `false` throws "External buffers are not allowed" inside Electron, and `FileSource` reads every replayed WAV through it, so a replay in the Mac app (Recordings → Replay) fails as it opens the audio. The gotcha's fix covered `vad.front` and `extractor.compute`, not `readWave` | `test.fail` (Electron end-to-end). Fix: `sherpa.readWave(path, false)`; a candidate for the next patch release |
 | E2E-L4 | `web/src/main.ts:13` | The shell shows (`booting` removed) before `app.js` has bound its controls: a click in that gap does nothing (seen under load) | Not testable deterministically; the E2E `open()` waits for the first render |
 | §14.3 | `web/src/api.ts:153` → `transfer.ts:165` | An import answered with a 2xx that isn't JSON leaves the window on "Importing…" | Not writable as `it.fails` (unhandled rejection) |
 | §14.4 | `web/src/keys.ts:20-49, 115` | The guide links are shared nodes: a second card showing at once takes them | `it.fails` |
@@ -143,6 +163,16 @@ always sets those maps and a stream with no centroid always has a placeholder.
 | LBW-L2 | `web/src/labels.ts:492` | A save failing with a plain Error shows "TypeError: …" instead of its message | `it.fails` |
 | LBW-L3 | `web/src/labels.ts` (`openEditor`, ~:479) | Save can be pressed before the first check answers (docs: Save waits until there are no errors) | `it.fails` |
 | LBW-L4 | `web/src/labels.ts:562` (`tryIt`) | After a needsKey refusal with `GET /api/setup` failing, Try retries in a loop | `it.fails` |
+| §11.2 | `src/server/main.ts:533` | A live capture keeps running when its Session cannot be built | `it.fails` |
+| §11.4 | `src/server/audio.ts:85-91` | An error after the headers are sent (an unreadable WAV) is an unhandled rejection that ends the process | Not writable even as `it.fails` (it would crash the worker) |
+| §11.5 | `src/store/transfer.ts:246-251` | **Privacy:** a `.tattle` export carries the exporter's home path in events.jsonl | `it.fails`; a follow-up for the user to decide |
+| §11.6 | `src/store/transfer.ts:127` | Exporting a listed recording without events.jsonl fails with a raw ENOENT | `it.fails` (two tests) |
+| §11.7 | `src/store/transfer.ts:226` | Two recordings with the same id and no start time count as the same (409) | `it.fails` |
+| §11.8 | `src/store/transfer.ts:171` | An original WAV whose header was never finalised imports cut to 1 s | `it.fails` |
+| §11.9 | `src/store/library.ts:202` | Recordings without a start time sort before every dated one | `it.fails` |
+| §11.18 | `src/store/transfer.ts:276` | A manifest without `recording` gives a raw TypeError instead of a 400 | `it.fails` |
+| §11.19 | `src/cli/replay.ts:105` | Replay exits 0 even after the credit ran out (402) | `it.fails` |
+| §11.20 | `src/cli/calibrateSpeakers.ts:44` | `--voices abc` runs with a NaN limit | `it.fails` |
 
 ## Deviations and decisions
 
@@ -234,6 +264,31 @@ Phase 9 (2026-09-30):
   the harness can drop the one echoed-key Jev error. The seeded recordings get real WAVs (makeSession's are bare
   bytes, which import cannot decode).
 
+Phase 5 (2026-09-30; +225 tests; → `8c5313b…df9a052`): B1 and B3 fixed test-first, S2 (`run(argv, deps)` in replay
+and both calibration tools; replay had no entry guard at all, so it got one in the S3 form) and S3. §4.0.6 in
+`tests/server.test.ts`: `secret.txt` in a mkdtemp folder, and the FakeEngine reset before each test. Not written: the
+`serve --replay … prints 'replaying …'` case (it needs a preload with a fake fetch in a child process, which §4.0.2
+does not list).
+
+- **Review finding, fixed:** the S3 guard as the spec gives it (`import.meta.url === pathToFileURL(process.argv[1]).href`)
+  throws when `process.argv[1]` is undefined. `src/server/main.ts` is bundled into the Mac app's main process, and a
+  packaged app started from Finder has no `argv[1]`: the app would not have started. A test loading the four modules
+  with no `argv[1]` failed (`ERR_INVALID_ARG_TYPE`) and passes with `process.argv[1] && …` (`8cb59f2`, B3-L1). The
+  development app and every test pass the path, which is why nothing else caught it.
+
+Phase 10 (2026-09-30):
+
+- 15 scenarios (spec: ≥ 8), `--repeat-each=3`: 45/45 passed in 59 s with the installed `/Applications/Tattle.app`
+  running throughout (it was already open, and was left running). Everything the dev app keeps is inside the test's
+  HOME (`userData` asserted), so isolation holds.
+- U3 resolved: Electron's module properties are writable; `dialog.showMessageBox`, `shell.openExternal` and
+  `shell.openPath` are replaced in the main process right after launch. U4: with an isolated HOME the lock is the
+  test's own, and a second launch with the same HOME exits 0 and fires `second-instance` in the first. U5: the
+  symlinked working folder works (no seam S5). U11: Playwright 1.63 launches Electron 44.4.5.
+- `TATTLE_FORCE_NO_APPLE_SPEECH=1` keeps the on-device helper from starting (and its model from being installed).
+- sherpa-onnx inside Electron: the VAD and the embedder work with the `false` copies. `readWave(path)` does not:
+  E2E-L5 (see the ledger), the most serious finding of this work, since it breaks replays in the Mac app.
+
 ## Resume notes
 
-Next: merge Phase 5 when its agent reports, then Phase 10 (E2E Electron), Phase 12 (release step 1), Phase 13.
+Next: Phase 12 (release step 1), then Phase 13 (close out).
