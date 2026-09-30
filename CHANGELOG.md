@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-30
+
+### Changed
+- Settings… and Check for Updates… in the Tattle menu now show icons, in line with the menu's standard items on macOS 26
+
+### Fixed
+- Tattle no longer contacts OpenRouter at launch to list Chat's models: it asks only when Chat opens with an OpenRouter key set, so a transcript-only show with Apple Speech contacts nothing
+
 ## [1.0.0] - 2026-09-29
 
 ### Added
