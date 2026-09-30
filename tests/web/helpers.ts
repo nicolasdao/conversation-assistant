@@ -156,3 +156,33 @@ export function installBrowserStubs(): { open: ReturnType<typeof vi.fn> } {
   vi.stubGlobal("open", open);
   return { open };
 }
+
+/**
+ * A stand-in for `api` in web/src/api.ts: a `vi.fn` per member of the real object, resolving to `undefined` unless
+ * overridden (`labelSetExportUrl`, which is synchronous, keeps its real behaviour). Use with `vi.mock`, keeping
+ * `ApiError` real:
+ *
+ *   const fake = vi.hoisted(() => ({}) as Record<string, ReturnType<typeof vi.fn>>);
+ *   vi.mock("../../web/src/api.ts", async (orig) => ({ ...(await orig()), api: fake }));
+ *   beforeEach(async () => Object.assign(fake, makeFakeApi((await vi.importActual<typeof import("../../web/src/api.ts")>("../../web/src/api.ts")).api)));
+ */
+export function makeFakeApi<T extends Record<string, unknown>>(real: T, overrides: Partial<Record<keyof T, (...a: any[]) => unknown>> = {}): Record<keyof T, ReturnType<typeof vi.fn>> {
+  const f = {} as Record<keyof T, ReturnType<typeof vi.fn>>;
+  for (const k of Object.keys(real) as (keyof T)[]) f[k] = vi.fn(async () => undefined);
+  if (typeof real.labelSetExportUrl === "function") f["labelSetExportUrl" as keyof T] = vi.fn(real.labelSetExportUrl as (...a: any[]) => unknown);
+  for (const [k, fn] of Object.entries(overrides)) f[k as keyof T] = vi.fn(fn as (...a: any[]) => unknown);
+  return f;
+}
+
+type StateModule = typeof import("../../web/src/state.ts");
+
+/**
+ * Builds a page state the way the page does: a snapshot (`fromSnapshot`) then events through the real reducer
+ * (`applyEvent`), so fixtures look like the engine's SSE stream. Each event is `[type, data]` or `[type, data, at]`.
+ */
+export function feed(state: StateModule, events: ([string, any] | [string, any, string])[], snapshot?: any): ReturnType<StateModule["emptyState"]> {
+  const s = snapshot ? state.fromSnapshot(snapshot) : state.emptyState();
+  const dirty: Parameters<StateModule["applyEvent"]>[4] = new Set();
+  for (const [type, data, at] of events) state.applyEvent(s, type, data, at ?? "2026-09-30T10:00:00.000Z", dirty);
+  return s;
+}
