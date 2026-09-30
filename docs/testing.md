@@ -41,7 +41,7 @@ Every change to Tattle is test-first (the rule is in [CLAUDE.md](../CLAUDE.md)).
 
 | Command | Runs |
 |---|---|
-| `npm test` | Every Vitest test, offline, in about 30 s |
+| `npm test` | Every Vitest test, offline, in about a minute |
 | `npx vitest run tests/<file>.test.ts` | One file |
 | `npm run test:coverage` | Every Vitest test with coverage; fails under the thresholds. The report is in `coverage/index.html` |
 | `npx vitest run --coverage --coverage.include='src/pipeline/**'` | Coverage of one folder while working on it |
@@ -50,7 +50,7 @@ Every change to Tattle is test-first (the rule is in [CLAUDE.md](../CLAUDE.md)).
 | `npm run test:all` | Type checks, then coverage, then the Swift tests, then the end-to-end tests |
 | `npm run typecheck` | Type checks the engine, the tests, and the page |
 
-`npx playwright install chromium` downloads Playwright's browser once per Mac (outside `node_modules`). With no end-to-end test yet, `npx playwright test --list` needs `--pass-with-no-tests` to exit 0.
+`npx playwright install chromium` downloads Playwright's browser once per Mac (outside `node_modules`).
 
 ## Offline, free, and away from real data
 
@@ -110,7 +110,7 @@ A page module is tested in happy-dom with the page's real markup:
 - **Isolation** (`e2e/electron/fixture.ts`): each test launches the app with its own `HOME` (so Application Support, the window's storage and the single-instance lock are its own, and an installed Tattle can run at the same time), `TATTLE_CREDENTIALS`, `TATTLE_SETTINGS` and `TATTLE_LABEL_SETS` inside it, and `TATTLE_FORCE_NO_APPLE_SPEECH=1` (the on-device helper never starts, and its model is never installed). It runs from a tmp working folder: in development `web`, `config`, `models` and `sessions` are relative to it, so symlinks give the app the project's page, config and models, and an empty `sessions/` instead of the real recordings.
 - **The main process** gets a `fetch` that throws, and `dialog.showMessageBox`, `shell.openExternal` and `shell.openPath` replaced by recorders (Electron's module properties are writable, and `desktop/main.ts` reads them at call time): `mac.recorded()` returns the sheets and the links. `mac.menu(["Tattle", "Settings…"])` clicks a menu item.
 - **Never** start a session, send a chat message or save keys here: the web end-to-end tests do, against fakes.
-- **sherpa-onnx inside Electron:** one test runs the VAD and the embedder in the main process (with the `false` copies the gotcha requires), which the Node tests cannot check.
+- **sherpa-onnx inside Electron:** tests run the VAD, the embedder and `readWave` in the main process with the `false` copies the gotcha requires, and one shows that `readWave` without its copy is refused there. The Node tests cannot check either.
 
 ## Swift tests (the capture helper)
 
@@ -124,7 +124,7 @@ A page module is tested in happy-dom with the page's real markup:
 
 ## Release gate
 
-The whole suite is **Step 1 of every release** (`/release-tattle`, `.agents/skills/release-tattle/scripts/test-suite.sh`): before the docs are updated or anything is committed, it checks what the suite needs (the models and fixture, Playwright's Chromium, `swift`), saying how to get what is missing, then runs `npm run test:all`. A failure stops the release. Without Claude Code, the same script is the first command of the manual release (README § Releasing). It takes about 10 minutes and spends nothing.
+The whole suite is **Step 1 of every release** (`/release-tattle`, `.agents/skills/release-tattle/scripts/test-suite.sh`): before the docs are updated or anything is committed, it checks what the suite needs (the models and fixture, Playwright's Chromium, `swift`), saying how to get what is missing, then runs `npm run test:all`. A failure stops the release. Without Claude Code, the same script is the first command of the manual release (README § Releasing). It takes about 3 minutes on this Mac (a minute or two more when the Swift tests build for the first time) and spends nothing.
 
 ## Coverage policy
 

@@ -189,7 +189,7 @@ Personal settings (`.claude/settings.local.json`) are git-ignored; nothing in `.
 
 ## Website
 
-The official website is **[hey-tattle.com](https://hey-tattle.com)** (`www.hey-tattle.com` redirects to it). It is the static page in `website/`, hosted on Cloudflare as the Worker `tattle-website`, and it redeploys by itself about three minutes after any push to `master` that changes `website/`; pushes that only touch the app do not deploy it. Its Download for Mac button links the latest release's DMG: each release writes it into the page (step 9 of [Releasing](#releasing)), and the page also reads the newest release from GitHub when it loads. How it is hosted, deployed, secured, and changed: [Website](docs/website.md).
+The official website is **[hey-tattle.com](https://hey-tattle.com)** (`www.hey-tattle.com` redirects to it). It is the static page in `website/`, hosted on Cloudflare as the Worker `tattle-website`, and it redeploys by itself about three minutes after any push to `master` that changes `website/`; pushes that only touch the app do not deploy it. Its Download for Mac button links the latest release's DMG: each release writes it into the page (the last step of [Releasing](#releasing)), and the page also reads the newest release from GitHub when it loads. How it is hosted, deployed, secured, and changed: [Website](docs/website.md).
 
 ## Releasing
 
@@ -207,7 +207,7 @@ A deployed version is final: GitHub keeps release tags and published releases fr
 
 It does, in order (a summary of the skill's own steps):
 
-1. Runs the whole test suite: unit tests with coverage thresholds, the capture helper's Swift tests, and the end-to-end tests of the web page and the Mac app (development build, offline); stops if any fails.
+1. Runs the whole test suite: type checks, unit tests with coverage thresholds, the capture helper's Swift tests, and the end-to-end tests of the web page and the Mac app (development build, offline); stops if any fails.
 2. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
 3. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.
 4. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
