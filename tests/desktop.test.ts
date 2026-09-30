@@ -60,8 +60,9 @@ test("sherpa-onnx calls that return audio copy it, because Electron refuses exte
     }
   };
   walk("src");
-  const calls = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/\b(?:vad|extractor)\.(front|compute|get)\(([^)]*)\)/g)].map((m) => `${f}: ${m[0]}`));
-  expect(calls.length).toBeGreaterThanOrEqual(2);
+  // readWave too: without its `false`, every replay in the Mac app failed as it opened the audio (E2E-L5)
+  const calls = files.flatMap((f) => [...readFileSync(f, "utf8").matchAll(/\b(?:(?:vad|extractor)\.(?:front|compute|get)|sherpa\.readWave)\(([^)]*)\)/g)].map((m) => `${f}: ${m[0]}`));
+  expect(calls.length).toBeGreaterThanOrEqual(3);
   for (const c of calls) expect(c).toMatch(/,?\s*false\)$/);
 });
 

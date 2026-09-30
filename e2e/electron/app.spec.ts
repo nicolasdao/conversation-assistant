@@ -156,10 +156,9 @@ test("sherpa-onnx runs inside Electron with copies: the VAD finds speech and the
   expect(got.dim).toBe(256);
 });
 
-// Known bug, recorded, not fixed (SPEC §4.0.4): src/audio/wav.ts reads WAVs with `sherpa.readWave(path)`, without the
-// copy, and FileSource reads every replayed WAV through it, so a replay in the Mac app fails as it opens the audio.
-test("BUG E2E-L5: a WAV read the way src/audio/wav.ts reads it loads inside Electron", async ({ mac }) => {
-  test.fail();
-  const n = await sherpaIn(mac, (sherpa, root) => sherpa.readWave(`${root}/fixtures/conversation/host.wav`).samples.length);
-  expect(n).toBeGreaterThan(0);
+// Why src/audio/wav.ts reads WAVs with `sherpa.readWave(path, false)`: without the copy, Electron refuses the buffer,
+// and every replay in the Mac app failed as it opened the audio (E2E-L5, fixed on 30 September 2026). The contract
+// test in tests/desktop.test.ts keeps the `false` in place.
+test("sherpa's readWave without a copy is refused inside Electron", async ({ mac }) => {
+  await expect(sherpaIn(mac, (sherpa, root) => sherpa.readWave(`${root}/fixtures/conversation/host.wav`).samples.length)).rejects.toThrow("External buffers are not allowed");
 });

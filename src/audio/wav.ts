@@ -38,7 +38,7 @@ export function encodeWav(samples: Float32Array, sampleRate = SAMPLE_RATE): Buff
 
 /** Reads any WAV sherpa can read, resampled to 16 kHz mono Float32. */
 export function readWav16k(path: string): Float32Array {
-  const wave = sherpa.readWave(path);
+  const wave = sherpa.readWave(path, false); // a copy: Electron refuses external buffers (docs/gotchas.md § Mac app)
   if (wave.sampleRate === SAMPLE_RATE) return wave.samples;
   return new sherpa.LinearResampler(wave.sampleRate, SAMPLE_RATE).flush(wave.samples);
 }
