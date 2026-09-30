@@ -80,6 +80,95 @@ describe("echo gate", () => {
     const f = tone(0.3);
     expect(g.host(f, 0)).toBe(f);
   });
+
+  test("a virtual output (a recorder, a loopback device) keeps the gate off", () => {
+    const g = new EchoGate(CFG);
+    expect(g.setOutput("virtual")).toBe(false);
+    expect(g.active).toBe(false);
+    g.setOutput("speakers");
+    expect(g.setOutput("virtual")).toBe(true);
+    expect(g.active).toBe(false);
+  });
+
+  test("always mode ignores a null output; never mode ignores speakers", () => {
+    const always = new EchoGate({ ...CFG, mode: "always" });
+    expect(always.setOutput(null)).toBe(false);
+    expect(always.active).toBe(true);
+    const never = new EchoGate({ ...CFG, mode: "never" });
+    expect(never.setOutput("speakers")).toBe(false);
+    expect(never.setOutput(null)).toBe(false);
+  });
+
+  test("going inactive resets the muted counter", () => {
+    const g = new EchoGate(CFG);
+    g.setOutput("speakers");
+    g.remote(tone(0.5), 0);
+    expect(g.host(tone(0.3), 0).every((v) => v === 0)).toBe(true);
+    g.setOutput("headphones");
+    expect(g.takeMutedMs()).toBe(0);
+  });
+
+  test("a host frame at exactly playingUntil + holdMs passes through (>=), one ms before is muted", () => {
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(tone(0.5), 1000); // playing until 1032
+    const f = tone(0.3);
+    expect(g.host(f, 1032 + 250 - 1)).not.toBe(f);
+    expect(g.host(f, 1032 + 250)).toBe(f);
+  });
+
+  test("a lead of exactly 1000 ms still mutes; 1000.5 ms does not", () => {
+    const f = tone(0.3);
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(tone(0.5), 2000); // playing until 2032
+    expect(g.host(f, 1032)).not.toBe(f); // 1000 ms ahead
+    const h = new EchoGate({ ...CFG, mode: "always" });
+    h.remote(tone(0.5), 2000);
+    expect(h.host(f, 1031.5)).toBe(f); // 1000.5 ms ahead: a bad timestamp, never muted
+  });
+
+  test("a call frame exactly at thresholdDbfs counts as playing", () => {
+    const amp = 10 ** (-20 / 20); // a constant of 0.1 is −20 dBFS
+    const at = Float32Array.from({ length: 512 }, () => amp);
+    const db = 20 * Math.log10(Math.sqrt(at.reduce((a, x) => a + x * x, 0) / at.length));
+    const g = new EchoGate({ ...CFG, mode: "always", thresholdDbfs: db });
+    g.remote(at, 0);
+    expect(g.host(tone(0.3), 0).every((v) => v === 0)).toBe(true);
+    const h = new EchoGate({ ...CFG, mode: "always", thresholdDbfs: db + 1e-9 });
+    h.remote(at, 0);
+    const f = tone(0.3);
+    expect(h.host(f, 0)).toBe(f);
+  });
+
+  test("an empty call frame is ignored", () => {
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(new Float32Array(0), 0);
+    const f = tone(0.3);
+    expect(g.host(f, 0)).toBe(f);
+  });
+
+  test("takeMutedMs rounds fractional ms: a 100-sample host frame is 6.25 ms → 6", () => {
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(tone(0.5), 0);
+    const out = g.host(new Float32Array(100).fill(0.3), 0);
+    expect(out.length).toBe(100);
+    expect(g.takeMutedMs()).toBe(6);
+  });
+
+  test("a later quiet call frame does not shorten playingUntil", () => {
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(tone(0.5), 1000); // until 1032
+    g.remote(tone(0.001), 1032); // quiet: ignored
+    const f = tone(0.3);
+    expect(g.host(f, 1032 + 249)).not.toBe(f);
+  });
+
+  test("an earlier loud call frame after a later one moves playingUntil back (it assigns, it does not take the max)", () => {
+    const g = new EchoGate({ ...CFG, mode: "always" });
+    g.remote(tone(0.5), 2000); // until 2032
+    g.remote(tone(0.5), 1000); // until 1032: frames arrive in time order, so this does not happen in a session
+    const f = tone(0.3);
+    expect(g.host(f, 1032 + 250)).toBe(f);
+  });
 });
 
 /** The fixture's host track with the call leaking in: the remote track, 40 ms late, at a third of its level. */
