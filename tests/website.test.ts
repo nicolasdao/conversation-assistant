@@ -112,7 +112,7 @@ describe("crawling", () => {
     expect(robots).not.toMatch(/^Disallow: \/\s*$/m);
     expect(robots).toMatch(new RegExp(`^Sitemap: ${SITE}/sitemap\\.xml$`, "m"));
     const locs = [...read("website/sitemap.xml").matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual([links("canonical")[0]!.href]);
+    expect(locs[0]).toBe(links("canonical")[0]!.href);
     expect(ignored("website/robots.txt") || ignored("website/sitemap.xml")).toBe(false);
   });
 });
@@ -131,6 +131,78 @@ describe("structured data", () => {
     const publisher = nodes.find((n) => n["@type"] === "Organization")!;
     expect(publisher).toMatchObject({ name: "Cloudless Labs", url: "https://cloudlesslabs.com" });
     expect(app.publisher).toEqual({ "@id": publisher["@id"] });
+  });
+});
+
+describe("the docs page, /docs", () => {
+  const docs = existsSync(path("website/docs.html")) ? read("website/docs.html") : ""; // a missing page fails each test, not the file
+  const docsHead = docs.slice(0, docs.indexOf("</head>"));
+  const docsMeta = (attr: "name" | "property", key: string) =>
+    docsHead.match(new RegExp(`<meta ${attr}="${key.replace(/[.:]/g, "\\$&")}" content="([^"]*)"`))?.[1];
+  const text = docs.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  const ids = new Set([...docs.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+
+  it("is a page of its own, with its own canonical address, title, description, and link preview", () => {
+    expect(docsHead).toContain(`<link rel="canonical" href="${SITE}/docs">`);
+    const title = docsHead.match(/<title>([^<]*)<\/title>/)![1]!;
+    expect(title).toMatch(/^Tattle\b/);
+    expect(title.length).toBeLessThanOrEqual(60);
+    expect(docsMeta("name", "description")!.length).toBeGreaterThanOrEqual(110);
+    expect(docsMeta("name", "description")!.length).toBeLessThanOrEqual(160);
+    expect(docsMeta("property", "og:url")).toBe(`${SITE}/docs`);
+    expect(docsMeta("property", "og:image")).toBe(meta("property", "og:image"));
+    expect(docsMeta("name", "twitter:card")).toBe("summary_large_image");
+    expect([...docs.matchAll(/<h1\b/g)]).toHaveLength(1);
+  });
+
+  it("is linked from the landing page's header bar, hero, and footer, and listed in the sitemap", () => {
+    const bar = page.match(/<div class="bar" id="bar">[\s\S]*?<div class="bar-track"/)![0];
+    const hero = page.match(/<header class="hero"[\s\S]*?<\/header>/)![0];
+    const footer = page.match(/<footer[\s\S]*?<\/footer>/)![0];
+    for (const part of [bar, hero, footer]) expect(part).toContain('href="/docs"');
+    const locs = [...read("website/sitemap.xml").matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toContain(`${SITE}/docs`);
+  });
+
+  it("has a contents list that reaches every section, and every in-page link lands somewhere", () => {
+    const sections = [...docs.matchAll(/<section id="([^"]+)"/g)].map((m) => m[1]);
+    const toc = docs.match(/<details class="toc"[\s\S]*?<\/details>/)![0];
+    expect(sections.length).toBeGreaterThan(15);
+    for (const id of sections) expect(toc, id).toContain(`href="#${id}"`);
+    for (const [, id] of docs.matchAll(/href="#([^"]+)"/g)) expect(ids.has(id), `#${id}`).toBe(true);
+  });
+
+  it("covers every part of the app", () => {
+    const topics = [
+      "start", "install", "permissions", "keys", "transcription", "session", "header", "transcript", "speakers", "timeline",
+      "fact-checking", "thinking", "jev-log", "insights", "label-sets", "create-with-ai", "try-a-set", "chat", "recordings",
+      "playback", "replay", "export-import", "costs", "privacy", "files", "updates", "menus", "shortcuts", "links",
+      "show-checklist", "troubleshooting", "limits", "developers", "help",
+    ];
+    for (const id of topics) expect(ids.has(id), `#${id}`).toBe(true);
+  });
+
+  it("names every menu item the Mac app adds, every verdict, and every Chat model, as the code defines them", () => {
+    const menu = [...read("desktop/main.ts").matchAll(/label: "([^"]+)"/g)].map((m) => m[1]!);
+    expect(menu.length).toBeGreaterThan(5);
+    for (const item of menu) expect(text, item).toContain(item);
+    expect(text).toContain("⌘,"); // Settings…, the one accelerator the app sets itself
+    const verdicts = read("web/src/panels.ts").match(/const VERDICT_LABEL[^{]*\{([^}]*)\}/)![1]!;
+    for (const [, label] of verdicts.matchAll(/: "([^"]+)"/g)) expect(text, label).toContain(label!);
+    const models: string[] = JSON.parse(read("config/app.json")).chat.models;
+    for (const id of models) expect(text, id).toContain(id);
+  });
+
+  it("documents the keyboard shortcuts", () => {
+    const shortcuts = docs.match(/<section id="shortcuts"[\s\S]*?<\/section>/)![0];
+    for (const key of ["⌘K", "⌘,", "Space", "Esc", "Enter", "Shift", "⌘Q", "⌘W"]) expect(shortcuts, key).toContain(key);
+  });
+
+  it("loads only the site's own files, which exist, and no inline script the CSP would block", () => {
+    for (const [, src] of docs.matchAll(/(?:src|href)="(assets\/[^"]+)"/g)) expect(existsSync(path(`website/${src}`)), src).toBe(true);
+    const scripts = [...docs.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+    for (const [, attrs, body] of scripts) if (body!.trim()) expect(attrs).toContain('type="application/ld+json"');
+    expect(docs).toContain('data-download href="https://github.com/nicolasdao/tattle/releases/latest"');
   });
 });
 

@@ -1,8 +1,9 @@
 ---
-description: Tattle's website, hey-tattle.com — what the page contains, its search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
+description: Tattle's website, hey-tattle.com — what the landing page and the /docs manual contain, their search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
 tags: [website, cloudflare, hosting, deployment, workers, dns, security, csp, seo, open-graph]
 source:
   - website/index.html
+  - website/docs.html
   - website/assets/**
   - website/wrangler.jsonc
   - website/_headers
@@ -25,19 +26,20 @@ Tattle's official website is **https://hey-tattle.com**. It is one page whose jo
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The page. Plain HTML: no framework, no bundler, no build step |
+| `index.html` | The landing page. Plain HTML: no framework, no bundler, no build step |
+| `docs.html` | The manual, served at `/docs`: every feature of the app, for its users (see [The docs page](#the-docs-page)). Its styles and script are `assets/docs.css` and `assets/docs.js` |
 | `assets/` | Its styles (`theme.css`, the app's On Air tokens; `style.css`), scripts, and the Barlow fonts (SIL OFL, `assets/fonts/OFL.txt`) |
 | `wrangler.jsonc` | The Cloudflare Worker's configuration |
 | `_headers` | Security headers for every response (see [Security](#security)) |
 | `.assetsignore` | Files in `website/` that are never uploaded: the config files, `experiments/`, Markdown, `.wrangler/` |
 | `og.jpg` | The link-preview image (`og:image`), 1200×630 (see [Search and link previews](#search-and-link-previews)) |
 | `favicon.ico`, `favicon.svg`, `apple-touch-icon.png` | The icons, made from `desktop/icon.svg` |
-| `robots.txt`, `sitemap.xml` | For crawlers: everything allowed, and the one page |
+| `robots.txt`, `sitemap.xml` | For crawlers: everything allowed, and the two pages |
 | `experiments/` | The ten design experiments the page grew out of (28 September 2026), with a gallery (`experiments/index.html`) and their shared brief (`experiments/_shared/BRIEF.md`), and the link-preview card candidates (`experiments/og/`). Kept for reference; **not deployed** |
 
 The page was chosen from experiment `02-record-button`. Its sections, top to bottom:
 
-0. **The header bar** (`assets/nav.js`), pinned to the top as the page scrolls: the app's own header strap (the ON AIR block, which the record key turns on, the name as a `<p>`, the record clock), the show's rundown as tabs (`01 Rundown` … `06 Credits`; the section on screen lights up red like a segment going on air), a compact Download that slides in once the hero's is off screen, and a playhead along its bottom edge with a tick where each section starts. On a phone the tabs are a swipeable second row.
+0. **The header bar** (`assets/nav.js`), pinned to the top as the page scrolls: the app's own header strap (the ON AIR block, which the record key turns on, the name as a `<p>`, the record clock), the show's rundown as tabs (`01 Rundown` … `06 Credits`; the section on screen lights up red like a segment going on air) and a **Docs** tab to the manual (`nav.js` lights only the `#` tabs, so a tab to another page must not start with `#`), a compact Download that slides in once the hero's is off screen, and a playhead along its bottom edge with a tick where each section starts. On a phone the tabs are a swipeable second row.
 1. **The hero**: the page's only `<h1>` is the lede beside the key ("Tattle listens to your calls…"), so the heading says what the app does. **The record key** (`assets/scene.js`, Three.js): the app icon as a glossy 3D key. Pressing it takes the page "on air" with rings, rising captions, and fact-check lower thirds. Without WebGL, `assets/main.js` draws a CSS key instead; with reduced motion, a calm version.
 2. **Rundown**: what the app does, in five steps, closed by **Your Mac does the listening** (`.onmac`): on macOS 26 or later transcripts are free, private, and work offline with Apple Speech. Its claims must keep "transcript-only" and "once the speech model has downloaded", and name the older-macOS and online-feature cases (see [Transcription](transcription.md)).
 3. **Jev** (`#jev`): why a decision model makes live judgment affordable, with a replaying **Jev call** (`assets/sections.js`). The questions shown are Tattle's real ones; the answers are labelled as examples. It links to [TypeSafe AI](https://typesafe.ai) and [Jev's documentation](https://docs.typesafe.ai/). See [Jev](jev.md).
@@ -45,7 +47,7 @@ The page was chosen from experiment `02-record-button`. Its sections, top to bot
 5. **Your labels** (`#labels`, since 29 September 2026): label sets — the three kinds of label (up to 2 categories, 2 scores, 8 markers) with small drawn examples, Create with AI's interview ("An interview, not a blank page", with a static example of one turn and the checklist, labelled as an example), Try on a recording, sharing `.tattle-labels` files, and the copy each recording keeps. See [Jev](jev.md#the-timeline-questions-per-segment-label-sets).
 6. **Before you go live**: the keys, the cost, privacy, signing.
 7. **Credits** (`#credits`): who made Tattle, [Nicolas Dao](https://nicolasdao.com) at [Cloudless Labs](https://cloudlesslabs.com), with his [YouTube channel](https://www.youtube.com/@nicolasdao) and [X](https://x.com/realnicdao) (`rel="me"`), and a full-width card for [MadKoo](https://www.youtube.com/@theMadKoo), the podcast where Tattle was first demoed. The footer's "Made by" line links the same three. The JSON-LD names them as `author` (with both profiles in `sameAs`) and `publisher`, and the head carries `<link rel="author">`.
-8. **Fine print**: made by, license, consent, trademarks, and the latest release line.
+8. **Fine print**: made by, license, consent, trademarks, and the latest release line. Its links start with Docs, and the hero links it too ("How it works: Docs").
 
 Every figure on the page comes from the docs (`jev.md`, `system1-system2.md`, `mission.md`, `transcription.md`, `setup.md`). How well Create with AI's model writes Jev's questions has not been measured, so the page makes no claim about it. Change the page's claims only from there. Since v0.9.0 the cue card says what is true on macOS 26 or later (no key, free transcripts, audio kept on the Mac) and names the older-macOS case (an OpenAI key, about $1.23 an hour); it must not drop that qualifier, because Tattle still supports macOS 14.2.
 
@@ -65,7 +67,7 @@ What search engines and link previews (X, LinkedIn, Slack, iMessage, WhatsApp, D
 | Icons | `/favicon.ico` (16, 32, 48), `/favicon.svg`, `/apple-touch-icon.png` (180, full-bleed, because iOS rounds it and turns transparency black). Google does not show a `data:` favicon in results, which the page used before |
 | Headings | One `<h1>`, the hero's lede, so it carries what the app does |
 | JSON-LD | An `@graph` of `WebSite` (the site name Google shows), `SoftwareApplication` (with `url`, `image`, `isAccessibleForFree`, `featureList`, and the repository in `sameAs`), and the publisher `Organization`, Cloudless Labs. There are no ratings, so Google shows no software rich result; never invent any |
-| `robots.txt`, `sitemap.xml` | Everything allowed, and the canonical page |
+| `robots.txt`, `sitemap.xml` | Everything allowed, and both pages (`/` and `/docs`) |
 
 **The link-preview image** (`og.jpg`) is card `02-record-key`, chosen on 30 September 2026: the site's 3D record key on its on-air rings, **Press record. Every claim gets checked.**, a Free for Mac strap, and a Contradicted lower third on "Bats are blind." Its claims come from the site brief's safe examples, like everything else on the page. Five candidates live in `experiments/og/` as HTML pages (1200×630, the site's `theme.css` and fonts, the rules in `og.css`), with a gallery (`experiments/og/index.html`) that shows each full size, at feed size, and cropped square. The key is captured from the live page into `experiments/og/assets/key.jpg`.
 
@@ -83,6 +85,14 @@ node scripts/make-site-images.mjs --capture-key         # the 3D key again, from
 **Cloudflare's robots.txt.** Before `website/robots.txt` existed, `/robots.txt` answered with Cloudflare's managed content-signals text (comments only, no rules, no sitemap). Since the first deploy with our file (30 September 2026, with v1.0.2), Cloudflare serves ours exactly as written.
 
 **Outside the repository:** verify the site in Google Search Console and Bing Webmaster Tools (a DNS TXT record, through the `cloudflare-config` skill) and submit `https://hey-tattle.com/sitemap.xml`. The GitHub repository's social preview (Settings → Social preview, 1280×640) is a separate upload.
+
+## The docs page
+
+`docs.html`, at **https://hey-tattle.com/docs** (Cloudflare serves `docs.html` at `/docs`; locally, open `docs.html`), is the manual: one page covering every feature of the app for the people who use it, in 30 numbered sections (quick start, install and permissions, keys, the transcription engines, going live, the header, the transcript, speakers, the timeline, fact-checking, the two analysis tabs, Insights, label sets, Chat, recordings, playback, export and import, costs, privacy, files, updates, the menu bar, keyboard shortcuts, links, before a show, troubleshooting, limits, running from source, help). It was written on 30 September 2026 from the code itself, not from these docs: where they disagreed, it follows the code (for example, the app shows five verdicts, and names a session by clicking its name in the header).
+
+It reuses the site's header strap and tokens (`theme.css`, `style.css`), with a sticky contents list that lights the section on screen (`docs.js`) and folds away on a phone. Its head has its own canonical address, description, Open Graph and X tags (the same image), and JSON-LD (`TechArticle` and `BreadcrumbList`).
+
+**Keep it current.** A change to what users see (a new setting, menu item, shortcut, message, limit, or price) updates `docs.html` in the same change. `tests/website.test.ts` catches part of it: it fails when the Mac app adds a menu item (the `label:` strings in `desktop/main.ts`), when a verdict label changes (`VERDICT_LABEL` in `web/src/panels.ts`), or when a Chat model is added (`chat.models` in `config/app.json`) and the page does not name it, when a required topic's anchor disappears, when a section is missing from the contents, or when an in-page link points nowhere.
 
 ## Hosting
 
@@ -167,7 +177,7 @@ The `cloudflare` skill's `cf.js` needs a workaround in this repository (see [Got
 
 1. Edit files under `website/`; preview with `npx wrangler dev`.
 2. If the import map or a Three.js version changed, recompute the hashes ([Security](#security)).
-3. Run `npx vitest run tests/website.test.ts`: it fails when the head loses a tag, the image outgrows its limits, the release's `update-website.sh` no longer finds a field it rewrites, or the import map's hash is stale.
+3. Run `npx vitest run tests/website.test.ts`: it fails when the head loses a tag, the manual falls behind the app (see [The docs page](#the-docs-page)), the image outgrows its limits, the release's `update-website.sh` no longer finds a field it rewrites, or the import map's hash is stale.
 4. Commit and push to `master`. Cloudflare redeploys within minutes; check **Deployments** in the dashboard, or https://hey-tattle.com.
 
 ### Releases update the site

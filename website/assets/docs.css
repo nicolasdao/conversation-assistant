@@ -1,0 +1,123 @@
+/* hey-tattle.com/docs: the manual. The site's tokens (theme.css) and its header bar (style.css); this file lays out the
+   long read: a sticky contents list, broadcast-strap section heads, tables, keys, and notes. */
+
+.docs-page { --bar-h: 63px; }
+/* style.css hides horizontal overflow on html and body, which makes body a scroll container and breaks the sticky contents;
+   clip keeps the page from scrolling sideways without that side effect */
+html, body.docs-page { overflow-x: clip; }
+.docs-page .bar { background: rgba(15, 32, 56, 0.94); border-bottom-color: var(--rule); }
+.docs-page .tabs a[aria-current="page"] { color: var(--ink); }
+.docs-page .tabs a[aria-current="page"] em { background: var(--live); color: #fff; }
+
+/* ---------- the page head ---------- */
+.dhead { padding: calc(var(--bar-h) + 56px) 24px 40px; border-bottom: 1px solid var(--rule);
+  background: radial-gradient(900px 420px at 85% 0%, rgba(43, 212, 240, 0.08), transparent 60%), radial-gradient(700px 400px at 0% 100%, rgba(232, 38, 59, 0.1), transparent 60%); }
+.dhead-in { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px; justify-items: start; }
+.dhead .topstrap { height: 72px; }
+.dhead .strap .name { font-size: 34px; margin: 6px 0 0; }
+.dhead .tag { font: 800 22px/1 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; padding: 0 26px 0 20px;
+  background: var(--live); color: #fff; clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%); }
+.dlede { margin: 0; max-width: 40em; font: 500 21px/1.5 var(--body); color: var(--ink-2); text-wrap: pretty; }
+.dlede b { color: var(--ink); font-weight: 700; }
+.dhead-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+.dhead .ca-download { font-size: 20px; padding: 15px calc(24px + var(--slant)) 15px 20px; }
+
+/* ---------- the two columns: contents, then the read ---------- */
+.doc { max-width: 1180px; margin: 0 auto; padding: 44px 24px 96px; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 56px; align-items: start; }
+.toc { position: sticky; top: calc(var(--bar-h) + 24px); max-height: calc(100vh - var(--bar-h) - 48px); overflow: auto; scrollbar-width: thin; padding-right: 6px; }
+.toc summary { list-style: none; cursor: pointer; font: 800 14px/1 var(--cond); letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); padding: 4px 0 14px; }
+.toc summary::-webkit-details-marker { display: none; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc .toc-g { margin: 14px 0 4px 11px; font: 800 12px/1 var(--cond); letter-spacing: 0.18em; text-transform: uppercase; color: var(--live); }
+.toc .toc-g:first-child { margin-top: 0; }
+.toc a { display: grid; grid-template-columns: 26px 1fr; gap: 6px; padding: 7px 10px 7px 8px; border-left: 3px solid transparent; text-decoration: none;
+  font: 700 14px/1.25 var(--cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.toc a em { font-style: normal; color: var(--mute); font-weight: 800; }
+.toc a:hover { color: var(--ink); background: var(--deck); }
+.toc a[aria-current] { color: var(--ink); border-left-color: var(--live); background: var(--deck); }
+.toc a[aria-current] em { color: var(--live); }
+
+.read { min-width: 0; max-width: 800px; }
+.read > section { scroll-margin-top: calc(var(--bar-h) + 20px); padding-bottom: 28px; margin-bottom: 44px; border-bottom: 1px solid var(--rule); }
+.read > section:last-child { border-bottom: 0; }
+.read h2 { display: flex; align-items: stretch; margin: 0 0 22px; width: max-content; max-width: 100%; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.35)); }
+.read h2 em { font: 800 18px/1 var(--cond); font-style: normal; display: flex; align-items: center; padding: 12px 22px 12px 14px; background: var(--live); color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%); }
+.read h2 span { font: 800 28px/1 var(--cond); letter-spacing: 0.02em; text-transform: uppercase; display: flex; align-items: center; padding: 10px 30px 10px 26px; margin-left: -12px;
+  background: var(--paper); color: var(--paper-ink); clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); }
+.read h3 { scroll-margin-top: calc(var(--bar-h) + 20px); margin: 34px 0 10px; font: 800 23px/1.1 var(--cond); letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink); }
+.read h4 { margin: 22px 0 6px; font: 700 16px/1.2 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.read p, .read li { font-size: 17px; line-height: 1.65; color: var(--ink-2); }
+.read p { margin: 0 0 14px; }
+.read strong, .read b { color: var(--ink); font-weight: 600; }
+.read ul, .read ol { margin: 0 0 16px; padding-left: 22px; }
+.read li { margin: 0 0 6px; }
+.read li::marker { color: var(--mute); }
+.read a { color: var(--accent); }
+.read code { font: 500 0.88em/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); background: var(--deck-2); padding: 2px 6px; border-radius: 2px; overflow-wrap: anywhere; }
+.read pre { margin: 0 0 16px; padding: 14px 16px; background: var(--deck); border-left: 3px solid var(--rule); overflow-x: auto; }
+.read pre code { background: none; padding: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+.lead { font-size: 19px !important; color: var(--ink) !important; }
+
+/* keys, as the app's keycaps */
+kbd { display: inline-block; min-width: 1.6em; text-align: center; font: 700 0.86em/1 var(--cond); letter-spacing: 0.04em; color: var(--ink);
+  background: var(--deck-3); border: 1px solid var(--rule); border-bottom-width: 3px; border-radius: 3px; padding: 3px 6px 2px; }
+/* a UI label, as it appears in the app */
+.ui { font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+/* chips: what a feature needs */
+.needs { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.chip { font: 700 12.5px/1 var(--cond); letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 12px 5px 8px; color: var(--ink-2); background: var(--deck-2);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+.chip.key { color: var(--paper-ink); background: var(--hype); }
+.chip.mac { color: var(--paper-ink); background: var(--accent); }
+.chip.cost { color: var(--paper-ink); background: var(--warn); }
+.chip.free { color: #fff; background: var(--good); }
+
+/* notes: a lower third's left edge */
+.note { margin: 0 0 18px; padding: 14px 18px 14px 16px; background: var(--deck); border-left: 4px solid var(--accent); }
+.note p:last-child, .note ul:last-child { margin-bottom: 0; }
+.note.warn { border-left-color: var(--warn); }
+.note.live { border-left-color: var(--live); }
+.note-t { display: block; margin-bottom: 6px; font: 800 13px/1 var(--cond); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+.note.warn .note-t { color: var(--warn); }
+.note.live .note-t { color: var(--live); }
+
+/* tables */
+.tbl { margin: 0 0 20px; overflow-x: auto; }
+.read table { width: 100%; border-collapse: collapse; font-size: 15.5px; line-height: 1.5; }
+.read th { text-align: left; font: 700 13px/1.2 var(--cond); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); padding: 10px 12px; border-bottom: 2px solid var(--rule); vertical-align: bottom; }
+.read td { padding: 10px 12px; border-bottom: 1px solid var(--rule); color: var(--ink-2); vertical-align: top; }
+.read td:first-child { color: var(--ink); font-weight: 600; }
+.read tbody tr:nth-child(odd) td { background: rgba(15, 32, 56, 0.55); }
+
+/* verdict swatches, as the app's lower thirds */
+.vd { display: inline-block; font: 800 13px/1 var(--cond); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 14px 5px 8px; color: #fff;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); white-space: nowrap; }
+.vd.good { background: var(--good); } .vd.bad { background: var(--bad); } .vd.warn { background: var(--warn); color: var(--paper-ink); } .vd.neutral { background: var(--neutral); }
+.vd.research { background: repeating-linear-gradient(135deg, var(--deck-3) 0 6px, var(--deck-2) 6px 12px); color: var(--accent); }
+
+/* numbered steps */
+.steps { counter-reset: step; list-style: none; padding-left: 0 !important; }
+.steps > li { counter-increment: step; position: relative; padding-left: 46px; margin-bottom: 12px; }
+.steps > li::before { content: counter(step, decimal-leading-zero); position: absolute; left: 0; top: 2px; font: 800 14px/1 var(--cond); color: var(--mute);
+  background: var(--deck-2); padding: 6px 13px 5px 7px; clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+
+.top-link { display: inline-block; margin-top: 4px; font: 700 13px/1 var(--cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--mute) !important; text-decoration: none; }
+.top-link:hover { color: var(--accent) !important; }
+
+/* ---------- phones: the contents fold into the top of the read ---------- */
+@media (max-width: 899px) {
+  .docs-page { --bar-h: 105px; }
+  .dhead { padding: calc(var(--bar-h) + 28px) 16px 28px; }
+  .dhead .topstrap { height: 60px; }
+  .dhead .strap .name { font-size: 26px; }
+  .dlede { font-size: 17px; }
+  .doc { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 20px 16px 72px; }
+  .toc { position: static; max-height: none; background: var(--deck); padding: 14px 14px 10px; }
+  .toc summary { padding: 2px 0 10px; }
+  .toc:not([open]) summary { padding-bottom: 2px; }
+  .read h2 span { font-size: 22px; padding: 9px 22px 9px 22px; }
+  .read h2 em { font-size: 15px; }
+  .read p, .read li { font-size: 16px; }
+}

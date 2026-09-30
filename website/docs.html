@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tattle docs · How to use the Mac app</title>
+<meta name="description" content="How to use Tattle, the free Mac app for live transcripts and fact-checks: install, keys, a live show, speakers, the timeline, label sets, Chat, and recordings.">
+<link rel="canonical" href="https://hey-tattle.com/docs">
+<meta name="theme-color" content="#0a1628">
+<meta name="author" content="Nicolas Dao">
+<link rel="author" href="https://nicolasdao.com">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Tattle">
+<meta property="og:url" content="https://hey-tattle.com/docs">
+<meta property="og:title" content="Tattle docs: how to use the Mac app">
+<meta property="og:description" content="Every feature of Tattle, the open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.">
+<meta property="og:image" content="https://hey-tattle.com/og.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Tattle, the open-source Mac app: its red record key, with the line Press record, every claim gets checked, and a lower third marking the claim Bats are blind as Contradicted. Free for Mac.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@realnicdao">
+<meta name="twitter:creator" content="@realnicdao">
+<meta name="twitter:image" content="https://hey-tattle.com/og.jpg">
+<meta name="twitter:image:alt" content="Tattle, the open-source Mac app: its red record key, with the line Press record, every claim gets checked, and a lower third marking the claim Bats are blind as Contradicted. Free for Mac.">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/BarlowCondensed-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/Barlow-500.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/theme.css">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/docs.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "@id": "https://hey-tattle.com/docs#article",
+      "headline": "How to use Tattle",
+      "description": "Every feature of Tattle, the open-source Mac app that transcribes live conversations, maps them on a timeline, and fact-checks claims as they're said.",
+      "url": "https://hey-tattle.com/docs",
+      "image": "https://hey-tattle.com/og.jpg",
+      "inLanguage": "en",
+      "about": { "@id": "https://hey-tattle.com/#app" },
+      "author": { "@type": "Person", "name": "Nicolas Dao", "url": "https://nicolasdao.com" },
+      "publisher": { "@type": "Organization", "name": "Cloudless Labs", "url": "https://cloudlesslabs.com" }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Tattle", "item": "https://hey-tattle.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Docs", "item": "https://hey-tattle.com/docs" }
+      ]
+    }
+  ]
+}
+</script>
+<script src="assets/download.js" defer></script>
+<script src="assets/docs.js" defer></script>
+</head>
+<body class="docs-page">
+
+<div class="bar scrolled show-dl" id="bar">
+  <div class="bar-in">
+    <div class="topstrap">
+      <div class="onair"><i></i><span>Off air</span></div>
+      <div class="strap">
+        <span class="eyebrow"><span class="ca-mark" style="--s:13px"></span>Open-source Mac app</span>
+        <p class="name"><a href="/">Tattle</a></p>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Site">
+      <a href="/"><em>01</em><span>Home</span></a>
+      <a href="/docs" aria-current="page"><em>02</em><span>Docs</span></a>
+      <a href="https://github.com/nicolasdao/tattle"><em>03</em><span>GitHub</span></a>
+    </nav>
+    <a class="bar-dl" data-when="mac" data-download href="https://github.com/nicolasdao/tattle/releases/latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+      Download
+    </a>
+  </div>
+</div>
+
+<header class="dhead">
+  <div class="dhead-in">
+    <div class="topstrap">
+      <div class="tag">Docs</div>
+      <div class="strap"><span class="eyebrow">The manual · every feature</span><h1 class="name">How to use Tattle</h1></div>
+    </div>
+    <p class="dlede">Tattle listens to your calls. It <b>transcribes</b> them as people speak, <b>maps</b> the conversation on a timeline, and <b>fact-checks</b> claims as they're said. This page covers everything it does, from the first launch to the last export.</p>
+    <div class="dhead-row">
+      <a class="ca-download" data-when="mac" data-download href="https://github.com/nicolasdao/tattle/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="square" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+        Download for Mac
+      </a>
+      <p class="ca-meta">Apple Silicon · macOS 14.2 or later · Free and open source<span data-release hidden> · <span data-version></span></span></p>
+    </div>
+  </div>
+</header>
+
+<div class="doc">
+  <details class="toc" id="toc" open>
+    <summary>On this page</summary>
+    <ol>
+      <li class="toc-g">Get started</li>
+      <li><a href="#start"><em>01</em>Quick start</a></li>
+      <li><a href="#install"><em>02</em>Install</a></li>
+      <li><a href="#keys"><em>03</em>Keys and accounts</a></li>
+      <li><a href="#transcription"><em>04</em>Transcription engines</a></li>
+      <li class="toc-g">On air</li>
+      <li><a href="#session"><em>05</em>Going live</a></li>
+      <li><a href="#header"><em>06</em>The header</a></li>
+      <li><a href="#transcript"><em>07</em>The transcript</a></li>
+      <li><a href="#speakers"><em>08</em>Speakers</a></li>
+      <li><a href="#timeline"><em>09</em>The timeline</a></li>
+      <li><a href="#fact-checking"><em>10</em>Fact-checking</a></li>
+      <li><a href="#thinking"><em>11</em>Fast · slow thinking</a></li>
+      <li><a href="#jev-log"><em>12</em>Jev log</a></li>
+      <li><a href="#insights"><em>13</em>Insights</a></li>
+      <li class="toc-g">Make it yours</li>
+      <li><a href="#label-sets"><em>14</em>Label sets</a></li>
+      <li><a href="#chat"><em>15</em>Chat</a></li>
+      <li class="toc-g">After the show</li>
+      <li><a href="#recordings"><em>16</em>Recordings</a></li>
+      <li><a href="#playback"><em>17</em>Playback</a></li>
+      <li><a href="#export-import"><em>18</em>Export and import</a></li>
+      <li class="toc-g">Reference</li>
+      <li><a href="#costs"><em>19</em>Costs</a></li>
+      <li><a href="#privacy"><em>20</em>Privacy</a></li>
+      <li><a href="#files"><em>21</em>Where files live</a></li>
+      <li><a href="#updates"><em>22</em>Updates</a></li>
+      <li><a href="#menus"><em>23</em>Menu bar</a></li>
+      <li><a href="#shortcuts"><em>24</em>Keyboard shortcuts</a></li>
+      <li><a href="#links"><em>25</em>Links into the app</a></li>
+      <li class="toc-g">Good to know</li>
+      <li><a href="#show-checklist"><em>26</em>Before a show</a></li>
+      <li><a href="#troubleshooting"><em>27</em>Troubleshooting</a></li>
+      <li><a href="#limits"><em>28</em>Limits</a></li>
+      <li><a href="#developers"><em>29</em>Run it from source</a></li>
+      <li><a href="#help"><em>30</em>Help and licence</a></li>
+    </ol>
+  </details>
+
+  <main class="read">
+
+    <!-- ===================================================== 01 -->
+    <section id="start">
+      <h2><em>01</em><span>Quick start</span></h2>
+      <p class="lead">Tattle is a Mac app. It hears two sides of a conversation: your microphone, and the call your Mac plays. It works with any call app, because it listens to the Mac's own audio.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>You need</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>A Mac with Apple Silicon</td><td>M1 or later. Intel Macs are not supported.</td></tr>
+          <tr><td>macOS 14.2 or later</td><td>macOS 26 or later transcribes on the Mac itself, for free. macOS 14.2 to 25 transcribes with OpenAI.</td></tr>
+          <tr><td>Earbuds or headphones</td><td>Recommended: they keep the call out of your microphone. See <a href="#speaker-mode">speaker mode</a>.</td></tr>
+          <tr><td>Accounts</td><td>None for transcripts on macOS 26+. An OpenRouter key for fact-checking, labels, and Chat. An OpenAI key on older macOS. See <a href="#keys">Keys and accounts</a>.</td></tr>
+        </tbody>
+      </table></div>
+      <ol class="steps">
+        <li><strong>Download</strong> the DMG from the button above (or <a href="https://github.com/nicolasdao/tattle/releases/latest">GitHub Releases</a>) and drag <strong>Tattle</strong> into Applications.</li>
+        <li><strong>Open it</strong> and click <span class="ui">Allow</span> for Microphone and System Audio Recording.</li>
+        <li>On older macOS, <strong>paste an OpenAI key</strong> on the setup screen. On macOS 26 or later there is nothing to paste.</li>
+        <li>Press <span class="ui">Start live</span>, choose what runs (transcript, fact-check, labels), and press <span class="ui">Start live</span> again.</li>
+        <li>Talk. Lines appear as people speak; name each speaker by clicking their name.</li>
+        <li>Press <span class="ui">Stop</span>. The show becomes a recording you can reopen, play back, chat about, and export.</li>
+      </ol>
+    </section>
+
+    <!-- ===================================================== 02 -->
+    <section id="install">
+      <h2><em>02</em><span>Install</span></h2>
+      <ol class="steps">
+        <li>Download <code>Tattle-&lt;version&gt;-arm64.dmg</code> from <a href="https://github.com/nicolasdao/tattle/releases/latest">GitHub Releases</a>, the only official source.</li>
+        <li>Open the DMG and drag <strong>Tattle</strong> into Applications.</li>
+        <li>Open Tattle from Applications. macOS asks once whether to open an app downloaded from the internet: it is signed and notarized by Apple.</li>
+        <li>On macOS 26 or later, the app opens straight away and prepares on-device speech recognition in the background (a one-time download managed by macOS). On older macOS, the setup screen asks for an OpenAI key.</li>
+      </ol>
+      <p>Only one copy runs at a time: opening Tattle again brings its window forward. Closing the window keeps the app, and any show, running; click the Dock icon to bring it back.</p>
+
+      <h3 id="permissions">Permissions</h3>
+      <p>On the first launch a sheet says <span class="ui">Tattle needs two permissions</span>. Click <span class="ui">Continue</span>, then <span class="ui">Allow</span> on both macOS prompts:</p>
+      <ul>
+        <li><strong>Microphone</strong>: "Tattle transcribes the host's microphone during a recording."</li>
+        <li><strong>System Audio Recording</strong>: "Tattle transcribes the call audio (co-hosts and guests) that the Mac plays during a recording."</li>
+      </ul>
+      <p>Asking up front means the prompts never interrupt a show. If the microphone is later turned off, every launch shows <span class="ui">The microphone is turned off for Tattle</span>, with <span class="ui">Open System Settings</span> (Privacy &amp; Security → Microphone: turn on Tattle, then quit and reopen it) or <span class="ui">Not now</span>.</p>
+      <div class="note warn"><span class="note-t">A refused System Audio permission is silent</span><p>macOS gives Tattle pure silence instead of an error, so the app cannot warn you in advance. The sign is the call's meter in the header turning red with <span class="ui">silent N s</span>. Fix it in System Settings → Privacy &amp; Security → System Audio Recording.</p></div>
+
+      <h3 id="upgrade">Coming from Conversation Assistant</h3>
+      <p>It is the same app, renamed. It updates itself to Tattle and moves your keys and recordings with it. After <span class="ui">Restart Now</span> on that one update, open <strong>Tattle</strong> from Applications yourself: it does not reopen on its own that once. If you install the DMG instead, delete <code>Conversation Assistant.app</code>.</p>
+
+      <h3 id="genuine">Check your download is genuine</h3>
+      <p>Tattle is signed by <strong>Developer ID Application: Nicolas Dao (UX774V7BK2)</strong> and notarized by Apple. In Terminal:</p>
+<pre><code>codesign -dv "/Applications/Tattle.app" 2&gt;&amp;1 | grep TeamIdentifier   # TeamIdentifier=UX774V7BK2
+spctl --assess -vv "/Applications/Tattle.app"                        # source=Notarized Developer ID
+shasum -a 256 Tattle-&lt;version&gt;-arm64.dmg                             # matches the checksum in the release notes</code></pre>
+      <p>The DMG itself is not signed (the app inside is), so <code>spctl</code> on the DMG saying "no usable signature" is expected. A copy from anywhere else, or signed by anyone else, is not the official one.</p>
+    </section>
+
+    <!-- ===================================================== 03 -->
+    <section id="keys">
+      <h2><em>03</em><span>Keys and accounts</span></h2>
+      <p>Tattle has no account and no server of its own. Paid features use your own keys with two services, paid directly by you, only for what you use.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Key</th><th>What needs it</th><th>Where to get it</th></tr></thead>
+        <tbody>
+          <tr><td>None</td><td>Transcripts on macOS 26 or later (Apple Speech), speakers, the timeline's segments, recordings, playback, export and import</td><td>—</td></tr>
+          <tr><td>OpenAI</td><td>Transcription on macOS 14.2 to 25, or when you pick the OpenAI engine</td><td><a href="https://platform.openai.com">platform.openai.com</a>, with prepaid credit. Keys start with <code>sk-</code></td></tr>
+          <tr><td>OpenRouter</td><td>Fact-checking, labels, Chat, Create with AI, and Try on a recording</td><td><a href="https://openrouter.ai">openrouter.ai</a>, with prepaid credit. Keys start with <code>sk-or-</code></td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="openai-setup">The OpenAI key on first launch</h3>
+      <p>The setup screen, <span class="ui">Add your OpenAI API key to start</span>, appears only when OpenAI is the transcription engine and no key is saved (on macOS 14.2 to 25, or if you chose OpenAI). Paste the key into <span class="ui">OpenAI API key</span> and press <span class="ui">Save key and start</span>. The fold <span class="ui">How do I get an OpenAI key? About 5 minutes</span> walks you through it:</p>
+      <ol>
+        <li>Sign up at platform.openai.com. It is separate from a ChatGPT subscription.</li>
+        <li>Settings → Billing → Add to credit balance. $10 is plenty; leave automatic recharge off.</li>
+        <li>API keys → Create new secret key, named Tattle, in the default project, with All permissions. It is shown only once: copy it.</li>
+      </ol>
+      <p>A transcript costs about $1.23 an hour of show. After saving: <span class="ui">All set. Opening Tattle…</span></p>
+
+      <h3 id="openrouter-prompts">The OpenRouter key, when you first need it</h3>
+      <p>Nothing asks for OpenRouter until you turn on a feature that needs it. A card then appears in place, with the guide open, a <span class="ui">Save</span> button and sometimes <span class="ui">Not now</span>:</p>
+      <ul>
+        <li>In <span class="ui">Start live</span>, turning on Fact-check or picking a label set: "Please provide your OpenRouter API key to configure fact-checking or labeling." <span class="ui">Not now</span> turns both off.</li>
+        <li>Opening Chat: "Please provide your OpenRouter API key to use Chat."</li>
+        <li>Labels → Try on a recording, and Labels → Create with AI.</li>
+      </ul>
+      <p>The guide: sign up at openrouter.ai, Settings → Credits ($10, auto top-up off), Settings → API keys, name it Tattle, and <strong>give it a credit limit</strong> such as $10. The app sets no spending limit of its own: the key's limit is the one that stops a mistake.</p>
+
+      <h3 id="key-checks">How a key is checked</h3>
+      <p>Before saving, Tattle makes a free request to the service with the key (10 s at most). It refuses a key that is empty, has spaces or line breaks, looks cut short, belongs to the other service, or that the service rejects ("OpenAI does not accept this key. Check it was copied whole, and not revoked."). It saves the key with a warning when:</p>
+      <ul>
+        <li>it cannot reach the service ("Could not reach the service to check it (are you online?). It was saved anyway.");</li>
+        <li>an OpenRouter account has no credit yet, or the key has no credit limit;</li>
+        <li>an OpenAI key cannot use the transcription models (check the project's model permissions).</li>
+      </ul>
+      <p>A working key shows <span class="ui">✓ Key works</span>, and for OpenRouter the limit and what is left. An OpenAI account with no credit cannot be detected in advance: it fails on the first transcription (see <a href="#troubleshooting">Troubleshooting</a>).</p>
+
+      <h3 id="change-keys">Change or remove a key</h3>
+      <p><span class="ui">Tattle → Settings…</span> (<kbd>⌘,</kbd>) opens the <span class="ui">API keys</span> window: one card per key, showing <span class="ui">Saved · …abcd</span> (the last four characters only). Paste a new key and press <span class="ui">Save</span>; it is checked, then used from the next call, with no restart. There is no button to remove a key: delete it from <code>~/Library/Application Support/Tattle/credentials.json</code> (see <a href="#files">Where files live</a>).</p>
+      <p>Keys stay on your Mac, in a file only your macOS user can read. They never appear in logs, recordings, exports, or anywhere else, and each is sent only to its own service.</p>
+    </section>
+
+    <!-- ===================================================== 04 -->
+    <section id="transcription">
+      <h2><em>04</em><span>Transcription engines</span></h2>
+      <p>Two engines turn speech into text. Choose one in the cog menu (top right) → <span class="ui">Transcription</span>.</p>
+      <div class="tbl"><table>
+        <thead><tr><th></th><th>On this Mac (Apple Speech)</th><th>OpenAI</th></tr></thead>
+        <tbody>
+          <tr><td>Needs</td><td>macOS 26 or later</td><td>An OpenAI key with credit</td></tr>
+          <tr><td>Cost</td><td>Free</td><td>About $1.23 an hour of show</td></tr>
+          <tr><td>Privacy</td><td>Audio never leaves your Mac</td><td>Audio is sent to OpenAI during a session</td></tr>
+          <tr><td>Accuracy</td><td>Less accurate on names and jargon ("Jev" can come out as "Jeff")</td><td>More accurate on names and jargon</td></tr>
+          <tr><td>Live text</td><td>About 2 s after speech starts; the final line about 1 s after it ends</td><td>About 1.2 s after speech starts; the final line about 2.5 s after it ends</td></tr>
+          <tr><td>Offline</td><td>Yes, once its speech model has downloaded, for a transcript-only session</td><td>No</td></tr>
+        </tbody>
+      </table></div>
+      <p>The first time, Tattle picks for you: Apple Speech on macOS 26 or later, OpenAI on older macOS (or if you already had an OpenAI key from an earlier version). The choice is saved and applies to the next session: a session keeps the engine it started with, and the window is read-only while one is on air ("A session is on air: the engine can be changed when it ends.").</p>
+
+      <h3 id="speech-model">The on-device speech model</h3>
+      <p>Apple Speech needs a speech model that macOS downloads once. Tattle starts it at launch; the Transcription window shows <span class="ui">Getting ready…</span>, then <span class="ui">Getting on-device speech recognition ready… N %</span>, then <span class="ui">Ready</span>. Everything but <span class="ui">Start live</span> works in the meantime. If it fails, the error appears with <span class="ui">Try again</span>.</p>
+      <p>All transcription is in English (US English for Apple Speech).</p>
+    </section>
+
+    <!-- ===================================================== 05 -->
+    <section id="session">
+      <h2><em>05</em><span>Going live</span></h2>
+      <p>Press <span class="ui">Start live</span> in the header. The window, <span class="ui">Choose what runs during this show</span>, has:</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Option</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Microphone</td><td>Your mic. <span class="ui">Built-in microphone</span>, then every other input with its connection (USB, Bluetooth…). Plugged in after launch? It is listed next time the window opens. The last one used is preselected.</td></tr>
+          <tr><td>People on the call</td><td><span class="ui">Any number</span>, or <span class="ui">1 on the call</span> to <span class="ui">4 on the call</span>. Voices beyond this count go to the closest speaker instead of becoming new ones. It resets to Any number each time. Your mic always counts one voice.</td></tr>
+          <tr><td>Transcript</td><td><span class="ui">Always on</span>: both streams recorded and transcribed live, speakers identified, a timeline, and chat.</td></tr>
+          <tr><td>Fact-check</td><td>System 1 (Jev) flags checkable claims on every line; System 2 (GPT-6 Luna) researches them with sources. On by default when your OpenRouter key is set.</td></tr>
+          <tr><td>Labels</td><td>A label set, or <span class="ui">Off</span>. Jev labels each part of the timeline with its questions. Defaults to the set you used last, or the built-in <span class="ui">AI podcast</span>; Off without an OpenRouter key.</td></tr>
+          <tr><td>Tonight's stories (optional)</td><td>Shown when a label set is picked: one headline per line (254 at most, 300 characters each). Jev says which story each part of the show is about, and the headlines help OpenAI spell names.</td></tr>
+        </tbody>
+      </table></div>
+      <p>A summary line says what runs and what it costs: <span class="ui">Everything on · labels: AI podcast</span>, <span class="ui">No fact-checking</span>, <span class="ui">No labels</span>, or <span class="ui">Transcript only: Jev and System 2 are not called</span>, then <span class="ui">Free: nothing leaves this Mac.</span> or <span class="ui">About $X an hour</span> (with "at most" when fact-checking is on). With Fact-check off and Labels off, the session is <strong>transcript only</strong>.</p>
+      <p>Press <span class="ui">Start live</span>. What you choose is fixed until the session ends: a feature turned off stays off. <span class="ui">Pause</span>, <span class="ui">Resume</span>, <span class="ui">Stop</span>, and Chat work either way. With Apple Speech, <span class="ui">Start live</span> waits until the speech model is ready.</p>
+
+      <h3 id="pause-stop">Pause, resume, stop</h3>
+      <ul>
+        <li><strong>Pause</strong> turns incoming audio into silence until you resume: nothing is heard, transcribed, or spent, and the recording stays in time. The timeline shows hatched bands for paused stretches. Replays cannot be paused.</li>
+        <li><strong>Resume</strong> starts listening again.</li>
+        <li><strong>Stop</strong> ends the show. Tattle finishes the lines still being transcribed (and retries failed ones once more), labels the last segment, and waits up to 3 minutes for fact-checks in progress. Then the session becomes a recording, on screen.</li>
+      </ul>
+      <p>While a session is on air your Mac does not go to sleep (the screen still can), updates wait, and quitting asks first: <span class="ui">A session is on air</span>, with <span class="ui">Stop and Quit</span> or <span class="ui">Cancel</span>. To keep every line, press Stop and wait for the session to end before quitting.</p>
+
+      <h3 id="speaker-mode">Speaker mode</h3>
+      <p>If the call plays through the Mac's speakers, your microphone hears it too, and the guests would be transcribed twice. Tattle notices and turns on <strong>speaker mode</strong>: a <span class="ui">Speakers</span> chip appears in the header, and your microphone is muted while the call plays, and for a quarter of a second after. Anything you say over a guest in that time is not transcribed or recorded, and your meter reads <span class="ui">muted · call playing</span>.</p>
+      <p>Speaker mode turns off by itself as soon as earbuds or headphones are connected. For the best transcript, wear earbuds. Tattle cannot tell a Bluetooth speaker from Bluetooth earbuds, so with a Bluetooth speaker it treats the audio as headphones and leaves the microphone open.</p>
+    </section>
+
+    <!-- ===================================================== 06 -->
+    <section id="header">
+      <h2><em>06</em><span>The header</span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Part</th><th>What it shows</th></tr></thead>
+        <tbody>
+          <tr><td>The ON AIR block</td><td><span class="ui">On air</span> (red), <span class="ui">Paused</span> (orange), <span class="ui">Replay</span> (cyan), or <span class="ui">Stopping</span>. Hidden when nothing is running.</td></tr>
+          <tr><td>Session name</td><td><span class="ui">No session</span>, or the session's name. Click it to rename (120 characters at most); Enter or clicking away saves, Esc cancels. Works on air and on recordings.</td></tr>
+          <tr><td>Features chip</td><td><span class="ui">Transcript only</span>, <span class="ui">No fact-check</span>, or <span class="ui">No labels</span> when a feature is off for this session.</td></tr>
+          <tr><td>Connection dot</td><td>Whether the page is receiving the engine's events.</td></tr>
+          <tr><td>Clock</td><td>Time since the session started (paused time included).</td></tr>
+          <tr><td>Meters</td><td><strong>Host</strong> (your mic, light blue) and <strong>Remote</strong> (the call, pink): the device, a level bar from −60 to 0 dBFS, and the level and delay, or <span class="ui">waiting…</span>, <span class="ui">paused</span>, <span class="ui">muted · call playing</span>, <span class="ui">silent N s</span>. A meter turns <strong>red</strong> when its stream stays at or below −50 dBFS for more than 10 s, or sends nothing for more than 3 s.</td></tr>
+          <tr><td>Speakers chip</td><td>Speaker mode is on (see <a href="#speaker-mode">Speaker mode</a>). Hover it for the details.</td></tr>
+          <tr><td>Spend / Cost</td><td><span class="ui">Spend $X</span> on air, <span class="ui">Cost $X</span> for a recording. Hover or focus it for the split: Transcription, Jev, System 2, Chat. It turns red with <span class="ui">OpenRouter stopped</span> if OpenRouter refuses for good (out of credit or over the key's limit).</td></tr>
+          <tr><td>Buttons</td><td><span class="ui">Start live</span>, <span class="ui">Pause</span> / <span class="ui">Resume</span>, <span class="ui">Stop</span>, <span class="ui">Export</span> (on a recording), <span class="ui">Import</span> (when nothing is on air), <span class="ui">Chat</span> (a dot pulses while a reply is being written), and the cog.</td></tr>
+        </tbody>
+      </table></div>
+      <h3 id="cog">The cog menu</h3>
+      <ul>
+        <li><strong>Recordings</strong>: open, rename, replay, export, delete (see <a href="#recordings">Recordings</a>).</li>
+        <li><strong>Insights</strong>: stats, the fact-checker, and the error log (see <a href="#insights">Insights</a>).</li>
+        <li><strong>Speakers</strong>: rename and merge voices (needs a session or a recording).</li>
+        <li><strong>Labels</strong>: your label sets (see <a href="#label-sets">Label sets</a>).</li>
+        <li><strong>Transcription</strong>: the engine (see <a href="#transcription">Transcription engines</a>).</li>
+      </ul>
+      <p>The window's layout: the transcript on the left, a right column with three tabs (<span class="ui">Fact-check</span>, <span class="ui">Fast · slow thinking</span>, <span class="ui">Jev log</span>), and the timeline along the bottom. Drag the divider between the two columns (25% to 75%; <kbd>←</kbd> <kbd>→</kbd> move it, double-click resets it), and drag the timeline's top edge to resize it (<kbd>↑</kbd> <kbd>↓</kbd>, double-click resets). The app remembers both, your right-column tab, your microphone, and your last label set.</p>
+    </section>
+
+    <!-- ===================================================== 07 -->
+    <section id="transcript">
+      <h2><em>07</em><span>The transcript</span></h2>
+      <p>Each line shows its time, the speaker's name tab (once per run of lines by the same speaker; your mic in light blue, the call in pink), and the text. It scrolls with the conversation while you are near the bottom.</p>
+      <ul>
+        <li><strong>Live text</strong> (grey italic, with a red dot) streams while someone speaks; the final line replaces it. Its speaker reads <span class="ui">Host</span> or <span class="ui">Call</span>, or the name when that stream has had only one speaker so far.</li>
+        <li><strong>Inferred speakers</strong> show as <span class="ui">Name *</span>: the line was under 1.5 s, too short for a voiceprint, so the speaker was inferred.</li>
+        <li><strong>Fillers</strong> ("uh", "yeah", "ok"…) are dimmed. A <span class="ui">LOUD</span> tag marks a line at least 6 dB louder than that stream's recent median.</li>
+        <li><strong>Flagged claims</strong> get an orange tint and a flag: Jev sent them to be fact-checked. The verdict appears on the fact-check card, not in the transcript.</li>
+        <li><strong>Segment dividers</strong> mark where the timeline's segments start: the time, the first category's option as a coloured tag (faded when Jev was unsure), marker icons, and companies mentioned.</li>
+      </ul>
+      <h3 id="failed-lines">Lines that could not be transcribed</h3>
+      <p>If the connection drops, a line keeps its place and reads <span class="ui">Not transcribed yet: the connection dropped. Retrying…</span>. Tattle retries every 15 s and once more at the end. A line that still fails reads <span class="ui">Not transcribed.</span> (on a recording, <span class="ui">Not transcribed. Play from here to hear it.</span>): the audio is kept.</p>
+      <h3 id="filters">Filters</h3>
+      <p>Under the transcript, a chip per marker (Hot take, Prediction…) and, on the right, <span class="ui">All speakers</span> and one menu per category (<span class="ui">All subjects</span>, <span class="ui">All modes</span>; grouped options such as <span class="ui">AI (all)</span>), then <span class="ui">Clear</span>. The speaker filter hides other speakers' lines; the marker and category filters hide lines outside matching segments and dim those segments on the timeline. Live text is hidden while a marker or category filter is on. Filters reset when the label set changes.</p>
+    </section>
+
+    <!-- ===================================================== 08 -->
+    <section id="speakers">
+      <h2><em>08</em><span>Speakers</span></h2>
+      <p>Each voice becomes a speaker, <span class="ui">Speaker 1</span>, <span class="ui">Speaker 2</span>…, from a voiceprint made on your Mac (lines of 1.5 s or more). Voices are compared only within their own stream: your mic holds one voice, the call as many as <span class="ui">People on the call</span> allows. Once a stream is at its limit, a new voice goes to the closest speaker. Renames and merges work on air, after the show, and on reopened recordings, and are saved with the recording.</p>
+      <h3 id="rename-merge">Rename or merge one speaker</h3>
+      <p>Click a name in the transcript. The window shows their lines, talk time, and stream (<span class="ui">on your mic</span> or <span class="ui">the call</span>):</p>
+      <ul>
+        <li><strong>Name</strong>, then <span class="ui">Rename</span> (or Enter).</li>
+        <li><strong>"Name is really…"</strong>: pick a speaker and press <span class="ui">Merge A into B</span>. A's lines move to B, and A disappears.</li>
+        <li><strong>"…is really Name"</strong>: the other way round; the other speaker's lines move here and this name is kept.</li>
+      </ul>
+      <p>These merges apply immediately, without a confirmation.</p>
+      <h3 id="speakers-window">The Speakers window</h3>
+      <p>Cog → <span class="ui">Speakers</span> lists every voice with a name field, <span class="ui">Rename</span>, a <span class="ui">Merge into…</span> menu and <span class="ui">Merge</span> (which asks first), and their talk time.</p>
+      <h3 id="duplicates">Find duplicate speakers</h3>
+      <p>When one person was split into two speakers, <span class="ui">Find duplicates</span> compares every voice with the others on the same stream and proposes merges, each with <span class="ui">High</span>, <span class="ui">Medium</span>, or <span class="ui">Low confidence</span> and a voice-match score. Nothing merges until you click. Set how many people were on the call first (1 to 4, or Any number). A two-hour recording takes about half a minute. Merge one suggestion at a time, <span class="ui">Merge N high &amp; medium</span>, or <span class="ui">Merge all N</span>; the last two ask first. Speakers you renamed are kept, and preferred as the name that stays.</p>
+    </section>
+
+    <!-- ===================================================== 09 -->
+    <section id="timeline">
+      <h2><em>09</em><span>The timeline</span></h2>
+      <p>The conversation is cut into <strong>segments</strong> of 12 to 75 seconds, where the topic changes. With labels on, Jev labels each segment with the label set's questions when it closes. The lanes, top to bottom (with the built-in <span class="ui">AI podcast</span> set):</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Lane</th><th>What it shows</th></tr></thead>
+        <tbody>
+          <tr><td>Section brackets</td><td>Runs of segments with the same first-category option.</td></tr>
+          <tr><td>First category</td><td>A coloured block per segment, e.g. <strong>Subject</strong>: AI models, AI tools, AI industry, Tech, Marketing, Personal life, Other topics, The show.</td></tr>
+          <tr><td>Second category</td><td>e.g. <strong>Mode</strong>: News, Analysis, Personal story, Explainer, Banter, Transition, Other.</td></tr>
+          <tr><td>Scores chart</td><td>Up to two lines on a 0–4 scale, e.g. <strong>Heat</strong> (orange) and <strong>Hype</strong> (yellow).</td></tr>
+          <tr><td>Markers</td><td>A pin where Jev said yes, e.g. Disagreement, Hot take, Prediction, Recommendation, Clip-worthy, Humour.</td></tr>
+          <tr><td>Time axis</td><td>With a <span class="ui">Now</span> line on air, <span class="ui">End</span> on a recording.</td></tr>
+        </tbody>
+      </table></div>
+      <p>With labels off, a single <span class="ui">Segments</span> lane replaces the categories, and the legend reads <span class="ui">Labels off for this session: segments and time only</span>. The segment still being spoken is drawn as <span class="ui">In progress</span>. A faded block means Jev was less sure than the set's threshold; an outline means it is not labelled (yet).</p>
+      <ul>
+        <li><strong>Hover</strong> a block or pin for its time, option, confidence, story, and companies mentioned.</li>
+        <li><strong>Click</strong> one to jump the transcript there (and, on a recording, move playback to it). A segment hidden by filters says so.</li>
+        <li><strong>Zoom</strong> with <span class="ui">−</span> / <span class="ui">+</span>, <span class="ui">Fit</span> (the whole show), or <kbd>⌘</kbd> + scroll or a pinch. The closest zoom shows about 30 s. Scroll to move through time. On air, it follows now while you are at the end.</li>
+        <li><strong>Resize</strong> the chart by dragging its top edge.</li>
+      </ul>
+      <p>How segments close: when Jev says the topic changed (and the segment is at least 12 s long), and always before 75 s. With Jev off (transcript only), a segment closes at a 2-second pause once it is at least 12 s long.</p>
+    </section>
+
+    <!-- ===================================================== 10 -->
+    <section id="fact-checking">
+      <h2><em>10</em><span>Fact-checking</span></h2>
+      <div class="needs"><span class="chip key">OpenRouter key</span><span class="chip cost">Up to about $0.35 an hour</span></div>
+      <p>Fact-checking works in two steps, like fast and slow thinking. <strong>System 1</strong> is Jev, a fast decision model from TypeSafe AI: on every line it answers a few typed questions (is it a checkable claim, about the public world, worth checking, is the speaker unsure) in under a second. <strong>System 2</strong> is GPT-6 Luna with web search: it researches only the claims System 1 flags, and returns a verdict with sources within seconds.</p>
+      <h3 id="verdicts">The verdicts</h3>
+      <div class="tbl"><table>
+        <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><span class="vd good">Supported</span></td><td>The sources back the claim.</td></tr>
+          <tr><td><span class="vd bad">False</span></td><td>The sources contradict it. A short correction follows.</td></tr>
+          <tr><td><span class="vd warn">Misleading</span></td><td>True in part, or true but misleading as said.</td></tr>
+          <tr><td><span class="vd neutral">Unverifiable</span></td><td>No reliable source settles it. A Supported, False, or Misleading verdict with no source found becomes Unverifiable.</td></tr>
+          <tr><td><span class="vd neutral">Not a claim</span></td><td>On inspection, not a checkable claim: a false alarm by System 1.</td></tr>
+          <tr><td><span class="vd research">Checking</span></td><td>Being researched now. <span class="ui">Queued</span>: waiting its turn.</td></tr>
+        </tbody>
+      </table></div>
+      <h3 id="cards">The fact-check tab</h3>
+      <p>The <span class="ui">Fact-check</span> tab lists claims, most recent first, with a tally (<span class="ui">N false</span>, <span class="ui">N misleading</span>, <span class="ui">N supported</span>, <span class="ui">N checking</span>). Each card shows the speaker, the steps <span class="ui">Queued</span> → <span class="ui">Researching</span> → the verdict, its confidence and research time, the line as said, the claim restated, a correction of 25 words at most, and up to three sources.</p>
+      <ul>
+        <li><strong>Repeats</strong>: a claim said again is linked to the first card (<span class="ui">Repeat ×N</span>) instead of being researched twice.</li>
+        <li><strong>Host disputes</strong>: click it on a card to disagree with a verdict, with an optional note. The card dims, and its grade no longer counts as evidence for System 2.</li>
+        <li><strong>Dropped</strong>: a claim can be dropped when it waited more than 10 minutes, the session's cap was reached, the session stopped, or research failed.</li>
+      </ul>
+      <div class="note live"><span class="note-t">Verdicts can be wrong</span><p>They come from AI models. Treat them as leads to check, not as facts.</p></div>
+      <h3 id="fc-limits">What gets checked, and how much</h3>
+      <ul>
+        <li>A line is flagged when Jev is confident it is a checkable claim about the public world, worth checking. Fillers, untranscribed lines, and lines Jev did not answer in time (3 s) are skipped.</li>
+        <li>Research runs two at a time, the most worth-checking first, up to 30 an hour and 40 per session.</li>
+        <li><strong>Audits</strong>: every 5 minutes, if at least 10 unflagged lines have piled up, System 2 reviews a sample of 10 for claims System 1 missed. Audits make no cards; they count as Misses in Insights.</li>
+        <li><strong>System 2 improves System 1</strong>: after 3 false alarms or 2 misses, System 2 rewrites System 1's questions. The rewrite is kept only if a replay of the session so far shows it fixes an error while keeping at least 90% of the good flags. Every session starts from the default questions, <code>s1@1</code>; roll back in Insights.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 11 -->
+    <section id="thinking">
+      <h2><em>11</em><span>Fast · slow thinking</span></h2>
+      <p>The right column's second tab shows the two systems at work: <span class="ui">System 1 · fast</span> (Jev, "Judges every line in under a second") and <span class="ui">System 2 · slow</span> (GPT-6 Luna, "Researches only what System 1 flags"), each <span class="ui">Thinking</span> or <span class="ui">Idle</span>, with its calls, average time, cost per call, and total.</p>
+      <ul>
+        <li><strong>The value box</strong>: how much cheaper System 1 made the show ("N× cheaper with System 1"), against asking System 2 about every line.</li>
+        <li><strong>From every line to a verdict</strong>: lines heard, checked by Jev, flagged, researched, and the verdicts.</li>
+        <li><strong>Claims handed from System 1 to System 2</strong>: each claim's trip, with its time and cost at each step. Click a row for the exact requests.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 12 -->
+    <section id="jev-log">
+      <h2><em>12</em><span>Jev log</span></h2>
+      <p>The third tab lists every call to Jev, newest first (the latest 200 on screen): the time, the purpose (<span class="ui">Line check</span>, <span class="ui">Topic labels</span>, <span class="ui">Rewrite test</span>, <span class="ui">Relabel</span>), what Jev was shown, the latency, the cost, its key answers ("Yes (93%)", "Analysis (81% sure)", "2.3 of 4"), and what the app did next (<span class="ui">→ Flagged: sent to System 2</span>, <span class="ui">→ Already checked</span>, <span class="ui">→ Not flagged</span>, <span class="ui">→ No answer in time</span>). Click a call for every answer and the exact HTTP request and response.</p>
+    </section>
+
+    <!-- ===================================================== 13 -->
+    <section id="insights">
+      <h2><em>13</em><span>Insights</span></h2>
+      <p>Cog → <span class="ui">Insights</span>, updated every minute and at the end of the show. Three tabs:</p>
+      <ul>
+        <li><strong>Overview</strong>: the label set's index as a big percentage (with the built-in set, <strong>Off-topic</strong>: time on personal life and other topics), a bar per category, a table per speaker (talk time, per-speaker markers such as Disagreements, score averages), and lists of listed markers (Predictions, Recommendations, Clip-worthy), each entry jumping to its moment.</li>
+        <li><strong>Fact-checker</strong>: System 1's version (<code>s1@N</code>), flags, good flags, false alarms, misses, repeats, the verdicts, what System 2 researched, the rewrites promoted or rejected with their gate results, and <span class="ui">Roll back to</span> an earlier version.</li>
+        <li><strong>Log</strong>: the last 30 errors (component, time, message). The tab's count turns red when there are any.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 14 -->
+    <section id="label-sets">
+      <h2><em>14</em><span>Label sets</span></h2>
+      <div class="needs"><span class="chip free">Making one: free</span><span class="chip key">Using one: OpenRouter key</span></div>
+      <p>A label set is what the timeline asks Jev about each segment of a show. Pick one in <span class="ui">Start live</span>. Sets are files on your Mac: making or editing one sends nothing anywhere.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Kind</th><th>How many</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Categories</td><td>0 to 2</td><td>Jev picks one option per segment (2 to 255 options, each with a name, a description Jev reads, a colour, an optional group). One option must be a fallback, named Other or None. Each draws a lane and a filter; the first draws the section brackets. One category may have an <strong>index</strong>: the share of time on chosen options, shown in Insights.</td></tr>
+          <tr><td>Scores</td><td>0 to 2</td><td>Exactly 5 levels, lowest first, drawn as a 0–4 line (the first in the heat colour, the second in the hype colour) and averaged per speaker.</td></tr>
+          <tr><td>Markers</td><td>0 to 8</td><td>A yes/no question: a pin with one of 30 icons when Jev's yes probability reaches its threshold (0.50–0.95). Optionally counted per speaker, or listed in Insights.</td></tr>
+        </tbody>
+      </table></div>
+      <p>A set also has a name, a description, a prefix before every question, companies to spot (whole words, found by code, up to 200), and a "Fade choices less sure than" threshold. It needs at least one label. The editor shows the estimated cost ("About $X per hour · N tokens per call of 32,000") and every rule broken.</p>
+
+      <h3 id="default-set">The built-in set: AI podcast</h3>
+      <p>Made for a podcast about AI and read-only: <strong>Subject</strong> (with the Off-topic index) and <strong>Mode</strong>, <strong>Heat</strong> and <strong>Hype</strong>, and six markers (Disagreement, Hot take, Prediction, Recommendation, Clip-worthy, Humour). It spots OpenAI, Anthropic, Google, Meta, Nvidia, TypeSafe, OpenRouter, DeepSeek, and Hugging Face. <span class="ui">Clone</span> it to make an editable copy.</p>
+
+      <h3 id="labels-window">The Labels window</h3>
+      <p>Cog → <span class="ui">Labels</span> works without a session or a key. The built-in set comes first (<span class="ui">Clone</span>, <span class="ui">Export</span>), then yours by name: click a name to rename it, <span class="ui">Edit</span>, <span class="ui">Export</span>, and × to delete (recordings made with it keep their own copy). A file that fails its checks is listed as <span class="ui">Broken</span> and left out of Start live. At the top: <span class="ui">New</span>, <span class="ui">Import</span>, and <span class="ui">Create with AI</span>.</p>
+      <p>The editor has a card per category, score, and marker (<span class="ui">Add category (n of 2)</span>, <span class="ui">Add score (n of 2)</span>, <span class="ui">Add marker (n of 8)</span>), a locked card for where segments end (the same, calibrated question for every set), and "How to write good labels". <span class="ui">Save</span> and <span class="ui">Try on a recording</span> stay disabled until the set is valid. To copy one of your own sets, export it and import it again.</p>
+
+      <h3 id="create-with-ai">Create with AI</h3>
+      <div class="needs"><span class="chip key">OpenRouter key</span><span class="chip cost">A few cents</span></div>
+      <p>GPT-6 Luna drafts a set with you, one question at a time, while the editor on the right fills in. It starts by asking what kind of conversation you will label (<span class="ui">A podcast about a topic</span>, <span class="ui">A sales or customer call</span>, <span class="ui">A team meeting</span>, <span class="ui">A job interview</span>, or your own words), proposes options, levels, wording, thresholds, and icons, and explains anything you ask about. Click a suggested answer or type your own; your edits in the editor win. A checklist tracks what the set still needs (<span class="ui">Still to settle: N</span>, then <span class="ui">Ready: try it on a recording, then save</span>). The cost so far shows as <span class="ui">Spent $X</span>. Nothing is saved until you press <span class="ui">Save</span>; closing the window discards the conversation.</p>
+
+      <h3 id="try-a-set">Try on a recording</h3>
+      <div class="needs"><span class="chip key">OpenRouter key</span><span class="chip cost">Shown before you start</span></div>
+      <p>From the editor or Create with AI: pick a recording, and Jev is asked the draft's questions about each segment that starts in its first 10 minutes (40 at most). The result shows two small timelines, the recording's own labels and the draft's, with the cost. Nothing is saved into the recording. Not available while a session is on air.</p>
+
+      <h3 id="share-sets">Share a set</h3>
+      <p><span class="ui">Export</span> saves a set as one <code>.tattle-labels</code> file in Downloads. To add one someone sent you, use <span class="ui">Import</span> in the Labels window, or drop the file anywhere on the app. A name already taken becomes "Name (2)".</p>
+
+      <h3 id="set-per-recording">The copy each recording keeps</h3>
+      <p>When a show starts, the whole set is copied into the recording, with tonight's stories. Editing or deleting the set later never changes past recordings, and the copy travels inside exports.</p>
+    </section>
+
+    <!-- ===================================================== 15 -->
+    <section id="chat">
+      <h2><em>15</em><span>Chat</span></h2>
+      <div class="needs"><span class="chip key">OpenRouter key</span><span class="chip cost">About $0.004 a question with GPT-6 Luna on a 2-hour show</span></div>
+      <p>Ask questions about the transcript of the show on screen, live or afterwards. Open it with <span class="ui">Chat</span> in the header or <kbd>⌘K</kbd> from anywhere.</p>
+      <ul>
+        <li>The transcript is attached. On air, each question also brings every line said since the last one, so answers cover the show up to the moment you ask.</li>
+        <li>Starters: <span class="ui">Summarise the conversation so far.</span>, <span class="ui">What were the main disagreements, and who took which side?</span>, and more.</li>
+        <li>Answers cite moments as <code>[m:ss]</code>: click one to jump there (on a recording, playback moves there and the chat stays open).</li>
+        <li>Chats are kept per recording, in a sidebar: <span class="ui">+ New chat</span>, rename, delete. A chat is created only with its first question, so opening Chat costs nothing.</li>
+        <li><strong>Stop</strong> a reply with the <span class="ui">Stop</span> button or <kbd>Esc</kbd>; it keeps what was written. <span class="ui">Copy</span> any message, <span class="ui">Edit</span> your last question (or <kbd>↑</kbd> in an empty box), <span class="ui">Regenerate</span> the last answer.</li>
+        <li>A reply keeps going if you close the window, and is saved.</li>
+        <li>A meter shows the context used, tokens in and out, and what this chat and the recording cost. Past 80% of the model's context, it suggests a new chat.</li>
+      </ul>
+      <h3 id="chat-models">Models</h3>
+      <p>Click the model button to pick one. Search by name, and sort by <span class="ui">Suggested</span>, <span class="ui">Cheapest</span>, <span class="ui">Priciest</span>, or <span class="ui">Largest context</span>; the list shows each model's context and prices per million tokens, from OpenRouter. Switching mid-chat sends the whole conversation to the new model with the next question.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Model</th><th>OpenRouter id</th></tr></thead>
+        <tbody>
+          <tr><td>GPT-6 Luna (default)</td><td><code>openai/gpt-6-luna</code></td></tr>
+          <tr><td>GPT-6 Sol</td><td><code>openai/gpt-6-sol</code></td></tr>
+          <tr><td>GPT-6 Astra</td><td><code>openai/gpt-6-astra</code></td></tr>
+          <tr><td>Claude Sonnet 5</td><td><code>anthropic/claude-sonnet-5</code></td></tr>
+          <tr><td>Claude Opus 5.5</td><td><code>anthropic/claude-opus-5.5</code></td></tr>
+          <tr><td>Claude Fable 5.1</td><td><code>anthropic/claude-fable-5.1</code></td></tr>
+          <tr><td>Gemini 3.8 Flash</td><td><code>google/gemini-3.8-flash</code></td></tr>
+          <tr><td>Grok 4.7</td><td><code>x-ai/grok-4.7</code></td></tr>
+          <tr><td>DeepSeek V4.1 Flash</td><td><code>deepseek/deepseek-v4.1-flash</code></td></tr>
+          <tr><td>Kimi K3</td><td><code>moonshotai/kimi-k3</code></td></tr>
+          <tr><td>Qwen3.8 Max Prime</td><td><code>qwen/qwen3.8-max-prime</code></td></tr>
+          <tr><td>GLM 5.3</td><td><code>z-ai/glm-5.3</code></td></tr>
+          <tr><td>Muse Spark 1.3</td><td><code>meta/muse-spark-1.3</code></td></tr>
+          <tr><td>Mistral Large 2512</td><td><code>mistralai/mistral-large-2512</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Every call asks providers not to collect your data. If no provider of a model accepts that, pick another model.</p>
+    </section>
+
+    <!-- ===================================================== 16 -->
+    <section id="recordings">
+      <h2><em>16</em><span>Recordings</span></h2>
+      <p>Every show is saved as a recording. Cog → <span class="ui">Recordings</span> lists them newest first, each with its name (or date), duration, lines, speakers, claims, cost, and the version that recorded it. Badges: <span class="ui">Viewing</span>, <span class="ui">Current</span>, <span class="ui">Incomplete</span> (it stopped abruptly), <span class="ui">Imported</span>, <span class="ui">No audio</span>.</p>
+      <ul>
+        <li><strong>Open</strong>: click a row. The recording reopens exactly as it was, instantly and for free: nothing is processed again. You can still rename and merge speakers, and chat about it.</li>
+        <li><strong>Search</strong> names and transcripts: a recording matches when every word is in its name or speakers, or all in one line; up to 5 matching lines show under it.</li>
+        <li><strong>Rename</strong>: click its name (120 characters at most; clear it to show the date again).</li>
+        <li><strong>Delete</strong>: the trash button, after a confirmation. It removes the audio, transcript, fact-checks, chats, and every other file, for good.</li>
+        <li><strong>Show Recordings in Finder</strong>: in the File menu.</li>
+      </ul>
+      <p>A recording on screen shows <span class="ui">Cost</span> instead of Spend, an <span class="ui">Export</span> button, and no meters. Stop the show on air before opening another recording.</p>
+      <h3 id="replay">Replay</h3>
+      <div class="needs"><span class="chip cost">About what the show cost</span></div>
+      <p><span class="ui">Replay</span> runs a recording's audio through the whole pipeline again, in real time, as a new recording (the original is untouched). It uses the transcription engine selected now and the label set last picked in Start live, with fact-checking on when an OpenRouter key is set (transcript only otherwise). Results can differ, since the AI models are not deterministic. To look at a show again, <strong>Open</strong> it instead: it is free.</p>
+    </section>
+
+    <!-- ===================================================== 17 -->
+    <section id="playback">
+      <h2><em>17</em><span>Playback</span></h2>
+      <p>A recording with audio has a player in the timeline's header: <span class="ui">Play</span> / <span class="ui">Pause</span> (or <kbd>Space</kbd>), speed (1×, 1.25×, 1.5×, 2×, 3×, 4×; voices keep their pitch), a volume boost up to 300%, and the time. Your mic and the call play mixed, each levelled to the same loudness.</p>
+      <ul>
+        <li>Move playback by clicking the timeline, a segment, a marker pin, a line's time in the transcript, or a time cited in Chat.</li>
+        <li>The line being heard is highlighted and kept in view (scroll yourself and it waits 4 s).</li>
+        <li>Speed and volume are remembered.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 18 -->
+    <section id="export-import">
+      <h2><em>18</em><span>Export and import</span></h2>
+      <p><span class="ui">Export</span> (in the header, or on a row in Recordings) saves a recording as one <code>.tattle</code> file in Downloads, to send by WhatsApp, email, or a cloud drive.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Audio</th><th>What you get</th><th>A two-hour show</th></tr></thead>
+        <tbody>
+          <tr><td>Compressed audio (default)</td><td>Sounds the same for speech; the best way to share.</td><td>About 57 MB</td></tr>
+          <tr><td>Original audio</td><td>Exactly as recorded, lossless.</td><td>About 450 MB</td></tr>
+          <tr><td>No audio</td><td>Transcript, timeline, fact-checks, and speakers; no playback or replay.</td><td>About 3 MB</td></tr>
+        </tbody>
+      </table></div>
+      <p><span class="ui">Include my chats</span> is off by default: they are your own questions. The window says whether the file fits email (24 MB), WhatsApp (2 GB), or needs a cloud drive.</p>
+      <h3 id="import">Import</h3>
+      <p><span class="ui">Import</span> in the header (or in Recordings), or drop a <code>.tattle</code> file anywhere on the app. Files from the app's earlier names (<code>.conversation-recording</code>, <code>.podcast-recording</code>) import too. Then rename it or <span class="ui">Open it</span>. Importing a recording you already have offers <span class="ui">Open the one I have</span> or <span class="ui">Import as a copy</span>. An imported recording works like your own; its cost is what it cost whoever recorded it. Files are 4 GB at most, and a recording from a newer version of Tattle asks you to update first.</p>
+    </section>
+
+    <!-- ===================================================== 19 -->
+    <section id="costs">
+      <h2><em>19</em><span>Costs</span></h2>
+      <p>Tattle itself is free. Paid calls go to your own accounts, and the header shows the spend as it happens.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>What</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td>Transcription, Apple Speech</td><td>Free</td></tr>
+          <tr><td>Transcription, OpenAI</td><td>About $1.23 an hour of show</td></tr>
+          <tr><td>Jev (line checks and labels)</td><td>About $0.03–0.04 an hour</td></tr>
+          <tr><td>Fact-checking research</td><td>Up to about $0.35 an hour (30 an hour, 40 per session at most)</td></tr>
+          <tr><td>Everything on, with OpenAI</td><td>About $1.60 an hour</td></tr>
+          <tr><td>Everything on, with Apple Speech</td><td>Up to about $0.40 an hour</td></tr>
+          <tr><td>Transcript only, with Apple Speech</td><td>$0</td></tr>
+          <tr><td>Chat</td><td>Per question, by model (about $0.004 with GPT-6 Luna on a 2-hour show)</td></tr>
+          <tr><td>Opening a recording</td><td>Free</td></tr>
+          <tr><td>Replay</td><td>About what the show cost</td></tr>
+          <tr><td>Try on a recording, Create with AI</td><td>Shown before and as you go; not added to any recording</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note warn"><span class="note-t">No spending limit in the app</span><p>The app shows what it spends but does not stop. Give your OpenRouter key a credit limit (for example $10) at openrouter.ai/settings/keys, and keep OpenAI on prepaid credit with automatic recharge off.</p></div>
+    </section>
+
+    <!-- ===================================================== 20 -->
+    <section id="privacy">
+      <h2><em>20</em><span>Privacy</span></h2>
+      <p>No server of our own, no account, no analytics, no telemetry. Nothing goes to the authors. What leaves your Mac, and when:</p>
+      <div class="tbl"><table>
+        <thead><tr><th>What</th><th>Sent to</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td>The conversation's audio</td><td>OpenAI, with your key</td><td>Only with the OpenAI engine, during a session or replay, never while paused. With Apple Speech, audio never leaves your Mac.</td></tr>
+          <tr><td>Transcript lines</td><td>OpenRouter, with your key</td><td>With fact-checking or labels on (Jev's questions, GPT-6 Luna's research and audits)</td></tr>
+          <tr><td>Your chat questions, with the transcript</td><td>OpenRouter, to the model you pick</td><td>When you ask</td></tr>
+          <tr><td>The first 10 minutes of a transcript; your show description and draft set</td><td>OpenRouter</td><td>Try on a recording; Create with AI</td></tr>
+          <tr><td>A key being checked</td><td>Its own service</td><td>When you save it</td></tr>
+          <tr><td>An update check</td><td>GitHub</td><td>At launch and every 4 hours, never on air</td></tr>
+        </tbody>
+      </table></div>
+      <p>Calls to OpenRouter ask providers not to collect your data. A transcript-only show on Apple Speech sends nothing anywhere.</p>
+      <div class="note live"><span class="note-t">Record with consent</span><p>Tattle records and transcribes everyone on a call. Many places require the consent of everyone recorded, and some require it to be explicit: tell the people on the call, and get their consent, before you record. You are responsible for how you use the app and its recordings.</p></div>
+    </section>
+
+    <!-- ===================================================== 21 -->
+    <section id="files">
+      <h2><em>21</em><span>Where files live</span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>What</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>The app</td><td><code>/Applications/Tattle.app</code></td></tr>
+          <tr><td>Recordings</td><td><code>~/Library/Application Support/Tattle/sessions/</code>, one folder per show of plain, readable files (File → Show Recordings in Finder)</td></tr>
+          <tr><td>Your keys</td><td><code>~/Library/Application Support/Tattle/credentials.json</code>, readable only by your macOS user</td></tr>
+          <tr><td>The engine choice</td><td><code>~/Library/Application Support/Tattle/settings.json</code></td></tr>
+          <tr><td>Your label sets</td><td><code>~/Library/Application Support/Tattle/labels/</code>, one file per set</td></tr>
+          <tr><td>Exports</td><td>Downloads, as <code>name.tattle</code> or <code>name.tattle-labels</code> (then "name (2)")</td></tr>
+          <tr><td>The Apple Speech model</td><td>Managed by macOS</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ===================================================== 22 -->
+    <section id="updates">
+      <h2><em>22</em><span>Updates</span></h2>
+      <p>Tattle updates itself from GitHub Releases. It checks at launch and every 4 hours, downloads a new version in the background (the Dock icon shows the progress), and when nothing is on air asks <span class="ui">Tattle X is ready</span>: <span class="ui">Restart Now</span>, or <span class="ui">Later</span> to install it the next time you quit. It never checks, and never asks, while a session is on air; a download already under way finishes in the background.</p>
+      <p><span class="ui">Tattle → Check for Updates…</span> checks now (it reads <span class="ui">Checking for Updates…</span> while it works). You may see:</p>
+      <ul>
+        <li><span class="ui">You're up to date</span>;</li>
+        <li><span class="ui">A new version is available</span>, with <span class="ui">Download and Install</span>, <span class="ui">Later</span>, and <span class="ui">Release Notes</span>;</li>
+        <li><span class="ui">Updates wait until the show ends</span>, on air;</li>
+        <li><span class="ui">Can't check for updates right now</span> or <span class="ui">The download failed</span>: check the connection and try again later.</li>
+      </ul>
+      <p>Permissions, keys, and recordings carry over. See what changed in the <a href="https://github.com/nicolasdao/tattle/blob/master/CHANGELOG.md">changelog</a>.</p>
+    </section>
+
+    <!-- ===================================================== 23 -->
+    <section id="menus">
+      <h2><em>23</em><span>Menu bar</span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Menu</th><th>Items</th></tr></thead>
+        <tbody>
+          <tr><td>Tattle</td><td>About Tattle · Check for Updates… · Settings… (<kbd>⌘,</kbd>, the API keys) · Services · Hide Tattle (<kbd>⌘H</kbd>) · Hide Others · Show All · Quit Tattle (<kbd>⌘Q</kbd>)</td></tr>
+          <tr><td>File</td><td>Show Recordings in Finder · Close Window (<kbd>⌘W</kbd>)</td></tr>
+          <tr><td>Edit</td><td>Undo, Redo, Cut, Copy, Paste, Paste and Match Style, Delete, Select All, Speech</td></tr>
+          <tr><td>View</td><td>Reload (<kbd>⌘R</kbd>), Force Reload, Actual Size (<kbd>⌘0</kbd>), Zoom In (<kbd>⌘+</kbd>), Zoom Out (<kbd>⌘−</kbd>), Toggle Full Screen (<kbd>⌃⌘F</kbd>)</td></tr>
+          <tr><td>Window</td><td>Minimize (<kbd>⌘M</kbd>), Zoom, Bring All to Front</td></tr>
+          <tr><td>Help</td><td>Tattle on GitHub · Licenses and Acknowledgements</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>About Tattle</strong> shows the version. <strong>Licenses and Acknowledgements</strong> opens a window listing every component the app includes with its licence, searchable, with the license files in Finder.</p>
+    </section>
+
+    <!-- ===================================================== 24 -->
+    <section id="shortcuts">
+      <h2><em>24</em><span>Keyboard shortcuts</span></h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Keys</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>⌘K</kbd></td><td>Open Chat, from anywhere</td></tr>
+          <tr><td><kbd>⌘,</kbd></td><td>Settings…: the API keys</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Play or pause a recording (not while typing or in a window)</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Send a chat message; save a rename or a key</td></tr>
+          <tr><td><kbd>Shift</kbd> <kbd>Enter</kbd></td><td>A new line in a chat message</td></tr>
+          <tr><td><kbd>↑</kbd> in an empty chat box</td><td>Edit your last question</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close a window or menu; cancel a rename or an edit; stop a chat reply</td></tr>
+          <tr><td><kbd>⌘</kbd> + scroll, or pinch</td><td>Zoom the timeline</td></tr>
+          <tr><td><kbd>←</kbd> <kbd>→</kbd> on the column divider</td><td>Move it</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd> on the timeline's edge</td><td>Resize the chart</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>Home</kbd> <kbd>End</kbd> in a menu</td><td>Move through its options; type to jump to one</td></tr>
+          <tr><td><kbd>⌘W</kbd></td><td>Close the window (the app and any show keep running)</td></tr>
+          <tr><td><kbd>⌘Q</kbd></td><td>Quit (asks first while a session is on air)</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ===================================================== 25 -->
+    <section id="links">
+      <h2><em>25</em><span>Links into the app</span></h2>
+      <p>When you run Tattle from source in a browser (see <a href="#developers">Run it from source</a>), the address says where you are, so you can bookmark or share a view:</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Address</th><th>Opens</th></tr></thead>
+        <tbody>
+          <tr><td><code>/recordings/&lt;id&gt;</code></td><td>That recording; add <code>?t=12:34</code> for a playback position</td></tr>
+          <tr><td><code>?tab=thinking</code>, <code>?tab=jev-log</code></td><td>That right-column tab</td></tr>
+          <tr><td><code>?panel=recordings</code>, <code>insights</code>, <code>speakers</code>, <code>labels</code>, <code>transcription</code>, <code>chat</code>, <code>keys</code></td><td>That window; <code>?panel=insights&amp;section=fact-checker</code> or <code>log</code> picks a tab, <code>?panel=chat&amp;chat=chat_N</code> a chat</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ===================================================== 26 -->
+    <section id="show-checklist">
+      <h2><em>26</em><span>Before a show</span></h2>
+      <h3 id="day-before">The day before</h3>
+      <ul>
+        <li>Run a short rehearsal session: both meters move, and a line is transcribed.</li>
+        <li>Keep a rehearsal as a fallback and give it a clear name (for example "Fallback · Ep 12"). If something fails on air, stop, and <strong>Open</strong> it (free, instant) or <strong>Replay</strong> it (about its original cost).</li>
+        <li>Try a new label set on a recording first.</li>
+      </ul>
+      <h3 id="pre-show">Pre-show checklist</h3>
+      <ul>
+        <li>Everyone wears headphones; the host wears <strong>earbuds</strong>. On the Mac's speakers, speaker mode drops whatever the host says over a guest.</li>
+        <li>In your call app, pick the Mac's built-in microphone: AirPods switch to a low-quality call mode when an app opens their mic.</li>
+        <li>Turn on a Focus mode: Tattle records every sound the Mac plays, notifications included.</li>
+        <li>Your OpenRouter key has a credit limit.</li>
+        <li>The label set is picked and tonight's stories are typed in.</li>
+        <li>Rename speakers as they first speak, and merge duplicates.</li>
+        <li>Screen-sharing the app to your audience? It is laid out to fit 1280 × 720.</li>
+        <li>Tell everyone they are recorded, and get their consent.</li>
+      </ul>
+      <h3 id="during">During the show</h3>
+      <ul>
+        <li>Glance at the meters: both should move. A red meter means silence.</li>
+        <li>Pause when you want nothing heard or spent; Stop still works.</li>
+        <li>At the end, press Stop and wait for it to finish before quitting.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 27 -->
+    <section id="troubleshooting">
+      <h2><em>27</em><span>Troubleshooting</span></h2>
+      <h3 id="ts-silence">A meter is red, or reads "silent"</h3>
+      <ul>
+        <li><strong>The call's meter</strong>: System Audio Recording is off for Tattle (System Settings → Privacy &amp; Security → System Audio Recording), or nothing is playing yet.</li>
+        <li><strong>Your mic's meter</strong>: the microphone permission is off (the launch sheet says so), the wrong microphone is picked, or a USB wireless mic's transmitter is off, muted, or out of range (it sends pure silence).</li>
+        <li>Speaker mode shows <span class="ui">muted · call playing</span> while the call plays: that is expected, not an error.</li>
+      </ul>
+      <h3 id="ts-waiting">"Waiting for speech…" and nothing appears</h3>
+      <p>Check both meters. A call app switching Bluetooth earbuds to their call mode changes the audio setup mid-show; Tattle follows it and restarts the microphone within about 1.5 s, and notes it in Insights → Log. A call app processing your voice can also turn your mic down by about 15 dB.</p>
+      <h3 id="ts-twice">Guests appear twice in the transcript</h3>
+      <p>The call is playing through a speaker the mic can hear, and speaker mode did not turn on: most likely a Bluetooth speaker, which Tattle takes for headphones. Use earbuds or headphones.</p>
+      <h3 id="ts-not-transcribed">Lines read "Not transcribed"</h3>
+      <ul>
+        <li><strong>OpenAI is out of credit</strong>: OpenAI answers 429 <code>insufficient_quota</code> (in Insights → Log). Add credit at platform.openai.com → Settings → Billing.</li>
+        <li><strong>The connection dropped</strong>: Tattle retries every 15 s and once at the end; the audio is kept either way.</li>
+      </ul>
+      <h3 id="ts-start-disabled">Start live is greyed out</h3>
+      <p>On Apple Speech, the speech model is still downloading (<span class="ui">Getting on-device speech recognition ready… N %</span>): Start is available as soon as it is. If it says <span class="ui">On-device speech recognition is not ready</span>, press <span class="ui">Try again</span>, or switch to OpenAI in cog → <span class="ui">Transcription</span>.</p>
+      <h3 id="ts-openrouter">Fact-checks, labels, or Chat stop</h3>
+      <p>The header's spend reads <span class="ui">OpenRouter stopped</span>, or Chat says the credits or the key's limit are exhausted (402): add credit, or raise the key's limit, at openrouter.ai. A model that is rate-limited (429) or whose providers all refuse the privacy setting: pick another model.</p>
+      <h3 id="ts-reopen">The app did not reopen after an update</h3>
+      <p>That happens once, on the update that renamed Conversation Assistant to Tattle: open <strong>Tattle</strong> from Applications. Your keys and recordings are there.</p>
+      <h3 id="ts-import">An import fails</h3>
+      <ul>
+        <li>"It should end in .tattle": the file is not a recording. (Exports end in <code>.tattle</code> rather than <code>.zip</code> so that Safari does not unzip them on download.)</li>
+        <li>"Exported by a newer Tattle": update the app, then import again.</li>
+        <li>"A session is on air": import after the show.</li>
+      </ul>
+      <h3 id="ts-mic-off">"The microphone is turned off for Tattle" at every launch</h3>
+      <p>Click <span class="ui">Open System Settings</span>, turn on Tattle under Microphone, then quit and reopen Tattle.</p>
+      <h3 id="ts-key">A key is refused</h3>
+      <p>Copy it again, whole, into the right field (OpenRouter keys start with <code>sk-or-</code>, OpenAI keys with <code>sk-</code>). If the service rejects it, check it was not revoked, deleted, or disabled.</p>
+      <p>Anything else: Insights → Log lists the last 30 errors, and <a href="#help">Help</a> says where to ask.</p>
+    </section>
+
+    <!-- ===================================================== 28 -->
+    <section id="limits">
+      <h2><em>28</em><span>Limits</span></h2>
+      <ul>
+        <li>Apple Silicon Macs only, macOS 14.2 or later; on-device transcription needs macOS 26.</li>
+        <li>English only.</li>
+        <li>One session at a time, on one Mac: Tattle opens no network port.</li>
+        <li>No video, clip export, social posting, or cloud version.</li>
+        <li>No echo cancellation: earbuds are the setup, and speaker mode mutes the mic instead.</li>
+        <li>No per-app audio: the call stream is everything the Mac plays.</li>
+        <li>No spending limit of its own.</li>
+        <li>Your mic is one voice; the call up to 4, or any number.</li>
+        <li>Label sets: 2 categories, 2 scores, 8 markers at most. Tonight's stories: 254 at most.</li>
+        <li>Imports: 4 GB at most.</li>
+        <li>Not on the Mac App Store: its sandbox would get in the way of capturing system audio. It is a signed, notarized direct download.</li>
+        <li>Only the latest release is supported.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== 29 -->
+    <section id="developers">
+      <h2><em>29</em><span>Run it from source</span></h2>
+      <p>Tattle is open source. To run it from the code you need Node 24, the Xcode command-line tools, and for on-device transcription the macOS 26 SDK. The permissions then belong to your terminal app, not to Tattle.</p>
+<pre><code>git clone https://github.com/nicolasdao/tattle.git &amp;&amp; cd tattle
+npm install
+npm run models &amp;&amp; npm run fixtures
+npm run build:capture &amp;&amp; npm run build:transcribe
+npm run serve            # http://127.0.0.1:4317</code></pre>
+      <p>Keys can also go in a <code>.env</code> file (copy <code>.env.example</code>); they win over the saved ones.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Command</th><th>Does</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td><code>npm run serve</code></td><td>The app in a browser at 127.0.0.1:4317 (<code>-- --replay &lt;dir&gt; --speed 1|max</code> replays a folder)</td><td>As a show</td></tr>
+          <tr><td><code>npm run app</code></td><td>The Mac app from the source folder</td><td>As a show</td></tr>
+          <tr><td><code>npm run replay</code></td><td>Runs two WAV files through the pipeline into a new session (<code>--engine apple|openai</code>, <code>--no-factcheck</code>, <code>--no-labels</code>, <code>--export</code>)</td><td>Free with Apple and both off</td></tr>
+          <tr><td><code>npm run preflight</code></td><td>The pre-show checks: models, capture and permissions, engine, keys, credit, one call of each service, disk space</td><td>About $0.01–0.02</td></tr>
+          <tr><td><code>npm run calibrate:speakers</code></td><td>Speaker counts at thresholds 0.35–0.75, from two WAV files</td><td>Free</td></tr>
+          <tr><td><code>npm run calibrate:boundary</code></td><td>Precision and recall of the topic boundary against your labels</td><td>Free</td></tr>
+          <tr><td><code>npm run capture:test</code>, <code>npm run transcribe:test</code></td><td>Interactive checks of capture and on-device transcription</td><td>Free</td></tr>
+          <tr><td><code>npm run smoke</code></td><td>Live checks of every paid service</td><td>Up to about $0.30</td></tr>
+          <tr><td><code>npm run dist:mac</code></td><td>Builds the DMG</td><td>Free</td></tr>
+          <tr><td><code>npm test</code>, <code>npm run test:all</code></td><td>The test suites, offline</td><td>Free</td></tr>
+        </tbody>
+      </table></div>
+      <p>The full developer documentation is in the <a href="https://github.com/nicolasdao/tattle#readme">README</a> and the <a href="https://github.com/nicolasdao/tattle/tree/master/docs">docs folder</a>, starting with the architecture.</p>
+    </section>
+
+    <!-- ===================================================== 30 -->
+    <section id="help">
+      <h2><em>30</em><span>Help and licence</span></h2>
+      <ul>
+        <li><strong>Questions and problems</strong>: Help → Tattle on GitHub, or <a href="https://github.com/nicolasdao/tattle">github.com/nicolasdao/tattle</a>. Include your version (Tattle → About Tattle).</li>
+        <li><strong>Security issues</strong>: report them privately, as <a href="https://github.com/nicolasdao/tattle/blob/master/SECURITY.md">SECURITY.md</a> describes, never in public.</li>
+        <li><strong>Licence</strong>: Tattle is free and open-source software under the <a href="https://github.com/nicolasdao/tattle/blob/master/LICENSE">BSD 3-Clause License</a>, © 2026 Cloudless Consulting Pty Ltd. The components it includes, and their licences, are under Help → Licenses and Acknowledgements and in <a href="https://github.com/nicolasdao/tattle/blob/master/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</li>
+        <li><strong>Made by</strong> <a href="https://nicolasdao.com">Nicolas Dao</a> at <a href="https://cloudlesslabs.com">Cloudless Labs</a>, in Sydney. Follow him on <a href="https://www.youtube.com/@nicolasdao">YouTube</a> and <a href="https://x.com/realnicdao">X</a>, and watch <a href="https://www.youtube.com/@theMadKoo">MadKoo</a>, the podcast where Tattle was first demoed.</li>
+      </ul>
+      <p>Tattle is an independent project, not affiliated with, sponsored, or endorsed by Apple, OpenAI, OpenRouter, or TypeSafe AI.</p>
+      <a class="top-link" href="#start">Back to the top ↑</a>
+    </section>
+
+  </main>
+</div>
+
+</body>
+</html>

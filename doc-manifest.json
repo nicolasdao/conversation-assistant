@@ -259,7 +259,7 @@
         "Testing",
         "Test fixture"
       ],
-      "line_count": 128,
+      "line_count": 129,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
@@ -748,12 +748,13 @@
     },
     {
       "dangling": false,
-      "description": "Tattle's website, hey-tattle.com — what the page contains, its search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.",
+      "description": "Tattle's website, hey-tattle.com — what the landing page and the /docs manual contain, their search and link-preview metadata (Open Graph image, icons, robots.txt, sitemap, JSON-LD), how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.",
       "has_frontmatter": true,
       "headings": [
         "Website",
         "What is in `website/`",
         "Search and link previews",
+        "The docs page",
         "Hosting",
         "Deploying",
         "Security",
@@ -761,7 +762,7 @@
         "Changing the site",
         "Releases update the site"
       ],
-      "line_count": 182,
+      "line_count": 192,
       "links_to": [
         "docs/desktop.md",
         "docs/gotchas.md",
@@ -775,6 +776,7 @@
       "path": "docs/website.md",
       "source": [
         "website/index.html",
+        "website/docs.html",
         "website/assets/**",
         "website/wrangler.jsonc",
         "website/_headers",

@@ -279,6 +279,11 @@ main { position: relative; z-index: 1; }
 .powered b { font: 800 19px/1 var(--cond); letter-spacing: 0.06em; color: var(--accent); }
 .powered::after { content: "↓"; color: var(--accent); }
 .powered:hover { color: var(--ink-2); }
+.hero-links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 28px; }
+.powered.docs::after { content: "→"; }
+/* the Docs tab: another page, not a segment of the rundown */
+.tabs .tab-docs { margin-left: 4px; padding-left: 14px; border-left: 1px solid var(--rule); color: var(--accent); }
+.tabs .tab-docs:hover { color: var(--ink); }
 
 /* ---------- Jev ---------- */
 .jev-intro { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: start; }

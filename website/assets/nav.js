@@ -6,7 +6,7 @@
   const fill = document.getElementById("bar-fill");
   const track = document.getElementById("bar-track");
   if (!bar || !tabs) return;
-  const links = [...tabs.querySelectorAll("a")];
+  const links = [...tabs.querySelectorAll('a[href^="#"]')]; // the section tabs; the Docs tab is another page
   const sections = links.map((a) => document.querySelector(a.getAttribute("href")));
 
   // ---------- the tab of the section on screen ----------
