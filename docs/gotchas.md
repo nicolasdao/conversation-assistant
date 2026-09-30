@@ -62,6 +62,7 @@ Found building on-device transcription on macOS 26.2, 29 September 2026 (see [Tr
 ## Web page
 
 - **A list outside an open modal dialog cannot be clicked.** `showModal()` makes everything outside the dialog inert, and a top-layer popover appended to `<body>` still shows above the dialog but is inert: `elementFromPoint` sees through it and clicks land on the dialog. The bespoke select's list therefore goes inside the open dialog (`web/src/ui.ts`). Keyboard selection worked all along, which hid the bug.
+- **A document-wide tab lookup catches every tab bar.** `bindTabs` looked up `.tabs .tab`, and the Insights dialog added in 0.8.0 uses `class="dlg-tabs tabs"` too. Its tabs have no pane, so switching a tab threw after showing the pane but before redrawing it: an opened recording kept the Jev log and Fast · slow thinking text of the recording before it ("Jev is off for this session…"), and a page loaded with `?tab=` in the URL never started. The lookup takes only `.tab[data-pane]`, a missing pane is skipped, and `tests/tabs.test.ts` checks both.
 
 ## Export and import
 

@@ -133,13 +133,14 @@ function jumpToTime(ms: number) {
 
 /** Right column tabs: Fact-check, Fast · slow thinking, Jev log. */
 function bindTabs() {
-  const tabs = [...document.querySelectorAll<HTMLButtonElement>(".tabs .tab")];
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>(".tabs .tab[data-pane]")];
   showPane = (paneId) => { const t = tabs.find((x) => x.dataset.pane === paneId); if (t) show(t); };
   const show = (tab: HTMLButtonElement) => {
     setRoute({ tab: tabName(tab.dataset.pane!) });
     for (const t of tabs) {
       t.setAttribute("aria-selected", String(t === tab));
-      $(`#${t.dataset.pane}`)!.hidden = t !== tab;
+      const pane = $(`#${t.dataset.pane}`);
+      if (pane) pane.hidden = t !== tab;
     }
     $("#tally")!.hidden = tab.dataset.pane !== "pane-fc";
     try { localStorage.setItem("pa.rightTab", tab.dataset.pane!); } catch { /* storage may be unavailable */ }
