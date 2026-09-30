@@ -121,6 +121,10 @@ A page module is tested in happy-dom with the page's real markup:
 - **The gate:** `npm run test:swift` runs `scripts/swift-coverage.mjs`, which runs `swift test --enable-code-coverage`, prints line coverage per source file, and fails when `ClockLock.swift` is below 90 %.
 - The first build of the test target takes a minute or two; later runs take seconds.
 
+## Release gate
+
+The whole suite is **Step 1 of every release** (`/release-tattle`, `.agents/skills/release-tattle/scripts/test-suite.sh`): before the docs are updated or anything is committed, it checks what the suite needs (the models and fixture, Playwright's Chromium, `swift`), saying how to get what is missing, then runs `npm run test:all`. A failure stops the release. Without Claude Code, the same script is the first command of the manual release (README § Releasing). It takes about 10 minutes and spends nothing.
+
 ## Coverage policy
 
 - `vitest.config.ts` measures `src/**`, `desktop/**` and `web/src/**` (with v8), excluding `src/types/**` and the two live-only command-line tools, `src/cli/smoke.ts` and `src/cli/preflight.ts`, which exist to call real services.

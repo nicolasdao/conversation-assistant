@@ -207,20 +207,22 @@ A deployed version is final: GitHub keeps release tags and published releases fr
 
 It does, in order (a summary of the skill's own steps):
 
-1. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
-2. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.
-3. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
-4. Shows you the version, the bump, and the entry, and waits for your go.
-5. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): tattle v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and tags it, **on this Mac only**.
-6. Builds and verifies the app, still on this Mac: the locked dependencies (`npm ci`), their registry signatures, no high-severity advisory in what ships, the notices, the build, Apple's notarization, and Gatekeeper. If anything fails, it undoes the local tag and commit, so the same version can be released after the fix.
-7. Asks once before **deploying**: it pushes `master` and the tag, and publishes the GitHub Release with the DMG, the update files, an SBOM, the GPL sources, and SHA-256 checksums.
-8. Verifies production from the outside: the update feed names the new version, the published DMG is the one that was built, and a downloaded copy passes Gatekeeper.
-9. Points the website at the new release: writes its version and DMG link into `website/index.html`, commits that file alone, pushes `master`, and waits until [hey-tattle.com](https://hey-tattle.com) links the new DMG (Cloudflare redeploys the site on the push).
+1. Runs the whole test suite: unit tests with coverage thresholds, the capture helper's Swift tests, and the end-to-end tests of the web page and the Mac app (development build, offline); stops if any fails.
+2. Brings the docs up to date (`update-doc`) and commits every pending change (`git-commit`), so the tag contains everything.
+3. Refuses to continue if anything is still uncommitted; runs the gates (`npm run typecheck`, `npm test`, `npm run build:web`, `npm run build:desktop`, the third-party notices check); and checks that this Mac can deploy: the Developer ID certificate (warning when it nears expiry), the notary credentials, GitHub access.
+4. Reads the commits since the last tag (and the session, when it did the work), writes the changelog entry, and picks the bump: new features → minor, fixes only → patch, anything breaking → major.
+5. Shows you the version, the bump, and the entry, and waits for your go.
+6. Stamps `CHANGELOG.md`, runs `npm version`, commits `chore(release): tattle v<version>` (only `package.json`, `package-lock.json`, and `CHANGELOG.md`), and tags it, **on this Mac only**.
+7. Builds and verifies the app, still on this Mac: the locked dependencies (`npm ci`), their registry signatures, no high-severity advisory in what ships, the notices, the build, Apple's notarization, and Gatekeeper. If anything fails, it undoes the local tag and commit, so the same version can be released after the fix.
+8. Asks once before **deploying**: it pushes `master` and the tag, and publishes the GitHub Release with the DMG, the update files, an SBOM, the GPL sources, and SHA-256 checksums.
+9. Verifies production from the outside: the update feed names the new version, the published DMG is the one that was built, and a downloaded copy passes Gatekeeper.
+10. Points the website at the new release: writes its version and DMG link into `website/index.html`, commits that file alone, pushes `master`, and waits until [hey-tattle.com](https://hey-tattle.com) links the new DMG (Cloudflare redeploys the site on the push).
 
 **Without Claude Code**, the same steps are plain shell scripts, run from the project root:
 
 ```bash
 S=.claude/skills/release-tattle/scripts
+sh $S/test-suite.sh                     # unit + coverage, Swift, end-to-end
 sh $S/preflight.sh release              # the working tree must be clean
 sh $S/checks.sh                         # typecheck, tests, web build, Mac app bundle, notices
 sh $S/credentials.sh                    # can this Mac deploy? (certificate, notary credentials, GitHub)

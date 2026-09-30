@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 255,
+      "line_count": 257,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -651,10 +651,11 @@
         "End-to-end tests of the web page",
         "End-to-end tests of the Mac app",
         "Swift tests (the capture helper)",
+        "Release gate",
         "Coverage policy",
         "Rules for new tests"
       ],
-      "line_count": 138,
+      "line_count": 142,
       "links_to": [
         "CLAUDE.md",
         "docs/architecture.md",
@@ -673,9 +674,7 @@
         "scripts/swift-coverage.mjs",
         ".agents/skills/release-tattle/scripts/test-suite.sh"
       ],
-      "source_unresolved": [
-        ".agents/skills/release-tattle/scripts/test-suite.sh"
-      ],
+      "source_unresolved": [],
       "tags": [
         "testing",
         "tdd",

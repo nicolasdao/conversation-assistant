@@ -128,7 +128,7 @@ The `cloudflare` skill's `cf.js` needs a workaround in this repository (see [Got
 
 ### Releases update the site
 
-The release skill (`release-tattle`, Step 11) finishes every deployed release by pointing the page at it, after production is verified:
+The release skill (`release-tattle`, Step 12) finishes every deployed release by pointing the page at it, after production is verified:
 
 1. `update-website.sh <version>` reads the **published** GitHub Release (it refuses one that is not published) and writes its version, DMG link, size, date, and release-notes link into `website/index.html`. It checks that each element it edits is still on the page, and fails if the page changed shape: update the script with the page, never by hand around it.
 2. `deploy-website.sh <version>` commits `website/index.html` alone (`chore(website): point the download and release line at v<version>`), pushes `master`, and waits until https://hey-tattle.com links the new DMG.

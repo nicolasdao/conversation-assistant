@@ -16,7 +16,7 @@ The running log for `SPEC.md`. Updated after every phase.
 - [x] Phase 9 — E2E web (Playwright + Chromium)
 - [x] Phase 10 — E2E Electron
 - [x] Phase 11 — Swift tests for the capture helper (2026-09-30, done while Phases 3–8 ran in parallel worktrees)
-- [ ] Phase 12 — The suite becomes Step 1 of every release
+- [x] Phase 12 — The suite becomes Step 1 of every release
 - [ ] Phase 13 — Close out
 
 ## Coverage
@@ -289,6 +289,18 @@ Phase 10 (2026-09-30):
 - sherpa-onnx inside Electron: the VAD and the embedder work with the `false` copies. `readWave(path)` does not:
   E2E-L5 (see the ledger), the most serious finding of this work, since it breaks replays in the Mac app.
 
+Phase 12 (2026-09-30):
+
+- `.agents/skills/release-tattle/scripts/test-suite.sh` checks the models and fixture, Playwright's Chromium and
+  `swift` (each with its fix command), then runs `npm run test:all`. It exited 0 in 192 s on this Mac.
+- `SKILL.md`: a new **Step 1 — Test suite**; Steps 1–11 renumbered 2–12 with every cross-reference; the Gates row and
+  the "never run the app" constraint reworded as the spec gives. **Deviation:** the spec's "run Step 2 first → run
+  Steps 1 and 2 first" would, after renumbering, name the mode step instead of the docs step (now Step 3); the
+  constraint says "Step 1 (the test suite) and Step 3 (update-doc, then git-commit …)". `skill.json` 0.6.0, its
+  description and the `gh` dependency's step numbers (10, 12). README § Releasing (a new item 1, renumbered, and
+  `test-suite.sh` first in "Without Claude Code"), `docs/website.md` (Step 12), `docs/testing.md` § Release gate.
+  `checks.sh` is unchanged. The release itself was not run.
+
 ## Resume notes
 
-Next: Phase 12 (release step 1), then Phase 13 (close out).
+Next: Phase 13 (close out).

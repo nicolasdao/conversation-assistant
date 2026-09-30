@@ -1,7 +1,7 @@
 {
 	"name": "release-tattle",
-	"version": "0.5.0",
-	"description": "Release workflow for Tattle: bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits and tags locally, builds and verifies the signed Mac app, deploys it to production (push and GitHub Release, which installed copies update to), verifies production, and points the website (hey-tattle.com) at the new release, plus an [Unreleased] ledger mode.",
+	"version": "0.6.0",
+	"description": "Release workflow for Tattle: runs the whole test suite first (unit tests with coverage thresholds, the capture helper's Swift tests, and end-to-end tests of the web page and the Mac app, offline), bumps package.json, writes CHANGELOG.md (Keep a Changelog), commits and tags locally, builds and verifies the signed Mac app, deploys it to production (push and GitHub Release, which installed copies update to), verifies production, and points the website (hey-tattle.com) at the new release, plus an [Unreleased] ledger mode.",
 	"type": "skill",
 	"keywords": ["release", "changelog", "versioning", "semver", "keep-a-changelog", "git-tag", "tattle"],
 	"authors": [{ "name": "Cloudless Consulting Pty Ltd", "email": "nic@cloudlesslabs.com" }],
@@ -25,7 +25,7 @@
 			"install": { "darwin": "brew install node", "linux": "apt install nodejs", "win32": "winget install OpenJS.NodeJS.LTS" }
 		},
 		"gh": {
-			"description": "GitHub CLI: creates the GitHub Release that publishes the Mac app (Step 9), and reads it back to update the website (Step 11)",
+			"description": "GitHub CLI: creates the GitHub Release that publishes the Mac app (Step 10), and reads it back to update the website (Step 12)",
 			"check": "gh --version",
 			"install": { "darwin": "brew install gh", "linux": "apt install gh", "win32": "winget install GitHub.cli" }
 		},
