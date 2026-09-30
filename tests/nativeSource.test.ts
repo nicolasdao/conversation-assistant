@@ -86,8 +86,8 @@ describe("native capture adapter (fake helper)", () => {
 
     for (let i = 0; i < 3; i++) {
       helpers[i].exit(1);
-      await new Promise((r) => setTimeout(r, 30));
-      expect(helpers.length).toBe(i + 2);
+      // the restart comes after a 5 ms timer: wait for it, not for a fixed time (a busy machine takes longer)
+      await vi.waitFor(() => expect(helpers.length).toBe(i + 2));
     }
     // after restart 1, the helper clock restarted: offset recomputed
     helpers[3].started(1_005_000);
@@ -115,9 +115,8 @@ describe("native capture adapter (fake helper)", () => {
     });
     helpers[0].started(Date.now());
     helpers[0].stdout.write(Buffer.from("garbage-garbage-garbage"));
-    await new Promise((r) => setTimeout(r, 30));
+    await vi.waitFor(() => expect(helpers.length).toBe(2));
     expect(helpers[0].killed).toEqual(["SIGKILL"]);
-    expect(helpers.length).toBe(2);
     expect(events.some((e) => /malformed/.test(String(e.message)))).toBe(true);
     await cap.stop();
   });
@@ -130,8 +129,7 @@ describe("native capture adapter (fake helper)", () => {
       onStatus: (type, data) => events.push({ type, ...data }),
     });
     helpers[0].stderr.write(JSON.stringify({ type: "warning", message: "device switched" }) + "\n");
-    await new Promise((r) => setTimeout(r, 5));
-    expect(events).toContainEqual({ type: "error", component: "capture", message: "device switched", level: "warning" });
+    await vi.waitFor(() => expect(events).toContainEqual({ type: "error", component: "capture", message: "device switched", level: "warning" }));
     await cap.stop();
     expect(helpers[0].stdin.writableEnded).toBe(true);
     expect(helpers[0].killed).toEqual([]);
@@ -409,8 +407,7 @@ describe("native capture adapter, more (fake helper)", () => {
     const { cap, helpers } = await capture({ sessionStartEpochMs: 1000 });
     helpers[0].started(1000);
     helpers[0].exit(1);
-    await new Promise((r) => setTimeout(r, 30));
-    expect(helpers).toHaveLength(2);
+    await vi.waitFor(() => expect(helpers).toHaveLength(2));
     helpers[0].stdout.write(frameBytes(0, 0, ramp(512))); // the old helper's pipe still delivers
     helpers[1].started(1500);
     helpers[1].stdout.write(frameBytes(0, 0, ramp(512)));
