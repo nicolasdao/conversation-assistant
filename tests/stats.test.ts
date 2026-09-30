@@ -133,6 +133,81 @@ describe("stats with another set: a sales call, one category, no scores, three m
   });
 });
 
+describe("stats at their edges", () => {
+  const base = { labels: new Map<string, SegmentLabels>(), set, resolveSpeaker: (id: string) => id, speakerName: (id: string) => id, factcheck: fc, cost };
+  const seg = (id: string, startMs: number, endMs: number, utterances: PipelineUtterance[]): Segment => ({ id, startMs, endMs, forced: false, final: false, utterances });
+
+  test("no segments: an index of 0, nothing labelled, no speakers, empty lists", () => {
+    const st = computeStats({ ...base, segments: [] });
+    expect(st).toMatchObject({ roganIndex: 0, labelledMs: 0, speakers: [] });
+    expect(st.index).toMatchObject({ name: "Off-topic", share: 0 });
+    expect(st.categories.map((c) => c.split)).toEqual([[], []]);
+    expect(st.lists.every((l) => l.items.length === 0)).toBe(true);
+  });
+
+  test("labelled segments of no length: the option is listed with 0 ms and a share of 0", () => {
+    const s = seg("seg_1", 5000, 5000, [u("u_1", "spk_1", 5000, 5000)]);
+    const labels = new Map([["seg_1", deriveLabels(s, { subject: choiceA("tech") }, set, "v", [])]]);
+    const st = computeStats({ ...base, labels, segments: [s] });
+    expect(st.categories[0].split).toEqual([{ option: "tech", ms: 0, share: 0 }]);
+    expect(st.index!.share).toBe(0);
+  });
+
+  test("a set without an index category has no index", () => {
+    const noIndex: LabelSet = { ...structuredClone(set), categories: set.categories.map(({ index: _i, ...c }) => c) };
+    const st = computeStats({ ...base, set: noIndex, segments: [] });
+    expect(st.index).toBeNull();
+    expect(st.roganIndex).toBe(0);
+  });
+
+  test("a failed line counts no talk time and adds no text", () => {
+    const s = seg("seg_1", 0, 10_000, [u("u_1", "spk_1", 0, 4000, "  I predict rain.  "), { ...u("u_2", "spk_2", 4000, 10_000, "lost words"), failed: true }]);
+    const labels = new Map([["seg_1", deriveLabels(s, { prediction: noulA(0.9) }, set, "v", [])]]);
+    const st = computeStats({ ...base, labels, segments: [s] });
+    expect(st.speakers.map((x) => x.speakerId)).toEqual(["spk_1"]);
+    expect(st.lists[0].items).toEqual([{ segmentId: "seg_1", text: "I predict rain." }]);
+  });
+
+  test("a segment with no labels at all still counts talk time", () => {
+    const st = computeStats({ ...base, segments: [seg("seg_1", 0, 5000, [u("u_1", "spk_1", 0, 5000)])] });
+    expect(st.speakers).toEqual([{ speakerId: "spk_1", displayName: "spk_1", talkMs: 5000, markers: { disagreement: 0 }, scores: { heat: null, hype: null } }]);
+    expect(st.labelledMs).toBe(0);
+  });
+
+  test("a labelled segment without the first category adds no labelled time but still counts markers and scores", () => {
+    const s = seg("seg_1", 0, 10_000, [u("u_1", "spk_1", 0, 10_000)]);
+    const labels = new Map([["seg_1", deriveLabels(s, { mode: choiceA("news"), disagreement: noulA(0.9), hype: scoreA(3) }, set, "v", [])]]);
+    const st = computeStats({ ...base, labels, segments: [s] });
+    expect(st.labelledMs).toBe(0);
+    expect(st.categories[1].split).toEqual([{ option: "news", ms: 10_000, share: 1 }]);
+    expect(st.speakers[0]).toMatchObject({ markers: { disagreement: 1 }, scores: { hype: 3, heat: null } });
+  });
+
+  test("a speaker who spoke only in unscored segments has no score", () => {
+    const a = seg("seg_1", 0, 10_000, [u("u_1", "spk_1", 0, 10_000)]);
+    const b = seg("seg_2", 10_000, 20_000, [u("u_2", "spk_2", 10_000, 20_000)]);
+    const labels = new Map([["seg_1", deriveLabels(a, { hype: scoreA(4) }, set, "v", [])], ["seg_2", deriveLabels(b, { subject: choiceA("tech") }, set, "v", [])]]);
+    const st = computeStats({ ...base, labels, segments: [a, b] });
+    expect(st.speakers.find((x) => x.speakerId === "spk_1")!.scores.hype).toBe(4);
+    expect(st.speakers.find((x) => x.speakerId === "spk_2")!.scores.hype).toBeNull();
+  });
+
+  test("speakers are sorted by talk time, most first, named by their surviving id", () => {
+    const s = seg("seg_1", 0, 10_000, [u("u_1", "spk_1", 0, 2000), u("u_2", "spk_2", 2000, 8000), u("u_3", "spk_3", 8000, 10_000)]);
+    const st = computeStats({
+      ...base, segments: [s], resolveSpeaker: (id) => (id === "spk_3" ? "spk_1" : id), speakerName: (id) => ({ spk_1: "Nic", spk_2: "Ana" } as Record<string, string>)[id],
+    });
+    expect(st.speakers.map((x) => [x.speakerId, x.displayName, x.talkMs])).toEqual([["spk_2", "Ana", 6000], ["spk_1", "Nic", 4000]]);
+  });
+
+  test("a per-speaker marker counts once per segment for each speaker in it, however many lines they said", () => {
+    const s = seg("seg_1", 0, 10_000, [u("u_1", "spk_1", 0, 2000), u("u_2", "spk_1", 2000, 4000), u("u_3", "spk_2", 4000, 6000), u("u_4", "spk_1", 6000, 8000)]);
+    const labels = new Map([["seg_1", deriveLabels(s, { disagreement: noulA(0.9) }, set, "v", [])]]);
+    const st = computeStats({ ...base, labels, segments: [s] });
+    expect(st.speakers.map((x) => x.markers.disagreement)).toEqual([1, 1]);
+  });
+});
+
 describe("stats stored by a recording made before label sets", () => {
   test("convert to version 2 in the converted set's shape", () => {
     const legacy = JSON.parse(readFileSync("tests/fixtures/legacy-session.json", "utf8"));
