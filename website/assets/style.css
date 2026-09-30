@@ -250,6 +250,13 @@ main { position: relative; z-index: 1; }
 .card p { margin: 0; color: var(--ink-2); font-size: 16px; line-height: 1.5; }
 .card .big { font: 800 56px/0.95 var(--cond); color: var(--ink); text-transform: uppercase; letter-spacing: 0.01em; }
 .card .big small { font-size: 22px; color: var(--mute); letter-spacing: 0.08em; }
+/* the Rundown's closing strap: transcription on the Mac */
+.onmac { margin-top: 56px; }
+.onmac-title { margin: 0 0 10px; font: 800 34px/1 var(--cond); color: var(--ink); text-transform: uppercase; letter-spacing: 0.02em; }
+.onmac-lede { margin: 0 0 22px; max-width: 40em; font-size: 17px; line-height: 1.5; color: var(--ink-2); }
+.onmac-note { margin: 16px 0 0; max-width: 48em; font-size: 14px; line-height: 1.5; color: var(--mute); }
+.cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.card.on { border-top-color: var(--good); }
 
 .signoff { display: grid; justify-items: center; text-align: center; padding-top: 120px; padding-bottom: 120px; }
 .signoff .dl, .signoff .dl-other { justify-items: center; }
@@ -527,6 +534,7 @@ html { scroll-behavior: smooth; }
   .seg { grid-template-columns: 96px minmax(0, 1fr); }
   .seg-vis { grid-column: 2; }
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards.three { grid-template-columns: minmax(0, 1fr); }
   .jev-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lab-kinds { grid-template-columns: minmax(0, 1fr); }
   .jc-grid { grid-template-columns: minmax(0, 1fr); }

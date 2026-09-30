@@ -28,6 +28,8 @@ The live layer never feeds any judgment. Two **engines** can produce both layers
 | **Apple Speech** (`apple`), macOS 26+ | One clip per utterance, each through its own short-lived `SpeechAnalyzer` | One `SpeechAnalyzer` per stream, never finalized | Free | Nothing |
 | **OpenAI** (`openai`) | `gpt-transcribe`, one upload per utterance, ~2.5 s after the speaker stops | `gpt-live-transcribe` over a realtime WebSocket, ~1.2 s after speech starts | ~$1.23 an hour | The audio, to OpenAI |
 
+**Offline.** With Apple Speech, a transcript-only session (fact-checking and labels off, Chat unused) needs no connection once the model is installed: on 30 September 2026 a real-time session showed no connection to anything outside the Mac from the engine, `tattle-transcribe`, or Apple's `localspeechrecognition` service (sampled every 2 s). The internet is needed only to download the model once (on a Mac that lacks it), for fact-checking, labels, Chat, and label-set drafting, and for update checks, which fail silently offline.
+
 Measured on a 1 h 57 min episode against OpenAI's text (fillers and number words normalized, 29 September 2026): Apple's clips disagree with OpenAI on **9.3 %** of words, take 0.3 s p50 / 0.9 s p95 each, and hear "Jev" 23 times where OpenAI does 36 times (the others become "Jeff", "Jeb", "Javi"). Apple's live text shows 2.0 s p50 after speech starts. Where they disagree, OpenAI is not always right ("dispatch it" against OpenAI's "Patch it").
 
 ## Choosing the engine — `src/settings.ts`

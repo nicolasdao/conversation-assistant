@@ -188,7 +188,7 @@
         "Licenses",
         "Publishing"
       ],
-      "line_count": 248,
+      "line_count": 250,
       "links_to": [
         "README.md",
         "docs/architecture.md",
@@ -648,7 +648,7 @@
         "Both engines",
         "Configuration (`config/app.json` → `transcription`)"
       ],
-      "line_count": 146,
+      "line_count": 148,
       "links_to": [
         "docs/architecture.md",
         "docs/gotchas.md",
@@ -707,7 +707,8 @@
         "docs/gotchas.md",
         "docs/jev.md",
         "docs/mission.md",
-        "docs/system1-system2.md"
+        "docs/system1-system2.md",
+        "docs/transcription.md"
       ],
       "over_size": false,
       "parse_error": null,
