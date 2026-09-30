@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { describe, expect, test } from "vitest";
 import { createApiServer, type EngineApi } from "../src/server/main.ts";
 import { inProcessHandler } from "../src/server/inProcess.ts";
@@ -87,4 +88,64 @@ test("each request's stream pair closes when its response ends", async () => {
   for (let i = 0; i < 5; i++) expect(await (await h(new Request("app://x/"))).text()).toBe("ok");
   for (let i = 0; i < 50 && open > 0; i++) await new Promise((res) => setTimeout(res, 10));
   expect(open).toBe(0);
+});
+
+describe("the in-process connection, edge by edge", () => {
+  /** A handler over a plain server that answers with `respond`, recording each request it saw. */
+  function over(respond: (req: IncomingMessage, res: ServerResponse) => void) {
+    const seen: { method?: string; url?: string; headers: Record<string, unknown>; body: string }[] = [];
+    const server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => { seen.push({ method: req.method, url: req.url, headers: req.headers, body }); respond(req, res); });
+    });
+    return { h: inProcessHandler(server), seen };
+  }
+
+  test("HEAD, 204, and 304 answers have no body; the headers still come through", async () => {
+    const { h } = over((req, res) => {
+      if (req.url === "/204") { res.writeHead(204, { "x-kind": "none" }); res.end(); return; }
+      if (req.url === "/304") { res.writeHead(304); res.end(); return; }
+      res.writeHead(200, { "content-type": "text/plain", "content-length": "5" });
+      res.end(req.method === "HEAD" ? undefined : "hello");
+    });
+    const head = await h(new Request("app://x/", { method: "HEAD" }));
+    expect([head.status, head.body, head.headers.get("content-length")]).toEqual([200, null, "5"]);
+    const none = await h(new Request("app://x/204"));
+    expect([none.status, none.body, none.headers.get("x-kind")]).toEqual([204, null, "none"]);
+    expect((await h(new Request("app://x/304"))).body).toBeNull();
+    expect(await (await h(new Request("app://x/"))).text()).toBe("hello");
+  });
+
+  test("a header with several values arrives joined with a comma", async () => {
+    // node joins most repeated headers itself; set-cookie arrives as a list, which the handler joins
+    const { h } = over((_req, res) => { res.setHeader("x-many", ["1", "2"]); res.setHeader("set-cookie", ["a=1", "b=2"]); res.end(); });
+    const r = await h(new Request("app://x/"));
+    expect(r.headers.get("x-many")).toBe("1, 2");
+    expect(r.headers.get("set-cookie")).toBe("a=1, b=2");
+  });
+
+  test("the request reaches the router as the page itself: Host 127.0.0.1, no Origin, the query kept, one connection each", async () => {
+    const { h, seen } = over((_req, res) => res.end());
+    await h(new Request("app://conversation-assistant/api/calls?system=s2&limit=5", { headers: { origin: "https://evil.example", "x-file-name": "a%20b" } }));
+    expect(seen[0]).toMatchObject({ method: "GET", url: "/api/calls?system=s2&limit=5", headers: { host: "127.0.0.1", connection: "close", "x-file-name": "a%20b" } });
+    expect(seen[0].headers.origin).toBeUndefined();
+  });
+
+  test("an upload's bytes arrive intact", async () => {
+    const { h, seen } = over((_req, res) => res.end("ok"));
+    const bytes = Buffer.from(Array.from({ length: 300_000 }, (_, i) => i % 128));
+    const r = await h(new Request("app://x/api/sessions/import", { method: "POST", body: bytes }));
+    expect(await r.text()).toBe("ok");
+    expect(Buffer.from(seen[0].body, "latin1").length).toBe(300_000);
+    expect(seen[0].body).toBe(bytes.toString());
+  });
+
+  test("a request body that fails, or a router that hangs up, rejects", async () => {
+    const { h } = over((_req, res) => res.end("never"));
+    const failing = new ReadableStream({ start(c) { c.error(new Error("the page's stream broke")); } });
+    await expect(h(new Request("app://x/", { method: "POST", body: failing, duplex: "half" } as RequestInit))).rejects.toThrow();
+    const hangUp = inProcessHandler(createServer((req) => req.socket.destroy()));
+    await expect(hangUp(new Request("app://x/"))).rejects.toThrow();
+  });
 });

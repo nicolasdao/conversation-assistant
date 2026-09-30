@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { request } from "node:http";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { about, createApiServer, Engine, engineStale } from "../src/server/main.ts";
 import { LabelSetStore } from "../src/labels/store.ts";
 import { wavHeader } from "../src/audio/wav.ts";
@@ -13,7 +13,10 @@ import { FakeEngine } from "./fakes/index.ts";
 
 let base = "";
 const engine = new FakeEngine();
-const web = mkdtempSync(join(tmpdir(), "web-"));
+// the web root sits in its own temporary folder, beside a file it must never serve
+const outside = mkdtempSync(join(tmpdir(), "server-"));
+const web = join(outside, "web");
+mkdirSync(web);
 const server = createApiServer(engine, { webRoot: web });
 
 beforeAll(async () => {
@@ -24,11 +27,21 @@ beforeAll(async () => {
   writeFileSync(join(web, "styles.css"), "body{}");
   writeFileSync(join(web, "dist", "app.js"), "export {}");
   writeFileSync(join(web, "fonts", "face.woff2"), "wOF2");
-  writeFileSync(join(tmpdir(), "secret.txt"), "top secret");
+  writeFileSync(join(outside, "secret.txt"), "top secret");
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-afterAll(() => new Promise<void>((r) => server.close(() => r())));
+afterAll(async () => {
+  await new Promise<void>((r) => server.close(() => r()));
+  rmSync(outside, { recursive: true, force: true });
+});
+// each test starts from the same engine state: no test depends on another's calls, renames, or events
+const NAMES = { ...engine.names };
+beforeEach(() => {
+  engine.calls.length = 0;
+  engine.names = { ...NAMES };
+  engine.bus.reset();
+});
 
 /** Raw http (the test setup disables fetch). */
 function call(method: string, path: string, body?: unknown): Promise<{ status: number; type: string; json: any; text: string }> {
