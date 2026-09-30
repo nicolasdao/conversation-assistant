@@ -649,11 +649,12 @@
         "Fakes (`tests/fakes/`)",
         "Web DOM tests (happy-dom)",
         "End-to-end tests of the web page",
+        "End-to-end tests of the Mac app",
         "Swift tests (the capture helper)",
         "Coverage policy",
         "Rules for new tests"
       ],
-      "line_count": 129,
+      "line_count": 138,
       "links_to": [
         "CLAUDE.md",
         "docs/architecture.md",

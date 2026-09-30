@@ -102,6 +102,15 @@ A page module is tested in happy-dom with the page's real markup:
 - **Known bugs** are `test.fail()` tests named `BUG <id>: …`, like `it.fails` in Vitest.
 - **Flakes:** before committing a change to these tests, run them three times: `npx playwright test --project=web --repeat-each=3`. A failure is investigated, never retried away.
 
+## End-to-end tests of the Mac app
+
+`npx playwright test --project=electron` drives the Mac app in development (Playwright's `_electron`, against `dist/desktop/main.mjs`: `npm run test:e2e` builds it first). A packaged build cannot be driven (it refuses remote debugging), so what only a signed build has is checked by the release instead.
+
+- **Isolation** (`e2e/electron/fixture.ts`): each test launches the app with its own `HOME` (so Application Support, the window's storage and the single-instance lock are its own, and an installed Tattle can run at the same time), `TATTLE_CREDENTIALS`, `TATTLE_SETTINGS` and `TATTLE_LABEL_SETS` inside it, and `TATTLE_FORCE_NO_APPLE_SPEECH=1` (the on-device helper never starts, and its model is never installed). It runs from a tmp working folder: in development `web`, `config`, `models` and `sessions` are relative to it, so symlinks give the app the project's page, config and models, and an empty `sessions/` instead of the real recordings.
+- **The main process** gets a `fetch` that throws, and `dialog.showMessageBox`, `shell.openExternal` and `shell.openPath` replaced by recorders (Electron's module properties are writable, and `desktop/main.ts` reads them at call time): `mac.recorded()` returns the sheets and the links. `mac.menu(["Tattle", "Settings…"])` clicks a menu item.
+- **Never** start a session, send a chat message or save keys here: the web end-to-end tests do, against fakes.
+- **sherpa-onnx inside Electron:** one test runs the VAD and the embedder in the main process (with the `false` copies the gotcha requires), which the Node tests cannot check.
+
 ## Swift tests (the capture helper)
 
 `native/capture/Package.swift` has a test target, `tattle-capture-tests` (`native/capture/Tests/tattle-capture-tests/`), written with Swift Testing (`import Testing`) against `@testable import tattle_capture` (the module name has an underscore). SwiftPM builds the executable for tests with its entry point renamed, so `main.swift`'s top-level code never runs, and no library split is needed; `swift build -c release` (`npm run build:capture`) does not build the tests.
