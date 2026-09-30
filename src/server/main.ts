@@ -502,6 +502,8 @@ export class Engine implements EngineApi {
     if (this.session && this.session.status !== "ended") throw new ApiError(409, "a session is already running");
     const features = parseFeatures(req?.features);
     const stories = parseStories(req?.stories);
+    // before anything starts: refused once the session runs, it would stay on air and the retry would get 409
+    if (typeof req?.name === "string" && req.name.trim().length > 120) throw new ApiError(400, "name is too long");
     // the session's label set, copied now: editing it later changes nothing in this session or its recording
     const labelSet = this.resolveLabelSet(req?.labelSet, features);
     features.labels = labelSet !== null;
