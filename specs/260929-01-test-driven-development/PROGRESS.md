@@ -128,7 +128,7 @@ Thresholds in `vitest.config.ts`: src 99/99/99/97, web/src 100/99/98/97, desktop
 | Id | File:line | Impact | Status |
 |---|---|---|---|
 | B1 | `src/server/main.ts:506` (`Engine.start`) | A name over 120 characters answered 400 while the session kept running; a retry got 409 | Fixed, `6dc0522` |
-| B3 | `src/server/main.ts:1129`, `src/cli/calibrateBoundary.ts:63`, `src/cli/calibrateSpeakers.ts:51` | The command-line tools silently did nothing from a path with a space | Fixed for spaces, `8c5313b` (S3's `pathToFileURL`); **a symlinked path still does nothing**: Node resolves the main module's symlinks but not `argv[1]`. Decision for the user |
+| B3 | `src/server/main.ts:1129`, `src/cli/calibrateBoundary.ts:63`, `src/cli/calibrateSpeakers.ts:51` | The command-line tools silently did nothing from a path with a space | Fixed for spaces, `8c5313b`; for symlinked paths after the spec (`isMain` in `src/entry.ts` resolves the path first), 2026-09-30 |
 | B3-L1 | the same guards | S3's guard threw `ERR_INVALID_ARG_TYPE` when `process.argv[1]` is undefined, as in the packaged Mac app started from Finder: `src/server/main.ts` is bundled into the app, so the app would not have started. Found in review before any release | Fixed, `8cb59f2` (test first) |
 | B2 | `web/src/panels.ts:590` (`segmentMatches`) | A speaker filter plus a label filter emptied the transcript; a speaker filter alone dimmed every segment | Fixed, `1e64d51` |
 | B4 | `web/src/licenses.ts:15` (`linkify`) | `<https://x>` linked to `https://x>`, breaking 7 real notices | Fixed, `6884e05` |
@@ -155,11 +155,11 @@ Thresholds in `vitest.config.ts`: src 99/99/99/97, web/src 100/99/98/97, desktop
 | CH-L1 | `src/chat/chat.ts:447` | A title that only got shorter by collapsing spaces still gets `…` (cosmetic) | `it.fails` |
 | DM-L1 | `desktop/main.ts:310-319` (`offerRestart`) | A restart put off through Check for Updates… is offered again by the automatic offer that waited for the show to end | `it.fails` (a judgment call: low) |
 | DM-L2 | `desktop/main.ts:244-259` (`before-quit`) | ⌘Q again while the on-air quit sheet is up stacks a second sheet | `it.fails` (low) |
-| S-state-1 | `web/src/state.ts:373` | After an event-stream reconnect, every error is listed twice | `it.fails` (unit) and `test.fail` (end-to-end) |
+| S-state-1 | `web/src/state.ts:373` | After an event-stream reconnect, every error is listed twice | Fixed after the spec, 2026-09-30 (an error seen before is not listed again) |
 | W7-L1 | `web/src/chat.ts:297-310` | A reply stream that ends without `done` is never fetched again: the unsaved version stays on screen | `it.fails` |
-| W7-L2 | `web/src/app.ts:230, 244-247` | The page listens for the engine's `error` events under the name EventSource uses for a dropped connection: every drop runs `JSON.parse(undefined)` and throws | `test.fail` (end-to-end); not writable as a unit `it.fails` |
-| E2E-L1 | `web/src/app.ts:248-250` (`es.onerror`) | Same cause: every engine `error` event (and each one replayed on reconnect) marks the event stream as lost (`#conn.down`) while it is connected | `test.fail` (end-to-end) |
-| E2E-L5 | `src/audio/wav.ts:41` (`readWav16k`) | **Severe for the Mac app**: `sherpa.readWave(path)` without `false` throws "External buffers are not allowed" inside Electron, and `FileSource` reads every replayed WAV through it, so a replay in the Mac app (Recordings → Replay) fails as it opens the audio. The gotcha's fix covered `vad.front` and `extractor.compute`, not `readWave` | `test.fail` (Electron end-to-end). Fix: `sherpa.readWave(path, false)`; a candidate for the next patch release |
+| W7-L2 | `web/src/app.ts:230, 244-247` | The page listens for the engine's `error` events under the name EventSource uses for a dropped connection: every drop runs `JSON.parse(undefined)` and throws | Fixed after the spec, 2026-09-30 |
+| E2E-L1 | `web/src/app.ts:248-250` (`es.onerror`) | Same cause: every engine `error` event (and each one replayed on reconnect) marks the event stream as lost (`#conn.down`) while it is connected | Fixed after the spec, 2026-09-30 |
+| E2E-L5 | `src/audio/wav.ts:41` (`readWav16k`) | **Severe for the Mac app**: `sherpa.readWave(path)` without `false` throws "External buffers are not allowed" inside Electron, and `FileSource` reads every replayed WAV through it, so a replay in the Mac app (Recordings → Replay) fails as it opens the audio. The gotcha's fix covered `vad.front` and `extractor.compute`, not `readWave` | Fixed after the spec, `7e860f7` (2026-09-30): verified in the development app, where a replay went from ending with this error to running to its end |
 | E2E-L4 | `web/src/main.ts:13` | The shell shows (`booting` removed) before `app.js` has bound its controls: a click in that gap does nothing (seen under load) | Not testable deterministically; the E2E `open()` waits for the first render |
 | §14.3 | `web/src/api.ts:153` → `transfer.ts:165` | An import answered with a 2xx that isn't JSON leaves the window on "Importing…" | Not writable as `it.fails` (unhandled rejection) |
 | §14.4 | `web/src/keys.ts:20-49, 115` | The guide links are shared nodes: a second card showing at once takes them | `it.fails` |
@@ -184,7 +184,7 @@ Thresholds in `vitest.config.ts`: src 99/99/99/97, web/src 100/99/98/97, desktop
 | LBW-L4 | `web/src/labels.ts:562` (`tryIt`) | After a needsKey refusal with `GET /api/setup` failing, Try retries in a loop | `it.fails` |
 | §11.2 | `src/server/main.ts:533` | A live capture keeps running when its Session cannot be built | `it.fails` |
 | §11.4 | `src/server/audio.ts:85-91` | An error after the headers are sent (an unreadable WAV) is an unhandled rejection that ends the process | Not writable even as `it.fails` (it would crash the worker) |
-| §11.5 | `src/store/transfer.ts:246-251` | **Privacy:** a `.tattle` export carries the exporter's home path in events.jsonl | `it.fails`; a follow-up for the user to decide |
+| §11.5 | `src/store/transfer.ts:246-251` | **Privacy:** a `.tattle` export carries the exporter's home path in events.jsonl (confirmed in a Mac app recording: two occurrences) | Fixed after the spec, 2026-09-30: the export leaves out each event's `dir` |
 | §11.6 | `src/store/transfer.ts:127` | Exporting a listed recording without events.jsonl fails with a raw ENOENT | `it.fails` (two tests) |
 | §11.7 | `src/store/transfer.ts:226` | Two recordings with the same id and no start time count as the same (409) | `it.fails` |
 | §11.8 | `src/store/transfer.ts:171` | An original WAV whose header was never finalised imports cut to 1 s | `it.fails` |
@@ -355,6 +355,14 @@ By severity:
    refusal, deleting a chat mid-reply, Create with AI's 402, a negative `retry-after`).
 8. **Tests still out of scope:** the website (`website/`), the release scripts, `scripts/**`, and the Apple Speech
    Swift helper (`native/transcribe`).
+
+## After the spec (2026-09-30, `/go-with-recommendations`)
+
+The recommendations above were carried out, test-first, each verified: `tests/fixtures/` tracked (`!tests/fixtures/`;
+a fresh clone passes the three files); E2E-L5 fixed (the `readWave` contract test red first, then a replay in the
+development app checked before and after the fix); W7-L2, E2E-L1 and S-state-1 fixed (their tests made plain, red,
+then green); §11.5 fixed; B3 extended to symlinked paths with `isMain`; the leftover worktrees removed. Follow-ups 1–4
+and 6 above are done; 5, 7 and 8 remain, and pushing and releasing wait for the user.
 
 ## Resume notes
 
