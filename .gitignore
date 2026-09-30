@@ -53,6 +53,10 @@ out/
 dist-electron/
 .wrangler/
 coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
 
 # ------------------------------------------------------------
 # Native tools (a possible Swift capture helper, Tier 2)

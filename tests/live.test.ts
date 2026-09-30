@@ -1,25 +1,12 @@
 import { describe, expect, test } from "vitest";
 import { Budget } from "../src/budget.ts";
 import { loadConfig } from "../src/config.ts";
-import { LiveTranscriber, REALTIME_URL, type LivePartial, type LiveTranscriptionRow, type SocketLike } from "../src/transcribe/live.ts";
+import { LiveTranscriber, REALTIME_URL, type LivePartial, type LiveTranscriptionRow } from "../src/transcribe/live.ts";
 import { EventBus } from "../src/store/events.ts";
+import { FakeSocket } from "./fakes/index.ts";
 
 const cfg = loadConfig().app;
 const live = cfg.transcription.live!;
-
-class FakeSocket implements SocketLike {
-  readyState = 1;
-  sent: any[] = [];
-  onopen: SocketLike["onopen"] = null;
-  onmessage: SocketLike["onmessage"] = null;
-  onclose: SocketLike["onclose"] = null;
-  onerror: SocketLike["onerror"] = null;
-  constructor(readonly url: string, readonly headers: Record<string, string>) {}
-  send(d: string) { this.sent.push(JSON.parse(d)); }
-  close() { this.onclose?.({ code: 1000 }); }
-  server(e: unknown) { this.onmessage?.({ data: JSON.stringify(e) }); }
-  get appends() { return this.sent.filter((m) => m.type === "input_audio_buffer.append"); }
-}
 
 function setup() {
   const sockets: FakeSocket[] = [];

@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import { loadConfig } from "../src/config.ts";
 import { Budget } from "../src/budget.ts";
 import { ChatService, composeQuestion, type ChatEvent, type ChatSource, type TranscriptLine } from "../src/chat/chat.ts";
+import { fakeOpenRouter } from "./fakes/index.ts";
 
 const cfg = loadConfig().app.chat;
 const line = (n: number, speakerId = "spk_1", speaker = "Speaker 1"): TranscriptLine =>
@@ -41,25 +42,6 @@ describe("composing a question", () => {
     expect(composeQuestion(undefined, [], false, "q").sent).toContain('<transcript status="finished">No one has spoken yet.</transcript>');
   });
 });
-
-/** A fake OpenRouter: the model catalogue, and chat completions streamed as server-sent events. */
-function fakeOpenRouter(reply = "Alice said [0:10] hello.", usage = { prompt_tokens: 120, completion_tokens: 8, cost: 0.0012 }) {
-  const bodies: any[] = [];
-  const fetchFn = (async (url: string, init?: RequestInit) => {
-    if (String(url).endsWith("/models")) {
-      return new Response(JSON.stringify({ data: [{ id: "openai/gpt-6-luna", name: "OpenAI: GPT-6 Luna", context_length: 1_050_000, pricing: { prompt: "0.0000001", completion: "0.0000005" }, top_provider: { max_completion_tokens: 128000 } }] }));
-    }
-    bodies.push(JSON.parse(String(init!.body)));
-    const chunks = [
-      ": OPENROUTER PROCESSING\n\n",
-      ...reply.split(" ").map((w, i) => `data: ${JSON.stringify({ id: "gen-1", model: "openai/gpt-6-luna", provider: "OpenAI", choices: [{ delta: { content: (i ? " " : "") + w } }] })}\n\n`),
-      `data: ${JSON.stringify({ id: "gen-1", choices: [{ delta: {} , finish_reason: "stop" }], usage })}\n\n`,
-      "data: [DONE]\n\n",
-    ];
-    return new Response(new ReadableStream({ start(c) { for (const x of chunks) c.enqueue(new TextEncoder().encode(x)); c.close(); } }), { status: 200 });
-  }) as typeof fetch;
-  return { fetchFn, bodies };
-}
 
 function setup(lines: TranscriptLine[], opts: { budget?: Budget; live?: boolean } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "chat-"));

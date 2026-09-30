@@ -13,6 +13,9 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "npm run build:web && npm run build:desktop && playwright test",
+    "test:all": "npm run typecheck && npm run test:coverage && npm run test:e2e",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json --noEmit",
     "models": "sh scripts/download-models.sh",
     "fixtures": "node --import tsx scripts/make-fixtures.ts",
@@ -38,10 +41,13 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.2",
+    "@vitest/coverage-v8": "5.0.1",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"

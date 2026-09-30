@@ -7,9 +7,10 @@ import { loadConfig } from "../src/config.ts";
 import { EchoGate } from "../src/audio/echoGate.ts";
 import { FileSource } from "../src/audio/source.ts";
 import { encodeWav, readWav16k } from "../src/audio/wav.ts";
-import { Session, type Services } from "../src/pipeline/session.ts";
+import { Session } from "../src/pipeline/session.ts";
 import { EventBus } from "../src/store/events.ts";
 import { FIXTURE_DIR, loadScript, requireAssets } from "./helpers.ts";
+import { FakeSocket, transcribeOnlyServices as services } from "./fakes/index.ts";
 
 const CFG = { mode: "auto" as const, thresholdDbfs: -45, holdMs: 250 };
 const tone = (amp: number) => Float32Array.from({ length: 512 }, (_, i) => amp * Math.sin(i / 3));
@@ -79,13 +80,6 @@ describe("echo gate", () => {
     const f = tone(0.3);
     expect(g.host(f, 0)).toBe(f);
   });
-});
-
-/** Transcription answers every clip; with both features off nothing else is called. */
-const services = (): Services => ({
-  transcribe: async () => ({ ok: true, text: "something was said here", filler: false }) as never,
-  ask: async () => { throw new Error("Jev is not called with both features off"); },
-  s2: {} as never,
 });
 
 /** The fixture's host track with the call leaking in: the remote track, 40 ms late, at a third of its level. */
@@ -161,7 +155,8 @@ describe("echo gate through the engine", () => {
     let status!: (type: "error" | "health", data: Record<string, unknown>) => void;
     const engine = new Engine({
       sessionsDir: mkdtempSync(join(tmpdir(), "sessions-")),
-      session: { services },
+      // live text gets a fake socket: without one it opened a real one to OpenAI's realtime endpoint (docs/testing.md)
+      session: { services, liveConnect: (url, headers) => new FakeSocket(url, headers) },
       live: async (_mic, onStatus) => {
         status = onStatus;
         // the helper says where the call plays before the session exists

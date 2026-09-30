@@ -5,20 +5,9 @@ import { describe, expect, test } from "vitest";
 import { loadConfig } from "../src/config.ts";
 import { FileSource } from "../src/audio/source.ts";
 import { Session, type Services } from "../src/pipeline/session.ts";
-import type { TranscriptionResult } from "../src/transcribe/openai.ts";
 import { EventBus } from "../src/store/events.ts";
 import { FIXTURE_DIR, requireAssets } from "./helpers.ts";
-
-/** Transcription that is down for the first `downFor` calls, then answers with `text`. */
-function flaky(downFor: number, failure: TranscriptionResult = { ok: false, error: "TypeError: fetch failed", retryable: true }, text = "words said here") {
-  let calls = 0;
-  const services = (): Services => ({
-    transcribe: async () => (++calls <= downFor ? failure : { ok: true, text, filler: false }),
-    ask: async () => { throw new Error("Jev is not called with both features off"); },
-    s2: {} as never,
-  });
-  return { services, calls: () => calls };
-}
+import { flaky } from "./fakes/index.ts";
 
 async function run(services: () => Services, retryEveryMs?: number) {
   const bus = new EventBus();

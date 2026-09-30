@@ -9,3 +9,10 @@ process.env.TATTLE_LABEL_SETS = mkdtempSync(join(tmpdir(), "tattle-labels-"));
 globalThis.fetch = (() => {
   throw new Error("network disabled in tests");
 }) as typeof fetch;
+
+// Nor a WebSocket: live text takes its socket factory through its options too (docs/testing.md).
+globalThis.WebSocket = class {
+  constructor() {
+    throw new Error("network disabled in tests");
+  }
+} as unknown as typeof WebSocket;

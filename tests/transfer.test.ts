@@ -1,41 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { readZipEntries, readZipEntry, writeZip } from "../src/store/zip.ts";
 import { EXTENSION, exportEstimate, exportFileName, exportRecording, importRecording, TransferError } from "../src/store/transfer.ts";
 import { SessionLibrary } from "../src/store/library.ts";
-import { wavHeader } from "../src/audio/wav.ts";
 import { createReadStream } from "node:fs";
 import { Engine } from "../src/server/main.ts";
+import { recording } from "./fakes/index.ts";
 
 const hasAfconvert = (() => { try { execFileSync("which", ["afconvert"]); return true; } catch { return false; } })();
-
-/** 3 s of a tone at 16 kHz, as the app writes its WAVs. */
-function tone(seconds: number, hz: number): Buffer {
-  const n = seconds * 16_000;
-  const pcm = Buffer.alloc(n * 2);
-  for (let i = 0; i < n; i++) pcm.writeInt16LE(Math.round(Math.sin((2 * Math.PI * hz * i) / 16_000) * 8000), i * 2);
-  return Buffer.concat([wavHeader(pcm.length, 16_000), pcm]);
-}
-
-function recording(root: string, id = "20260925-120000") {
-  const dir = join(root, id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "session.json"), JSON.stringify({ id, app: { name: "conversation-assistant", version: "0.2.0" }, mode: "live", startedAt: "2026-09-25T12:00:00Z", streams: ["host", "remote"] }));
-  writeFileSync(join(dir, "meta.json"), JSON.stringify({ name: "Episode 12: a/b" }));
-  writeFileSync(join(dir, "events.jsonl"), [
-    { seq: 1, type: "session.started", at: "x", data: { sessionId: id, mode: "live", s1Version: "s1@1", labelSetVersion: "a" } },
-    { seq: 2, type: "utterance", at: "x", data: { id: "u_1", stream: "host", startMs: 0, endMs: 2500, speakerId: "spk_1", speakerName: "Nic", text: "Hello", tags: [] } },
-    { seq: 3, type: "session.ended", at: "x", data: { sessionId: id, reason: "stopped" } },
-  ].map((e) => JSON.stringify(e)).join("\n") + "\n");
-  writeFileSync(join(dir, "jev_calls.jsonl"), JSON.stringify({ kind: "jev_call", cost_usd: 0.25 }) + "\n");
-  writeFileSync(join(dir, "chats.jsonl"), JSON.stringify({ kind: "chat", op: "create", chat_id: "chat_1", title: "Private", model: "m", at: "x" }) + "\n");
-  writeFileSync(join(dir, "host.wav"), tone(3, 440));
-  writeFileSync(join(dir, "remote.wav"), tone(3, 660));
-  return dir;
-}
 
 describe("zip", () => {
   test("round trip: deflated data and stored files, with UTF-8 names and checksums", async () => {

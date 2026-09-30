@@ -4,28 +4,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { SessionLibrary } from "../src/store/library.ts";
 import { Engine } from "../src/server/main.ts";
-
-let seq = 0;
-const ev = (type: string, data: Record<string, unknown>) => JSON.stringify({ seq: ++seq, type, at: "2026-09-25T10:00:00.000Z", data });
-
-function makeSession(root: string, id: string, o: { mode?: string; startedAt: string; lines: [string, string][]; cost?: number; ended?: boolean }) {
-  const dir = join(root, id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "session.json"), JSON.stringify({ id, mode: o.mode ?? "live", startedAt: o.startedAt, streams: ["host", "remote"], labelSetVersion: "abc", s1Version: "s1@1" }));
-  const events = [
-    ev("session.started", { sessionId: id, mode: o.mode ?? "live", s1Version: "s1@1", labelSetVersion: "abc" }),
-    ev("speaker.created", { id: "spk_1", displayName: "Speaker 1", stream: "host" }),
-    ev("speaker.updated", { id: "spk_1", displayName: "Nic" }),
-    ...o.lines.map(([id2, text], i) => ev("utterance", { id: id2, stream: "host", startMs: i * 5000, endMs: i * 5000 + 4000, speakerId: "spk_1", speakerName: "Nic", text, tags: [] })),
-    ev("segment.closed", { id: "seg_1", startMs: 0, endMs: 9000, forced: false, final: true, utteranceIds: [] }),
-    ev("claim.flagged", { claimId: "c_1", utteranceId: "u_1", text: "x", priority: 3, s1Version: "s1@1" }),
-    ...(o.ended === false ? [] : [ev("session.ended", { sessionId: id, reason: "end_of_input" })]),
-  ];
-  writeFileSync(join(dir, "events.jsonl"), events.join("\n") + "\n");
-  writeFileSync(join(dir, "jev_calls.jsonl"), JSON.stringify({ kind: "jev_call", cost_usd: o.cost ?? 0.01 }) + "\n");
-  writeFileSync(join(dir, "host.wav"), Buffer.alloc(44 + 32_000 * 90)); // 90 s
-  return dir;
-}
+import { ev, makeSession } from "./fakes/index.ts";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "library-"));
