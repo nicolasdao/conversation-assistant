@@ -6,7 +6,7 @@ The running log for `SPEC.md`. Updated after every phase.
 
 - [x] Phase 0 — Preconditions and PROGRESS.md (2026-09-30)
 - [x] Phase 1 — Tooling, shared fakes, probes, baseline (2026-09-30)
-- [ ] Phase 2 — CLAUDE.md and docs/testing.md
+- [x] Phase 2 — CLAUDE.md and docs/testing.md (2026-09-30)
 - [ ] Phase 3 — `src/audio`, `src/speakers`, `src/transcribe`, `src/pipeline`
 - [ ] Phase 4 — `src/jev`, `src/factcheck`, `src/chat`, budget, config, keys, paths, licenses, version (+ `src/labels`, `src/settings.ts`)
 - [ ] Phase 5 — `src/server`, `src/store`, `src/cli`
@@ -98,6 +98,11 @@ Phase 1:
 - **Playwright:** `npx playwright test --list` exits 1 while there are no tests ("No tests found"); `--pass-with-no-tests` makes it 0. The config loads.
 - `npm i` warned that the install scripts of electron-winstaller, esbuild and fsevents were not run (npm's install-script approval); esbuild still works (`0.28.2`), and they are existing dependencies.
 
+Phase 2:
+
+- `docs/testing.md` covers what exists now (loop, layers, commands, offline rules, fakes, DOM tests, coverage policy, rules). Its E2E web, E2E Electron, Swift and release-gate sections are written in Phases 9–12, as the spec says. `CLAUDE.md` names `npm run test:swift`, which Phase 11 adds.
+- The doc manifest was regenerated with `build-doc-manifest.py`; `--affects tests/foo.test.ts` names `docs/testing.md`.
+
 ## Resume notes
 
-Next: Phase 2 (CLAUDE.md, docs/testing.md, README, doc manifest).
+Next: Phase 3 (inventory 1: `src/audio`, `src/speakers`, `src/transcribe`, `src/pipeline`).

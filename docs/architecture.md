@@ -236,6 +236,6 @@ Validation rejects, among others, `minSegmentMs > maxSegmentMs`, a label set ove
 
 ## Tests
 
-`npm test` runs offline: `tests/setup.ts` replaces `fetch` with a function that throws, and every client takes its `fetch` (or WebSocket) through its constructor so tests pass fakes. The suite covers audio and VAD on the fixture, speakers, transcription, live text, the Jev client's retry rules, the segmenter, the fact-checker loop and gate, the timeline, stats, the capture adapter and Apple Speech (each with a fake helper process), the engine setting and the key gate, the HTTP API, the library, and an end-to-end session with fake services that also checks no API key reaches any file or event. `npm run smoke` and `npm run preflight` are the live checks.
+`npm test` runs every test offline, with fakes for every external service and tmp folders for every file; `npm run test:all` adds coverage thresholds and the end-to-end tests. Every change is test-first: see [Testing](testing.md) for the layers, fakes, commands, and rules. `npm run smoke` and `npm run preflight` are the live checks, never part of a test.
 
 Related: [Setup](setup.md), [Mission](mission.md), [Jev](jev.md), [System 1 and System 2](system1-system2.md), [Transcription](transcription.md), [Speakers](speakers.md), [Recordings](recordings.md), [Chat](chat.md).

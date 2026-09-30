@@ -31,7 +31,7 @@
         "License",
         "Versioning"
       ],
-      "line_count": 250,
+      "line_count": 254,
       "links_to": [
         "CHANGELOG.md",
         "SECURITY.md",
@@ -47,6 +47,7 @@
         "docs/setup.md",
         "docs/speakers.md",
         "docs/system1-system2.md",
+        "docs/testing.md",
         "docs/transcription.md",
         "docs/website.md"
       ],
@@ -89,6 +90,7 @@
         "docs/setup.md",
         "docs/speakers.md",
         "docs/system1-system2.md",
+        "docs/testing.md",
         "docs/transcription.md"
       ],
       "over_size": false,
@@ -256,7 +258,7 @@
         "Jev questions",
         "Test fixture"
       ],
-      "line_count": 111,
+      "line_count": 112,
       "links_to": [
         "docs/architecture.md",
         "docs/desktop.md",
@@ -627,6 +629,61 @@
         "gpt-6-luna",
         "feedback-loop",
         "architecture"
+      ],
+      "toc": {
+        "linked": false,
+        "present": false,
+        "stale": false
+      }
+    },
+    {
+      "dangling": false,
+      "description": "How Tattle is tested, test-first — the TDD loop, the test layers and where each test goes, the commands, the shared fakes, DOM tests under happy-dom, the coverage thresholds and their exclusions, and the rules every test follows (offline, no real user data, no spend).",
+      "has_frontmatter": true,
+      "headings": [
+        "Testing",
+        "The TDD loop",
+        "Layers",
+        "Commands",
+        "Offline, free, and away from real data",
+        "Fakes (`tests/fakes/`)",
+        "Web DOM tests (happy-dom)",
+        "Coverage policy",
+        "Rules for new tests"
+      ],
+      "line_count": 106,
+      "links_to": [
+        "CLAUDE.md",
+        "docs/architecture.md",
+        "docs/gotchas.md",
+        "docs/mission.md"
+      ],
+      "over_size": false,
+      "parse_error": null,
+      "path": "docs/testing.md",
+      "source": [
+        "tests/**",
+        "e2e/**",
+        "vitest.config.ts",
+        "playwright.config.ts",
+        "native/capture/Tests/**",
+        "scripts/swift-coverage.mjs",
+        ".agents/skills/release-tattle/scripts/test-suite.sh"
+      ],
+      "source_unresolved": [
+        "e2e/**",
+        "native/capture/Tests/**",
+        "scripts/swift-coverage.mjs",
+        ".agents/skills/release-tattle/scripts/test-suite.sh"
+      ],
+      "tags": [
+        "testing",
+        "tdd",
+        "vitest",
+        "coverage",
+        "playwright",
+        "e2e",
+        "swift"
       ],
       "toc": {
         "linked": false,

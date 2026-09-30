@@ -85,6 +85,9 @@ On macOS 26+ with `tattle-transcribe` built, the page asks for no key: it transc
 | Script | Does |
 | --- | --- |
 | `npm test` / `npm run typecheck` | Offline tests (no network) and type checks |
+| `npm run test:coverage` | The same tests with coverage; fails below the thresholds in `vitest.config.ts` (see [Testing](docs/testing.md)) |
+| `npm run test:e2e` | End-to-end tests of the web page and the Mac app with Playwright (offline) |
+| `npm run test:all` | Everything: type checks, coverage, and the end-to-end tests |
 | `npm run models` | Downloads the local models |
 | `npm run fixtures` | Builds `fixtures/conversation/{host,remote}.wav` and `script.json` with macOS `say` |
 | `npm run smoke` | Live checks of transcription, Jev, and System 2 (measured at about $0.05); streaming text is not checked |
@@ -124,6 +127,7 @@ Expect about $1.60 per hour of show with OpenAI transcription: roughly $1.00 str
 - [Setup and API keys](docs/setup.md) — The two API keys (OpenAI and OpenRouter), both optional — which one the transcription engine requires, the first-run setup screen (OpenAI only, on Macs that transcribe with OpenAI), the prompts that ask for the OpenRouter key when fact-checking, labels, or Chat need it, where keys are stored on the Mac, how each key is checked before it is saved, the setup routes and their gate, and how the command-line tools find the keys.
 - [Speakers](docs/speakers.md) — How each utterance gets a speaker from local voice embeddings, voices tied to a stream with a per-stream limit, the 0.65 threshold, merge suggestions with confidence, and how to rename, merge, and calibrate.
 - [System 1 and System 2](docs/system1-system2.md) — The fact-checker's System 1 / System 2 architecture — Jev flags claims on every utterance, GPT-6 Luna researches them and audits for misses, and verdicts drive memory questions and gated rewrites that improve System 1 — with every rule, threshold, prompt, and schema.
+- [Testing](docs/testing.md) — How Tattle is tested, test-first — the TDD loop, the test layers and where each test goes, the commands, the shared fakes, DOM tests under happy-dom, the coverage thresholds and their exclusions, and the rules every test follows (offline, no real user data, no spend).
 - [Transcription](docs/transcription.md) — How speech becomes text, with two engines — Apple Speech on this Mac (the default on macOS 26+, free, nothing leaves the Mac), with one clip per utterance and live text from stream analyzers, or OpenAI's gpt-transcribe and gpt-live-transcribe — how the engine is chosen and saved, the tattle-transcribe helper, costs, and configuration.
 - [Website](docs/website.md) — Tattle's website, hey-tattle.com — what the page contains, how it is hosted on Cloudflare as a static Worker, how pushes to master redeploy it, the domain and redirect, the security headers, and how to preview, deploy, and change it safely.
 <!-- END doc-index -->
