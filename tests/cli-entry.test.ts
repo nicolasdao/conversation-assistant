@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -50,5 +50,35 @@ describe("the command-line tools run from a path with spaces", () => {
     const r = run("src/server/main.ts", ["--bogus"]);
     expect(r.stderr).toMatch(/Unknown option '--bogus'/);
     expect(r.status).toBe(1);
+  });
+});
+
+describe("npm run serve, as a child process with an isolated home and no keys", () => {
+  test("says what is missing, refuses a replay without the keys, stays up, and exits 0 on SIGTERM", async () => {
+    // its own working folder: the config it reads, and a recordings folder that is not the repository's
+    const cwd = join(tmp, "serve-cwd");
+    mkdirSync(cwd);
+    symlinkSync(join(ROOT, "config"), join(cwd, "config"));
+    symlinkSync(join(ROOT, "node_modules"), join(cwd, "node_modules"));
+    const env: NodeJS.ProcessEnv = {
+      ...process.env, HOME: tmp, TATTLE_CREDENTIALS: join(tmp, "credentials.json"), TATTLE_SETTINGS: join(tmp, "settings.json"),
+      TATTLE_FORCE_NO_APPLE_SPEECH: "1", TATTLE_LABEL_SETS: join(tmp, "labels"),
+    };
+    delete env.OPENAI_API_KEY;
+    delete env.OPENROUTER_API_KEY;
+    const child = spawn(process.execPath, ["--import", "tsx", join(ROOT, "src/server/main.ts"), "--port", "0", "--replay", "fixtures/conversation"], { cwd, env });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (c) => (out += c));
+    child.stderr.on("data", (c) => (err += c));
+    const exited = new Promise<number | null>((r) => child.on("exit", (code) => r(code)));
+    for (let i = 0; i < 900 && !(out.includes("API key missing") && err.includes("--replay needs")); i++) await new Promise((r) => setTimeout(r, 100));
+    expect(out).toContain("Tattle on http://127.0.0.1:0 (transcription: OpenAI)");
+    expect(out).toContain("API key missing (openai): open the page above to add it");
+    expect(err).toContain("--replay needs openai and openrouter (fact-checking and labels run)");
+    expect(child.exitCode).toBeNull(); // still serving
+    child.kill("SIGTERM");
+    expect(await exited).toBe(0);
+    expect(existsSync(join(cwd, "sessions"))).toBe(false); // nothing was recorded
   });
 });
