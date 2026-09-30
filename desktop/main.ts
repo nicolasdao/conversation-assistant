@@ -1,6 +1,6 @@
 // The Mac app (see docs/desktop.md). The engine runs in this process, the one `npm run serve` starts, and the window
 // loads the same web page from the private app:// scheme, answered in-process: no server, no port.
-import { app, BrowserWindow, dialog, ipcMain, Menu, powerSaveBlocker, protocol, session, shell, systemPreferences } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, powerSaveBlocker, protocol, session, shell, systemPreferences } from "electron";
 import electronUpdater, { type UpdateInfo } from "electron-updater";
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
@@ -144,10 +144,22 @@ ipcMain.on("desktop:run", (e, request: unknown) => {
   else if (request === "show-license-files") void shell.openPath(licensesDir());
 });
 
+/**
+ * An SF Symbol for a menu item of our own. macOS 26 draws a symbol beside the standard items (About, Hide, Quit) but
+ * not beside ours, which then sit out of line with them; made once, since the menu is rebuilt during a download.
+ */
+const symbols = new Map<string, Electron.NativeImage>();
+function symbol(name: string): Electron.NativeImage {
+  let image = symbols.get(name);
+  if (!image) symbols.set(name, image = nativeImage.createMenuSymbol(name));
+  return image;
+}
+
 function updateItem(): Electron.MenuItemConstructorOptions {
-  if (update.kind === "checking") return { label: "Checking for Updates…", enabled: false };
-  if (update.kind === "downloading") return { label: `Downloading ${update.version}… ${update.percent}%`, enabled: false };
-  return { label: "Check for Updates…", click: () => void checkForUpdatesNow() };
+  const icon = symbol("arrow.triangle.2.circlepath");
+  if (update.kind === "checking") return { label: "Checking for Updates…", icon, enabled: false };
+  if (update.kind === "downloading") return { label: `Downloading ${update.version}… ${update.percent}%`, icon: symbol("arrow.down.circle"), enabled: false };
+  return { label: "Check for Updates…", icon, click: () => void checkForUpdatesNow() };
 }
 
 /** The menu bar; rebuilt when the update item changes. */
@@ -159,7 +171,7 @@ function menu() {
         { role: "about" },
         updateItem(),
         { type: "separator" },
-        { label: "Settings…", accelerator: "CommandOrControl+,", click: () => sendCommand("keys") },
+        { label: "Settings…", icon: symbol("gearshape"), accelerator: "CommandOrControl+,", click: () => sendCommand("keys") },
         { type: "separator" },
         { role: "services" },
         { type: "separator" },
@@ -173,7 +185,7 @@ function menu() {
     {
       label: "File",
       submenu: [
-        { label: "Show Recordings in Finder", click: () => void shell.openPath(appPaths().sessions) },
+        { label: "Show Recordings in Finder", icon: symbol("folder"), click: () => void shell.openPath(appPaths().sessions) },
         { type: "separator" },
         { role: "close" },
       ],
@@ -184,9 +196,9 @@ function menu() {
     {
       role: "help",
       submenu: [
-        { label: "Tattle on GitHub", click: () => void shell.openExternal(REPO) },
+        { label: "Tattle on GitHub", icon: symbol("globe"), click: () => void shell.openExternal(REPO) },
         { type: "separator" },
-        { label: "Licenses and Acknowledgements", click: () => openLicenses() },
+        { label: "Licenses and Acknowledgements", icon: symbol("doc.text"), click: () => openLicenses() },
       ],
     },
   ]));

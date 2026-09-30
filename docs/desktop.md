@@ -92,6 +92,8 @@ Since 28 September 2026 the app menu is the app's own, as in a native Mac app, n
 | Edit, View, Window | The standard ones |
 | Help | **Tattle on GitHub**, **Licenses and Acknowledgements** (below) |
 
+macOS 26 draws an SF Symbol beside the standard items (About, Services, Hide, Quit) but not beside an app's own, which then sit out of line with them. Since 30 September 2026 **Settings…** carries `gearshape` and **Check for Updates…** `arrow.triangle.2.circlepath` (`arrow.down.circle` while downloading), **Show Recordings in Finder** `folder`, **Tattle on GitHub** `globe`, and **Licenses and Acknowledgements** `doc.text`, through Electron's `nativeImage.createMenuSymbol`. A misspelt symbol name gives an empty image and no icon, not an error.
+
 **Settings…** opens the API keys window ([Setup](setup.md)), the page's `?panel=keys`. The app's own windows (Recordings, Insights, Speakers, Labels) stay in the page's settings cog, not in the menu bar: the menu bar holds what is about the app (its version, updates, the API keys, the licenses), and the cog what is about the show, one click away in the window shared on air. So in the Mac app the cog leaves out what the menu bar has: API keys, the footer's version and Licenses link, and the Replay-a-folder button (see [Architecture](architecture.md#web-front-end--web)). In a browser (`npm run serve`), which has no menu bar, the cog keeps them all.
 
 ### The bridge to the page — `desktop/preload.ts`, `web/src/desktop.ts`
