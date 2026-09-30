@@ -16,7 +16,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   const text = await res.text();
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-  if (!res.ok) throw new ApiError(res.status, json?.error ?? text ?? res.statusText, json && typeof json === "object" ? json : null);
+  // an empty body must still say something: the message is what the toast shows
+  if (!res.ok) throw new ApiError(res.status, json?.error ?? (text || `${res.status} ${res.statusText}`.trim()), json && typeof json === "object" ? json : null);
   return json as T;
 }
 
