@@ -53,3 +53,60 @@ export function snapshot(session: Record<string, unknown> = {}, set: LabelSet | 
     labels: { set, stories: [], version: "v1" },
   };
 }
+
+/**
+ * Records the listeners page code adds to `document` and `window` from now on, and returns a function that removes
+ * them (and stops recording), so a module imported fresh per test leaves no old handler reacting to the next test.
+ */
+export function trackDocumentListeners(): () => void {
+  const added: [EventTarget, string, EventListenerOrEventListenerObject][] = [];
+  const restores: (() => void)[] = [];
+  for (const target of [document, window] as EventTarget[]) {
+    const orig = target.addEventListener;
+    target.addEventListener = function (this: EventTarget, type: string, fn: EventListenerOrEventListenerObject | null, o?: boolean | AddEventListenerOptions) {
+      if (fn) added.push([target, type, fn]);
+      return orig.call(this, type, fn, o);
+    } as typeof target.addEventListener;
+    restores.push(() => { target.addEventListener = orig; });
+  }
+  return () => {
+    for (const r of restores) r();
+    for (const [target, type, fn] of added) target.removeEventListener(type, fn);
+  };
+}
+
+/** GET /api/setup's answer with the OpenRouter key set or not. */
+export function setupWith(openrouter: boolean) {
+  return {
+    configured: true, required: [], path: "/tmp/credentials.json",
+    keys: [
+      { name: "openai", env: "OPENAI_API_KEY", set: false, source: null, hint: null },
+      { name: "openrouter", env: "OPENROUTER_API_KEY", set: openrouter, source: openrouter ? "file" : null, hint: openrouter ? "abcd" : null },
+    ],
+  };
+}
+
+/** GET /api/transcription's answer. */
+export function transcriptionWith(engine: "apple" | "openai", model: "missing" | "installing" | "installed" | "error" = "installed", o: { fraction?: number; error?: string } = {}) {
+  return {
+    engine, saved: engine,
+    apple: { available: true, reason: null, model, fraction: o.fraction ?? null, error: o.error ?? null },
+    openai: { keySet: false },
+  };
+}
+
+/** A label-set library entry (GET /api/label-sets). */
+export function setEntry(id: string, o: { name?: string; builtIn?: boolean; perHourUsd?: number; broken?: string } = {}) {
+  return {
+    id, name: o.name ?? id, description: "", builtIn: !!o.builtIn, perHourUsd: o.perHourUsd,
+    counts: { categories: 1, scores: 0, markers: 0 }, ...(o.broken ? { broken: o.broken } : {}),
+  };
+}
+
+/** A recording in the library (GET /api/sessions). */
+export function recording(id: string, o: Record<string, unknown> = {}) {
+  return {
+    id, name: null, notes: null, mode: "live", startedAt: null, durationMs: 65_000, ended: true,
+    utterances: 12, speakers: ["Ann", "Bob"], segments: 3, claims: 0, costUsd: 0.5, ...o,
+  };
+}
