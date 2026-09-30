@@ -430,7 +430,8 @@ describe("export and import, case by case", () => {
     expect(second.id).toBe("20260925-120000-2");
   });
 
-  test.fails("BUG §11.5: an exported recording does not carry the exporter's home folder", async () => {
+  // the session.started event names the folder it was recorded in, which in the Mac app is under the home folder (§11.5)
+  test("an exported recording does not carry the exporter's home folder", async () => {
     const root = tmpDir("src-");
     const dir = recording(root);
     const home = "/Users/private-person/Library/Application Support/Tattle/sessions/20260925-120000";

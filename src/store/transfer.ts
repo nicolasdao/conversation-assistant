@@ -104,7 +104,7 @@ export async function exportRecording(
     for (const f of [...DATA_FILES, ...(opts.chats ? ["chats.jsonl"] : [])]) {
       const p = join(dir, f);
       if (!existsSync(p)) continue;
-      entries.push({ name: `data/${f}`, data: await readFile(p) });
+      entries.push({ name: `data/${f}`, data: f === "events.jsonl" ? withoutFolder(await readFile(p, "utf8")) : await readFile(p) });
       files.push(`data/${f}`);
     }
     const streams: Manifest["audio"]["streams"] = [];
@@ -147,6 +147,19 @@ export async function exportRecording(
   } finally {
     await rm(work, { recursive: true, force: true });
   }
+}
+
+/**
+ * The events without the folder the recording was made in: in the Mac app it is under the exporter's home folder,
+ * which names them, and the importer's own folder is filled in when the recording is opened (SessionLibrary.events).
+ */
+function withoutFolder(events: string): Buffer {
+  return Buffer.from(events.split("\n").map((line) => {
+    if (!line.includes('"dir":')) return line;
+    const e = JSON.parse(line);
+    if (e?.data && typeof e.data === "object") delete e.data.dir;
+    return JSON.stringify(e);
+  }).join("\n"));
 }
 
 /** Rewrites a WAV (afconvert's has extra chunks) as the app's own: a 44-byte header, 16 kHz mono PCM16, `samples` long. */

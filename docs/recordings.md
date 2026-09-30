@@ -73,7 +73,7 @@ Inside:
 | Entry | Holds |
 | --- | --- |
 | `manifest.json` (first) | `format: "tattle-recording"` (`"conversation-assistant-recording"` and `"podcast-assistant-recording"`, from the app's earlier names, still import), `formatVersion` (1), `app` (name and version that **exported** it), `exportedAt`; `recording` (`id`, `name`, `startedAt`, `durationMs`, `mode`, `recordedWith`: the version that **recorded** it, from `session.json`, or null before 0.3.0); `audio` (`choice`, `format`, `bitrate`, and each stream's sample count); `chats`; `files` |
-| `data/*` | The session's files, deflated: `session.json`, `meta.json`, `speakers.json`, every JSONL file; `chats.jsonl` only when chosen |
+| `data/*` | The session's files, deflated: `session.json`, `meta.json`, `speakers.json`, every JSONL file; `chats.jsonl` only when chosen. `events.jsonl` leaves out the folder the recording was made in (`dir`: in the Mac app it is under the home folder, which names the user); opening the recording fills in the importer's own |
 | `audio/host.m4a`, `audio/remote.m4a` | Compressed audio (the default), stored |
 | `audio/host.wav`, `audio/remote.wav` | Or the original WAVs, stored |
 
