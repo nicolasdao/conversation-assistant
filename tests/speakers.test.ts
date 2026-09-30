@@ -44,6 +44,15 @@ describe("speaker registry", () => {
     expect(consistent / pairs.length).toBeGreaterThanOrEqual(0.95);
   });
 
+  test("Embedder.embed returns a Float32Array of length dim, the same for the same clip", async () => {
+    const clip = (await fixtureUtterances()).find((u) => u.samples.length >= 2 * 16_000)!.samples;
+    const a = embedder.embed(clip);
+    expect(a).toBeInstanceOf(Float32Array);
+    expect(a.length).toBe(embedder.dim);
+    expect(embedder.dim).toBeGreaterThan(0);
+    expect([...embedder.embed(clip)]).toEqual([...a]);
+  });
+
   test("short utterances take the stream's last speaker, marked inferred", () => {
     const reg = new SpeakerRegistry(cfg.app.speakers, embedder);
     const first = reg.assignEmbedding("remote", null);
